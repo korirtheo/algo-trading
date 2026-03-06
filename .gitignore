@@ -205,7 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-<<<<<<< HEAD
 
 # ============================================
 # Project-specific ignores
@@ -213,6 +212,8 @@ __marimo__/
 
 # Downloaded market data (large CSVs + JSON, re-downloadable)
 stored_data*/
+stored_data_jan_mar_2024/
+stored_data_combined/
 
 # Generated charts (re-generable from backtest)
 charts/
@@ -234,5 +235,3 @@ optuna_output.txt
 
 # Claude Code
 .claude/
-=======
->>>>>>> 437b43a079e76cb966a94c4d7a1f1aa6dc5ba09a
