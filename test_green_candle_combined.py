@@ -1,16 +1,25 @@
 """
-Combined Green Candle Strategy Backtest (H + G + A + F + P on shared balance)
-=============================================================================
+Combined Green Candle Strategy Backtest (H+G+A+F+D+V+M+R+P+W on shared balance)
+=================================================================================
 Strategy H: Gap>=35% + body>=4% + 2nd green + new hi + vol confirm -> +16% target, 15m
 Strategy G: Gap>=30% + 2nd green + new hi       -> +11% target, 10m time stop
 Strategy A: Gap>=15% + body>=4% + 2nd green + new hi -> +6% target, 12m time stop
 Strategy F: Gap>=10% + 2nd green                 -> +8% target, 3m time stop (catch-all)
+Strategy D: Gap>=10% + opening spike + dip + 5-candle high -> partial +12%, runner +18%
+            Trailing stop 2% (activates at +2%), hard stop -9%, 30m time limit
+Strategy M: Gap>=20% + morning spike + midday consolidation + breakout -> partial +6%
+            Trailing stop 4% (activates at +5%), hard stop -10%, 120m time limit
+Strategy V: Gap>=24% + below VWAP 4+ candles + reclaim with volume -> partial +9%, runner +17%
+            Trailing stop 2% (activates at +2%), hard stop -10%, 100m time limit
+Strategy R: Day 1 gap>=100%, Day 2 pullback+bounce above D1 close -> +19% target
+            Trailing stop 4% (activates at +8%), hard stop -10%, 180m time limit
 Strategy P: Gap>=10% + PM high breakout + pullback + bounce -> partial +9%, runner +13%
             Trailing stop 2% (activates at +2%), hard stop -12%, 40m time limit
-            (fallback: only fires when H/G/A/F don't classify the stock)
+Strategy W: Gap>=8% + morning run + consolidation + power hour breakout -> +6% target
+            Trailing stop 1% (activates at +3.5%), hard stop -3.5%, EOD exit
 
-Priority: H > G > A > F > P (highest conviction first).
-All strategies share the same $25K cash pool, MAX_POSITIONS=1.
+Priority: H > G > A > F > D > V > M > R > P > W (highest conviction first).
+Single shared cash balance, no position limits. Full balance sizing per trade.
 No SPY regime filter.
 
 Usage:
@@ -22,6 +31,7 @@ import os
 import sys
 import math
 import numpy as np
+import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -29,13 +39,13 @@ import matplotlib.dates as mdates
 from zoneinfo import ZoneInfo
 from datetime import datetime
 
+import json
+
 from test_full import (
     load_all_picks,
     _is_warrant_or_unit,
-    _get_trade_pct,
     SLIPPAGE_PCT,
     STARTING_CASH,
-    TRADE_PCT,
     TOP_N,
     MARGIN_THRESHOLD,
     VOL_CAP_PCT,
@@ -47,59 +57,236 @@ if hasattr(_sys.stdout, 'buffer'):
     _sys.stdout = io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8",
                                     errors="replace", line_buffering=True)
 
+# --- FLOAT DATA (for strategy L) ---
+FLOAT_DATA = {}
+_float_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "float_data.json")
+if os.path.exists(_float_path):
+    with open(_float_path) as _f:
+        _raw = json.load(_f)
+    for _tk, _v in _raw.items():
+        if isinstance(_v, dict) and _v.get("floatShares"):
+            FLOAT_DATA[_tk] = _v["floatShares"]
+
 # --- STRATEGY H CONFIG: High Conviction (filtered G) ---
-H_MIN_GAP_PCT = 35.0             # Optuna v2: tightened from 25%
-H_MIN_BODY_PCT = 4.0             # Optuna v2: loosened from 5%
-H_REQUIRE_VOL_CONFIRM = True     # c2 volume > c1 volume
-H_TARGET_PCT = 16.0              # Optuna v2: raised from 12%
+H_MIN_GAP_PCT = 35.0
+H_MIN_BODY_PCT = 4.0
+H_REQUIRE_VOL_CONFIRM = True
+H_TARGET_PCT = 16.0
 H_TIME_LIMIT_MINUTES = 15
+H_STOP_PCT = 0.0                 # 0 = no hard stop (legacy behavior)
+H_TRAIL_PCT = 0.0                # 0 = no trailing stop
+H_TRAIL_ACTIVATE_PCT = 0.0
 
 # --- STRATEGY G CONFIG: Big Gap Runner ---
-G_MIN_GAP_PCT = 30.0             # Optuna v2: tightened from 25%
-G_MIN_BODY_PCT = 0.0             # No body filter
+G_MIN_GAP_PCT = 30.0
+G_MIN_BODY_PCT = 0.0
 G_REQUIRE_2ND_GREEN = True
 G_REQUIRE_2ND_NEW_HIGH = True
-G_TARGET_PCT = 11.0              # Optuna v2: raised from 8%
-G_TIME_LIMIT_MINUTES = 10        # Optuna v2: cut from 20m
+G_TARGET_PCT = 11.0
+G_TIME_LIMIT_MINUTES = 10
+G_STOP_PCT = 0.0
+G_TRAIL_PCT = 0.0
+G_TRAIL_ACTIVATE_PCT = 0.0
 
 # --- STRATEGY A CONFIG: Quick Scalp ---
-A_MIN_GAP_PCT = 15.0             # Unchanged
-A_MIN_BODY_PCT = 4.0             # Optuna v2: added body filter
+A_MIN_GAP_PCT = 15.0
+A_MIN_BODY_PCT = 4.0
 A_MAX_BODY_PCT = 999
 A_REQUIRE_2ND_GREEN = True
 A_REQUIRE_2ND_NEW_HIGH = True
-A_TARGET_PCT = 6.0               # Optuna v2: raised from 3%
-A_TIME_LIMIT_MINUTES = 12        # Optuna v2: raised from 10m
+A_TARGET_PCT = 6.0
+A_TIME_LIMIT_MINUTES = 12
+A_STOP_PCT = 0.0
+A_TRAIL_PCT = 0.0
+A_TRAIL_ACTIVATE_PCT = 0.0
 
 # --- STRATEGY F CONFIG: Catch-All ---
-F_MIN_GAP_PCT = 10.0             # Unchanged
-F_MIN_BODY_PCT = 0.0             # No body filter
+F_MIN_GAP_PCT = 10.0
+F_MIN_BODY_PCT = 0.0
 F_REQUIRE_2ND_GREEN = True
 F_REQUIRE_2ND_NEW_HIGH = False
-F_TARGET_PCT = 8.0               # Optuna v2: lowered from 10%
-F_TIME_LIMIT_MINUTES = 3         # Unchanged
+F_TARGET_PCT = 8.0
+F_TIME_LIMIT_MINUTES = 3
+F_STOP_PCT = 0.0
+F_TRAIL_PCT = 0.0
+F_TRAIL_ACTIVATE_PCT = 0.0
 
-# --- STRATEGY P CONFIG: PM High Breakout + Pullback + Bounce (Optuna v2) ---
+# --- STRATEGY D CONFIG: Opening Dip Buy (Optuna v2 optimized) ---
+# Fallback: fires when H/G/A/F don't classify, alongside P but fires earlier
+D_MIN_GAP_PCT = 30.0             # Optuna v2: raised from 10%
+D_MIN_SPIKE_PCT = 10.0           # Optuna v2: raised from 6%
+D_SPIKE_WINDOW = 20              # Optuna v2: widened from 5
+D_DIP_PCT = 6.0                  # Optuna v2: tightened from 8%
+D_ENTRY_MODE = "5candle"         # "5candle" or "vwap"
+D_MAX_ENTRY_CANDLE = 45          # Optuna v2: widened from 15
+D_TARGET1_PCT = 12.0             # Target (no partial sell)
+D_TARGET2_PCT = 12.0             # Same as target1 (partial_sell=0)
+D_STOP_PCT = 9.0                 # Hard stop per entry
+D_TIME_LIMIT_MINUTES = 70        # Optuna v2: widened from 30
+D_PARTIAL_SELL_PCT = 0.0         # Optuna v2: no partial sell — trail only
+D_TRAIL_PCT = 2.0                # Fixed trailing stop %
+D_TRAIL_ACTIVATE_PCT = 2.0       # Start trailing after +2% unrealized
+
+# --- STRATEGY M CONFIG: Midday Range Break (DISABLED by Optuna v2) ---
+# Morning spike → midday consolidation → afternoon breakout
+M_MIN_GAP_PCT = 9999.0           # DISABLED: set gap to 9999
+M_MORNING_SPIKE_PCT = 8.0        # Morning high >= 8% above open
+M_MORNING_CANDLES = 40           # Check spike in first 40 candles
+M_RANGE_START_CANDLE = 55        # Consolidation starts at candle 55
+M_CONSOLIDATION_LEN = 40         # Consolidation lasts 40 candles (ends c95)
+M_MAX_RANGE_PCT = 7.0            # Consolidation range <= 7%
+M_VOL_RATIO = 0.5                # Consolidation vol <= 0.5x morning vol
+M_MAX_ENTRY_CANDLE = 150         # Must enter by candle 150
+M_TARGET1_PCT = 6.0              # Partial target: sell 50% here
+M_STOP_PCT = 10.0                # Hard stop per entry
+M_TIME_LIMIT_MINUTES = 120       # 60 candles * 2 min
+M_PARTIAL_SELL_PCT = 50.0        # Sell 50% at target1
+M_TRAIL_PCT = 4.0                # Trailing stop %
+M_TRAIL_ACTIVATE_PCT = 5.0       # Start trailing after +5% unrealized
+
+# --- STRATEGY V CONFIG: VWAP Reclaim (Optuna v2 optimized) ---
+# Gap-up sells off below VWAP, then reclaims with volume -> buy the reclaim
+V_MIN_GAP_PCT = 14.0             # Optuna v2: lowered from 24%
+V_MIN_BELOW_CANDLES = 7          # Optuna v2: raised from 4
+V_MIN_BELOW_PCT = 1.0            # Must dip at least 1% below VWAP
+V_VOL_SPIKE_RATIO = 3.5          # Optuna v2: raised from 1.0
+V_MAX_ENTRY_CANDLE = 60          # Optuna v2: lowered from 80
+V_TARGET1_PCT = 3.0              # Optuna v2: lowered from 9%
+V_TARGET2_PCT = 19.0             # Optuna v2: raised from 17%
+V_STOP_PCT = 9.0                 # Optuna v2: lowered from 10%
+V_TIME_LIMIT_MINUTES = 100       # 50 candles * 2 min
+V_PARTIAL_SELL_PCT = 25.0        # Sell 25% at target1
+V_TRAIL_PCT = 3.0                # Optuna v2: raised from 2%
+V_TRAIL_ACTIVATE_PCT = 5.0       # Optuna v2: raised from 2%
+
+# --- STRATEGY R CONFIG: Multi-Day Runner (DISABLED) ---
+# Day 1: massive gap-up. Day 2: pullback then bounce continuation.
+R_DAY1_MIN_GAP = 9999.0          # DISABLED
+R_D2_PULLBACK_PCT = 10.0         # Optuna v2: raised from 3%
+R_PULLBACK_WINDOW = 30           # Pullback within first 30 candles
+R_BOUNCE_REF = "d2_open"         # Optuna v2: changed from d1_close
+R_MAX_ENTRY_CANDLE = 55          # Optuna v2: raised from 20
+R_TARGET1_PCT = 9.0              # Optuna v2: lowered from 19%
+R_STOP_PCT = 9.0                 # Optuna v2: lowered from 10%
+R_TRAIL_PCT = 6.0                # Optuna v2: raised from 4%
+R_TRAIL_ACTIVATE_PCT = 6.0       # Optuna v2: lowered from 8%
+R_TIME_LIMIT_MINUTES = 100       # Optuna v2: reduced from 180
+
+# --- STRATEGY P CONFIG: PM High Breakout + Pullback + Bounce (Optuna v2 optimized) ---
 # Only fires when H/G/A/F did not classify the stock (fallback)
-# Advanced exits: trailing stop + partial selling
-P_MIN_GAP_PCT = 10.0            # Optuna v2: widened from 15%
-P_CONFIRM_ABOVE = 4             # Optuna v2: tightened from 3
-P_CONFIRM_WINDOW = 6            # Optuna v2: widened from 5
-P_PULLBACK_PCT = 7.0            # Optuna v2: widened from 5.5%
-P_PULLBACK_TIMEOUT = 30         # Optuna v2: widened from 20
-P_MAX_ENTRY_CANDLE = 75         # Optuna v2: reduced from 90
-P_TARGET1_PCT = 9.0             # Partial target: sell 25% here
-P_TARGET2_PCT = 13.0            # Runner target: sell remaining here
-P_STOP_PCT = 12.0               # Optuna v2: widened from 10%
-P_TIME_LIMIT_MINUTES = 40       # Optuna v2: reduced from 50
-P_PARTIAL_SELL_PCT = 25.0       # Sell 25% of position at target1
+# Advanced exits: trailing stop (no partial sell — full trail)
+P_MIN_GAP_PCT = 10.0            # Minimum gap
+P_CONFIRM_ABOVE = 3             # Optuna v2: 3 candles above PM high
+P_CONFIRM_WINDOW = 3            # Optuna v2: 3 candle window
+P_PULLBACK_PCT = 9.0            # Optuna v2: widened from 7%
+P_PULLBACK_TIMEOUT = 10         # Optuna v2: tightened from 30
+P_MAX_ENTRY_CANDLE = 105        # Optuna v2: raised from 75
+P_TARGET1_PCT = 15.0            # Optuna v2: raised from 9%
+P_TARGET2_PCT = 15.0            # Same as target1 (partial_sell=0)
+P_STOP_PCT = 12.0               # Hard stop
+P_TIME_LIMIT_MINUTES = 180      # Optuna v2: raised from 40
+P_PARTIAL_SELL_PCT = 0.0        # Optuna v2: no partial sell — trail only
 P_TRAIL_PCT = 2.0               # Fixed trailing stop %
 P_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing after +2% unrealized
 
+# --- STRATEGY W CONFIG: Power Hour Breakout (DISABLED) ---
+# Gap-up + morning run + all-day consolidation + 3 PM+ volume breakout
+W_MIN_GAP_PCT = 9999.0           # DISABLED
+W_MIN_MORNING_RUN = 4.0          # Optuna v2: raised from 3%
+W_CONSOL_START = 35              # Optuna v2: earlier start
+W_MAX_RANGE_PCT = 10.0           # Optuna v2: tightened from 16%
+W_MAX_VWAP_DEV_PCT = 5.0         # Optuna v2: tightened from 11%
+W_EARLIEST_CANDLE = 165          # Optuna v2: later start
+W_LATEST_CANDLE = 190            # Optuna v2: later end
+W_VOL_SURGE_MULT = 2.0           # Optuna v2: lowered from 3x
+W_VOL_VS_MORNING_MULT = 0.1      # Breakout vol >= 0.1x morning spike vol
+W_MAX_HOD_BREAKS = 3             # Max HOD breaks before entry window
+W_REQUIRE_ABOVE_VWAP = True      # Must be above VWAP at breakout
+W_TARGET_PCT = 8.0               # Optuna v2: raised from 6%
+W_STOP_PCT = 3.0                 # Optuna v2: tightened from 3.5%
+W_TRAIL_PCT = 2.5                # Optuna v2: raised from 1%
+W_TRAIL_ACTIVATE_PCT = 2.0       # Optuna v2: lowered from 3.5%
+
+# --- STRATEGY L CONFIG: Low Float Squeeze (optimized trial #486) ---
+L_MAX_FLOAT = 15_000_000        # Float shares threshold
+L_MIN_GAP_PCT = 30.0            # Minimum gap %
+L_EARLIEST_CANDLE = 8           # Don't enter too early
+L_LATEST_CANDLE = 115           # Latest possible entry candle
+L_HOD_BREAK_REQUIRED = True     # Must break to new HOD for entry
+L_VOL_SURGE_MULT = 1.5          # Current candle vol >= Nx avg of last 10
+L_MIN_PRICE_ACCEL_PCT = 1.0     # Min green candle body % for entry candle
+L_REQUIRE_ABOVE_VWAP = True     # Must be above VWAP at entry
+# Float-tiered targets
+L_TIER1_FLOAT = 1_000_000       # Ultra-low float boundary
+L_TIER2_FLOAT = 5_000_000       # Low float boundary
+L_TIER1_TARGET1_PCT = 30.0
+L_TIER1_TARGET2_PCT = 40.0
+L_TIER2_TARGET1_PCT = 15.0
+L_TIER2_TARGET2_PCT = 40.0
+L_TIER3_TARGET1_PCT = 9.0
+L_TIER3_TARGET2_PCT = 32.0
+L_STOP_PCT = 14.0               # Hard stop (wide for low float volatility)
+L_PARTIAL_SELL_PCT = 0.0        # No partial sell
+L_TRAIL_PCT = 1.0               # Tight trailing stop %
+L_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing early at +2%
+L_TIME_LIMIT_MINUTES = 70       # Time limit in minutes
+
 # --- SHARED CONFIG ---
 EOD_EXIT_MINUTES = 15
-MAX_POSITIONS = 1               # 100% of balance per trade
-FULL_BALANCE_SIZING = True      # Use full cash for each trade
+FULL_BALANCE_SIZING = True      # Use full balance for each trade
+
+# Strategy priority (lower = higher priority; Optuna can override)
+STRAT_PRIORITY = {"H": 0, "G": 1, "A": 2, "F": 3, "D": 4, "V": 5, "P": 6, "L": 7}
+
+
+
+def _load_r_intraday(ticker, target_date, data_dirs):
+    """Load intraday CSV for a ticker and filter to target_date market hours."""
+    for d in data_dirs:
+        csv_path = os.path.join(d, "intraday", f"{ticker}.csv")
+        if not os.path.exists(csv_path):
+            continue
+        try:
+            df = pd.read_csv(csv_path, index_col=0, parse_dates=True)
+            if df.empty:
+                continue
+            if df.index.tz is not None:
+                df.index = df.index.tz_localize(None)
+            day_data = df[df.index.date == pd.Timestamp(target_date).date()]
+            if len(day_data) < 20:
+                continue
+            day_data = day_data.between_time("09:30", "15:58")
+            if len(day_data) < 20:
+                continue
+            # Re-localize to UTC for consistency with other picks
+            day_data.index = day_data.index.tz_localize("America/New_York").tz_convert("UTC")
+            return day_data
+        except Exception:
+            continue
+    return None
+
+
+def _compute_vwap(mh):
+    """Compute cumulative VWAP from market-hour candle DataFrame."""
+    h = mh["High"].values.astype(float)
+    l = mh["Low"].values.astype(float)
+    c = mh["Close"].values.astype(float)
+    v = mh["Volume"].values.astype(float)
+    typical = (h + l + c) / 3.0
+    cum_tp_vol = np.cumsum(typical * v)
+    cum_vol = np.cumsum(v)
+    cum_vol[cum_vol == 0] = 1e-9
+    return cum_tp_vol / cum_vol
+
+
+def _get_tiered_targets(float_shares):
+    """Return (target1_pct, target2_pct) based on float size."""
+    if float_shares < L_TIER1_FLOAT:
+        return L_TIER1_TARGET1_PCT, L_TIER1_TARGET2_PCT
+    elif float_shares < L_TIER2_FLOAT:
+        return L_TIER2_TARGET1_PCT, L_TIER2_TARGET2_PCT
+    else:
+        return L_TIER3_TARGET1_PCT, L_TIER3_TARGET2_PCT
 
 
 def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_confirm=False):
@@ -132,18 +319,20 @@ def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_conf
     return None
 
 
-def simulate_day_combined(picks, starting_cash, cash_account=False):
-    """Simulate combined A+G+F strategy for one day on shared capital."""
-    cash = starting_cash
-    unsettled = 0.0
-    trade_pct = _get_trade_pct(starting_cash)
+def simulate_day_combined(picks, cash, cash_account=False):
+    """Simulate combined strategy for one day with single cash pool.
+    cash: float, available cash.
+    Returns: (states, cash, unsettled, selection_log)
+    """
+    cash_box = [float(cash)]
+    unsettled_box = [0.0]
+    selection_log = []
 
     def _receive_proceeds(amount):
-        nonlocal cash, unsettled
         if cash_account:
-            unsettled += amount
+            unsettled_box[0] += amount
         else:
-            cash += amount
+            cash_box[0] += amount
 
     # Build unified timestamp index
     all_timestamps = set()
@@ -154,7 +343,7 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
     all_timestamps = sorted(all_timestamps)
 
     if not all_timestamps:
-        return [], cash, unsettled
+        return [], cash_box[0], unsettled_box[0], []
 
     # Initialize states
     states = []
@@ -162,12 +351,20 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
         mh = pick.get("market_hour_candles")
         if mh is None or len(mh) == 0:
             continue
+        vwap = _compute_vwap(mh)
+        ticker = pick["ticker"]
+        float_shares = FLOAT_DATA.get(ticker)
+        l_eligible = (float_shares is not None
+                      and float_shares <= L_MAX_FLOAT
+                      and pick["gap_pct"] >= L_MIN_GAP_PCT)
+        l_tgt1, l_tgt2 = _get_tiered_targets(float_shares) if l_eligible else (0, 0)
         states.append({
-            "ticker": pick["ticker"],
+            "ticker": ticker,
             "premarket_high": pick["premarket_high"],
             "gap_pct": pick["gap_pct"],
             "pm_volume": pick.get("pm_volume", 0),
             "mh": mh,
+            "vwap": vwap,
             # State — H/G/A/F candle classification
             "candle_count": 0,
             "first_candle_ok": False,
@@ -177,7 +374,48 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             "signal": False,
             "signal_price": None,
             "open_price": None,
-            "strategy": None,  # "H", "G", "A", "F", or "P"
+            "strategy": None,  # "H", "G", "A", "F", "D", or "P"
+            # State — D (Opening Dip Buy fallback)
+            "d_eligible": False,         # Set True after candle 2 if H/G/A/F failed
+            "d_spike_high": 0.0,         # Highest high in spike window
+            "d_spike_detected": False,   # Spike >= min_spike_pct above open
+            "d_dip_detected": False,     # Low hit dip level
+            "d_below_vwap": False,       # For VWAP entry mode
+            "d_recent_closes": [],       # For 5-candle high tracking
+            # State — D advanced exit management
+            "d_highest_since_entry": 0.0,
+            "d_trailing_active": False,
+            "d_partial_taken": False,
+            "d_partial_proceeds": 0.0,
+            # State — M (Midday Range Break fallback)
+            "m_eligible": False,
+            "m_morning_spike_ok": False,
+            "m_consol_checked": False,
+            "m_consol_high": 0.0,
+            "m_breakout_ready": False,
+            # State — M advanced exit management
+            "m_highest_since_entry": 0.0,
+            "m_trailing_active": False,
+            "m_partial_taken": False,
+            "m_partial_proceeds": 0.0,
+            # State — V (VWAP Reclaim fallback)
+            "v_eligible": False,
+            "v_below_count": 0,
+            "v_max_below_pct": 0.0,
+            "v_reclaim_ready": False,
+            # State — V advanced exit management
+            "v_highest_since_entry": 0.0,
+            "v_trailing_active": False,
+            "v_partial_taken": False,
+            "v_partial_proceeds": 0.0,
+            # State — R (Multi-Day Runner)
+            "is_r_candidate": pick.get("is_r_candidate", False),
+            "r_day1_close": pick.get("r_day1_close", 0),
+            "r_eligible": pick.get("is_r_candidate", False),
+            "r_pullback_seen": False,
+            # State — R advanced exit management
+            "r_highest_since_entry": 0.0,
+            "r_trailing_active": False,
             # State — P (PM high breakout fallback)
             "p_eligible": False,         # Set True after candle 2 if H/G/A/F failed
             "p_recent_closes": [],       # Track closes above PM high
@@ -189,6 +427,31 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             "p_trailing_active": False,
             "p_partial_taken": False,
             "p_partial_proceeds": 0.0,
+            # State — W (Power Hour Breakout fallback)
+            "w_eligible": False,
+            "w_morning_run_ok": False,
+            "w_morning_high": 0.0,
+            "w_morning_spike_vol": 0.0,
+            "w_consol_checked": False,
+            "w_consol_high": 0.0,
+            "w_consol_avg_vol": 0.0,
+            "w_breakout_ready": False,
+            # State — W exit management
+            "w_highest_since_entry": 0.0,
+            "w_trailing_active": False,
+            # State — L (Low Float Squeeze)
+            "l_eligible": l_eligible,
+            "l_float_shares": float_shares or 0,
+            "l_running_hod": 0.0,
+            "l_target1_pct": l_tgt1,
+            "l_target2_pct": l_tgt2,
+            # State — L exit management
+            "l_highest_since_entry": 0.0,
+            "l_trailing_active": False,
+            "l_partial_taken": False,
+            "l_partial_proceeds": 0.0,
+            # State — H/G/A/F trail tracking
+            "hgaf_trail_stop": 0.0,
             # Position
             "entry_price": None,
             "entry_time": None,
@@ -201,6 +464,48 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             "vol_capped": False,
             "done": False,
         })
+
+    # Create dedicated L-only states for cross-pool signal independence.
+    # Without this, H/G/A/F claim signal=True first and L never gets checked
+    # on the same ticker. L-only states skip H/G/A/F detection entirely.
+    l_only_states = []
+    for st in states:
+        if st["l_eligible"]:
+            l_st = dict(st)  # shallow copy (shares mh/vwap refs, which are read-only)
+            l_st["l_only"] = True
+            # Disable all non-L strategies
+            l_st["d_eligible"] = False
+            l_st["v_eligible"] = False
+            l_st["m_eligible"] = False
+            l_st["p_eligible"] = False
+            l_st["w_eligible"] = False
+            l_st["is_r_candidate"] = False
+            l_st["r_eligible"] = False
+            l_st["r_pullback_seen"] = False
+            # Reset per-instance state
+            l_st["signal"] = False
+            l_st["signal_price"] = None
+            l_st["strategy"] = None
+            l_st["candle_count"] = 0
+            l_st["first_candle_ok"] = False
+            l_st["first_candle_body_pct"] = 0.0
+            l_st["done"] = False
+            l_st["entry_price"] = None
+            l_st["shares"] = 0
+            l_st["position_cost"] = 0.0
+            l_st["pnl"] = 0.0
+            l_st["l_running_hod"] = 0.0
+            l_st["l_highest_since_entry"] = 0.0
+            l_st["l_trailing_active"] = False
+            l_st["l_partial_taken"] = False
+            l_st["l_partial_proceeds"] = 0.0
+            # Fresh mutable lists (avoid cross-state mutation)
+            l_st["d_recent_closes"] = []
+            l_st["p_recent_closes"] = []
+            l_only_states.append(l_st)
+            # Prevent original state from also detecting L (avoid double entries)
+            st["l_eligible"] = False
+    states.extend(l_only_states)
 
     for ts in all_timestamps:
         entry_candidates = []
@@ -236,7 +541,12 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
                 def _close_position(st, price, reason, ts_now):
                     sell_price = price * (1 - SLIPPAGE_PCT / 100)
                     proceeds = st["shares"] * sell_price
-                    st["pnl"] = st["p_partial_proceeds"] + proceeds - st["position_cost"]
+                    partial_procs = (st.get("p_partial_proceeds", 0)
+                                     + st.get("d_partial_proceeds", 0)
+                                     + st.get("m_partial_proceeds", 0)
+                                     + st.get("v_partial_proceeds", 0)
+                                     + st.get("l_partial_proceeds", 0))
+                    st["pnl"] = partial_procs + proceeds - st["position_cost"]
                     st["exit_price"] = price
                     st["exit_time"] = ts_now
                     st["exit_reason"] = reason
@@ -311,20 +621,335 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
 
                     continue
 
-                # ===== STRATEGIES H/G/A/F: Simple target + time stop =====
+                # ===== STRATEGY D: Dip Buy (trailing + partial) =====
+                if st["strategy"] == "D":
+                    # Update highest since entry
+                    if c_high > st["d_highest_since_entry"]:
+                        st["d_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["d_trailing_active"]:
+                        trail_stop = st["d_highest_since_entry"] * (1 - D_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 2. Hard stop (before trail activates)
+                        stop_price = st["entry_price"] * (1 - D_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 3. Activate trailing stop at +X% unrealized
+                    if not st["d_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= D_TRAIL_ACTIVATE_PCT:
+                            st["d_trailing_active"] = True
+
+                    # 4. Partial sell at target1
+                    if not st["d_partial_taken"] and D_PARTIAL_SELL_PCT > 0:
+                        tgt1 = st["entry_price"] * (1 + D_TARGET1_PCT / 100)
+                        if c_high >= tgt1:
+                            partial_shares = st["shares"] * (D_PARTIAL_SELL_PCT / 100)
+                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            partial_proceeds = partial_shares * sell_price
+                            st["d_partial_proceeds"] += partial_proceeds
+                            st["shares"] -= partial_shares
+                            st["d_partial_taken"] = True
+                            _receive_proceeds(partial_proceeds)
+                            if st["shares"] <= 0.001:
+                                st["pnl"] = st["d_partial_proceeds"] - st["position_cost"]
+                                st["exit_price"] = tgt1
+                                st["exit_time"] = ts
+                                st["exit_reason"] = "TARGET"
+                                st["entry_price"] = None
+                                st["shares"] = 0
+                                st["done"] = True
+                                continue
+                            # Fall through to check target2 on same candle
+
+                    # 5. Runner target2 (full exit of remaining)
+                    tgt2 = st["entry_price"] * (1 + D_TARGET2_PCT / 100)
+                    if c_high >= tgt2:
+                        _close_position(st, tgt2, "TARGET", ts)
+                        continue
+
+                    # 6. Time stop
+                    if minutes_in_trade >= D_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY M: Midday Break (trailing + partial) =====
+                if st["strategy"] == "M":
+                    # Update highest since entry
+                    if c_high > st["m_highest_since_entry"]:
+                        st["m_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["m_trailing_active"]:
+                        trail_stop = st["m_highest_since_entry"] * (1 - M_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 2. Hard stop (before trail activates)
+                        stop_price = st["entry_price"] * (1 - M_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 3. Activate trailing stop at +X% unrealized
+                    if not st["m_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= M_TRAIL_ACTIVATE_PCT:
+                            st["m_trailing_active"] = True
+
+                    # 4. Partial sell at target1
+                    if not st["m_partial_taken"] and M_PARTIAL_SELL_PCT > 0:
+                        tgt1 = st["entry_price"] * (1 + M_TARGET1_PCT / 100)
+                        if c_high >= tgt1:
+                            partial_shares = st["shares"] * (M_PARTIAL_SELL_PCT / 100)
+                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            partial_proceeds = partial_shares * sell_price
+                            st["m_partial_proceeds"] += partial_proceeds
+                            st["shares"] -= partial_shares
+                            st["m_partial_taken"] = True
+                            _receive_proceeds(partial_proceeds)
+                            if st["shares"] <= 0.001:
+                                st["pnl"] = st["m_partial_proceeds"] - st["position_cost"]
+                                st["exit_price"] = tgt1
+                                st["exit_time"] = ts
+                                st["exit_reason"] = "TARGET"
+                                st["entry_price"] = None
+                                st["shares"] = 0
+                                st["done"] = True
+                                continue
+
+                    # 5. Time stop
+                    if minutes_in_trade >= M_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY V: VWAP Reclaim (trailing + partial) =====
+                if st["strategy"] == "V":
+                    if c_high > st["v_highest_since_entry"]:
+                        st["v_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["v_trailing_active"]:
+                        trail_stop = st["v_highest_since_entry"] * (1 - V_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        stop_price = st["entry_price"] * (1 - V_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 2. Activate trailing stop
+                    if not st["v_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= V_TRAIL_ACTIVATE_PCT:
+                            st["v_trailing_active"] = True
+
+                    # 3. Partial sell at target1
+                    if not st["v_partial_taken"] and V_PARTIAL_SELL_PCT > 0:
+                        tgt1 = st["entry_price"] * (1 + V_TARGET1_PCT / 100)
+                        if c_high >= tgt1:
+                            partial_shares = st["shares"] * (V_PARTIAL_SELL_PCT / 100)
+                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            partial_proceeds = partial_shares * sell_price
+                            st["v_partial_proceeds"] += partial_proceeds
+                            st["shares"] -= partial_shares
+                            st["v_partial_taken"] = True
+                            _receive_proceeds(partial_proceeds)
+                            if st["shares"] <= 0.001:
+                                st["pnl"] = st["v_partial_proceeds"] - st["position_cost"]
+                                st["exit_price"] = tgt1
+                                st["exit_time"] = ts
+                                st["exit_reason"] = "TARGET"
+                                st["entry_price"] = None
+                                st["shares"] = 0
+                                st["done"] = True
+                                continue
+
+                    # 4. Runner target2
+                    tgt2 = st["entry_price"] * (1 + V_TARGET2_PCT / 100)
+                    if c_high >= tgt2:
+                        _close_position(st, tgt2, "TARGET", ts)
+                        continue
+
+                    # 5. Time stop
+                    if minutes_in_trade >= V_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY L: Low Float Squeeze (trailing + partial + tiered targets) =====
+                if st["strategy"] == "L":
+                    if c_high > st["l_highest_since_entry"]:
+                        st["l_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["l_trailing_active"]:
+                        trail_stop = st["l_highest_since_entry"] * (1 - L_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 2. Hard stop (before trail activates)
+                        stop_price = st["entry_price"] * (1 - L_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 3. Activate trailing stop
+                    if not st["l_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= L_TRAIL_ACTIVATE_PCT:
+                            st["l_trailing_active"] = True
+
+                    # 4. Partial sell at target1 (float-tiered)
+                    if not st["l_partial_taken"] and L_PARTIAL_SELL_PCT > 0:
+                        tgt1 = st["entry_price"] * (1 + st["l_target1_pct"] / 100)
+                        if c_high >= tgt1:
+                            partial_shares = st["shares"] * (L_PARTIAL_SELL_PCT / 100)
+                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            partial_proceeds = partial_shares * sell_price
+                            st["l_partial_proceeds"] += partial_proceeds
+                            st["shares"] -= partial_shares
+                            st["l_partial_taken"] = True
+                            _receive_proceeds(partial_proceeds)
+                            if st["shares"] <= 0.001:
+                                st["pnl"] = st["l_partial_proceeds"] - st["position_cost"]
+                                st["exit_price"] = tgt1
+                                st["exit_time"] = ts
+                                st["exit_reason"] = "TARGET"
+                                st["entry_price"] = None
+                                st["shares"] = 0
+                                st["done"] = True
+                                continue
+
+                    # 5. Runner target2 (float-tiered)
+                    tgt2 = st["entry_price"] * (1 + st["l_target2_pct"] / 100)
+                    if c_high >= tgt2:
+                        _close_position(st, tgt2, "TARGET", ts)
+                        continue
+
+                    # 6. Time stop
+                    if minutes_in_trade >= L_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY R: Multi-Day Runner (trailing + target) =====
+                if st["strategy"] == "R":
+                    if c_high > st["r_highest_since_entry"]:
+                        st["r_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["r_trailing_active"]:
+                        trail_stop = st["r_highest_since_entry"] * (1 - R_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        stop_price = st["entry_price"] * (1 - R_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 2. Activate trailing stop
+                    if not st["r_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= R_TRAIL_ACTIVATE_PCT:
+                            st["r_trailing_active"] = True
+
+                    # 3. Target
+                    tgt = st["entry_price"] * (1 + R_TARGET1_PCT / 100)
+                    if c_high >= tgt:
+                        _close_position(st, tgt, "TARGET", ts)
+                        continue
+
+                    # 4. Time stop
+                    if minutes_in_trade >= R_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY W: Power Hour Breakout (trailing + target) =====
+                if st["strategy"] == "W":
+                    if c_high > st["w_highest_since_entry"]:
+                        st["w_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["w_trailing_active"]:
+                        trail_stop = st["w_highest_since_entry"] * (1 - W_TRAIL_PCT / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 2. Hard stop (before trail activates)
+                        stop_price = st["entry_price"] * (1 - W_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # 3. Activate trailing stop at +X% unrealized
+                    if not st["w_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= W_TRAIL_ACTIVATE_PCT:
+                            st["w_trailing_active"] = True
+
+                    # 4. Target (full exit)
+                    tgt = st["entry_price"] * (1 + W_TARGET_PCT / 100)
+                    if c_high >= tgt:
+                        _close_position(st, tgt, "TARGET", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGIES H/G/A/F: target + stop + trail + time stop =====
                 strat_map = {
-                    "H": (H_TARGET_PCT, H_TIME_LIMIT_MINUTES),
-                    "G": (G_TARGET_PCT, G_TIME_LIMIT_MINUTES),
-                    "A": (A_TARGET_PCT, A_TIME_LIMIT_MINUTES),
-                    "F": (F_TARGET_PCT, F_TIME_LIMIT_MINUTES),
+                    "H": (H_TARGET_PCT, H_TIME_LIMIT_MINUTES, H_STOP_PCT, H_TRAIL_PCT, H_TRAIL_ACTIVATE_PCT),
+                    "G": (G_TARGET_PCT, G_TIME_LIMIT_MINUTES, G_STOP_PCT, G_TRAIL_PCT, G_TRAIL_ACTIVATE_PCT),
+                    "A": (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, A_STOP_PCT, A_TRAIL_PCT, A_TRAIL_ACTIVATE_PCT),
+                    "F": (F_TARGET_PCT, F_TIME_LIMIT_MINUTES, F_STOP_PCT, F_TRAIL_PCT, F_TRAIL_ACTIVATE_PCT),
                 }
-                target_pct, time_limit = strat_map.get(st["strategy"], (A_TARGET_PCT, A_TIME_LIMIT_MINUTES))
+                target_pct, time_limit, stop_pct, trail_pct, trail_act = strat_map.get(
+                    st["strategy"], (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, 0, 0, 0))
 
                 # Target hit
                 target_price = st["entry_price"] * (1 + target_pct / 100)
                 if c_high >= target_price:
                     _close_position(st, target_price, "TARGET", ts)
                     continue
+
+                # Hard stop
+                if stop_pct > 0:
+                    stop_price = st["entry_price"] * (1 - stop_pct / 100)
+                    if c_low <= stop_price:
+                        _close_position(st, stop_price, "STOP", ts)
+                        continue
+
+                # Trailing stop
+                if trail_pct > 0:
+                    unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                    if unrealized_pct >= trail_act:
+                        trail_stop = c_high * (1 - trail_pct / 100)
+                        if trail_stop > st.get("hgaf_trail_stop", 0):
+                            st["hgaf_trail_stop"] = trail_stop
+                    if st.get("hgaf_trail_stop", 0) > 0 and c_low <= st["hgaf_trail_stop"]:
+                        _close_position(st, st["hgaf_trail_stop"], "TRAIL", ts)
+                        continue
 
                 # Time stop
                 if minutes_in_trade >= time_limit:
@@ -335,6 +960,32 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
 
             # --- NOT IN POSITION: candle-by-candle signal detection ---
             st["candle_count"] += 1
+
+            # --- R CANDIDATE: separate entry logic (Day 2 of massive gapper) ---
+            if st["is_r_candidate"]:
+                if st["candle_count"] > R_MAX_ENTRY_CANDLE or not st["r_eligible"]:
+                    st["done"] = True
+                    continue
+
+                # Track open price from first candle
+                if st["candle_count"] == 1:
+                    st["open_price"] = c_open
+
+                # Phase 1: Pullback from D2 open
+                if not st["r_pullback_seen"] and st["candle_count"] <= R_PULLBACK_WINDOW:
+                    pullback_level = st["open_price"] * (1 - R_D2_PULLBACK_PCT / 100)
+                    if c_low <= pullback_level:
+                        st["r_pullback_seen"] = True
+
+                # Phase 2: Bounce above reference
+                if st["r_pullback_seen"] and not st["signal"]:
+                    ref_price = st["r_day1_close"] if R_BOUNCE_REF == "d1_close" else st["open_price"]
+                    if c_close > ref_price:
+                        st["strategy"] = "R"
+                        st["signal"] = True
+                        st["signal_price"] = c_close
+                        entry_candidates.append(st)
+                continue
 
             # CANDLE 1: Check first candle is green
             if st["candle_count"] == 1:
@@ -347,11 +998,11 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
                     st["open_price"] = c_open
                     if body_pct > 0:
                         st["first_candle_ok"] = True
-                if not st["first_candle_ok"]:
+                if not st["first_candle_ok"] and not st.get("l_only"):
                     st["done"] = True
 
-            # CANDLE 2: Classify for H, G, A, F
-            elif st["candle_count"] == 2 and st["first_candle_ok"]:
+            # CANDLE 2: Classify for H, G, A, F (skip for L-only states)
+            elif st["candle_count"] == 2 and st["first_candle_ok"] and not st.get("l_only"):
                 second_green = c_close > c_open
                 second_new_high = c_high > st["first_candle_high"]
                 vol_confirm = float(candle["Volume"]) > st["first_candle_volume"]
@@ -365,10 +1016,28 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
                     st["signal"] = True
                     entry_candidates.append(st)
                 else:
-                    # H/G/A/F rejected — enable P fallback if gap qualifies
+                    # H/G/A/F rejected — enable D, V, M, P, W fallbacks if gap qualifies
+                    eligible = False
+                    if st["gap_pct"] >= D_MIN_GAP_PCT:
+                        st["d_eligible"] = True
+                        # Initialize D spike tracking retroactively
+                        st["d_spike_high"] = max(st["first_candle_high"], c_high)
+                        eligible = True
+                    if st["gap_pct"] >= V_MIN_GAP_PCT:
+                        st["v_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= M_MIN_GAP_PCT:
+                        st["m_eligible"] = True
+                        eligible = True
                     if st["gap_pct"] >= P_MIN_GAP_PCT:
                         st["p_eligible"] = True
-                    else:
+                        eligible = True
+                    if st["gap_pct"] >= W_MIN_GAP_PCT:
+                        st["w_eligible"] = True
+                        eligible = True
+                    if st["l_eligible"]:  # Already set at init based on float + gap
+                        eligible = True
+                    if not eligible:
                         st["done"] = True
 
             # Retry fill on later candles (H/G/A/F)
@@ -377,62 +1046,339 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
                     st["signal_price"] = c_close
                     entry_candidates.append(st)
 
-            # --- P: PM high breakout + pullback + bounce (candle 3+) ---
-            elif st["p_eligible"] and st["entry_price"] is None and not st["done"]:
-                if st["candle_count"] > P_MAX_ENTRY_CANDLE:
+            # --- D + V + M + P + W + L: All track simultaneously, first to fire wins ---
+            elif (st["d_eligible"] or st["v_eligible"] or st["m_eligible"] or st["p_eligible"] or st["w_eligible"] or st["l_eligible"]) and st["entry_price"] is None and not st["done"]:
+                # Check if all D, V, M, P, W, L have timed out
+                d_timed_out = not st["d_eligible"] or st["candle_count"] > D_MAX_ENTRY_CANDLE
+                v_timed_out = not st["v_eligible"] or st["candle_count"] > V_MAX_ENTRY_CANDLE
+                m_timed_out = not st["m_eligible"] or st["candle_count"] > M_MAX_ENTRY_CANDLE
+                p_timed_out = not st["p_eligible"] or st["candle_count"] > P_MAX_ENTRY_CANDLE
+                w_timed_out = not st["w_eligible"] or st["candle_count"] > W_LATEST_CANDLE
+                l_timed_out = not st["l_eligible"] or st["candle_count"] > L_LATEST_CANDLE
+                if d_timed_out and v_timed_out and m_timed_out and p_timed_out and w_timed_out and l_timed_out:
                     st["done"] = True
                     continue
 
-                pm_high = st["premarket_high"]
+                # --- D: Opening Dip Buy detection ---
+                if st["d_eligible"] and st["candle_count"] <= D_MAX_ENTRY_CANDLE and not st["signal"]:
+                    # Update spike high
+                    if c_high > st["d_spike_high"]:
+                        st["d_spike_high"] = c_high
 
-                # Phase 1: Breakout confirmation
-                if not st["p_breakout_confirmed"]:
-                    st["p_recent_closes"].append(c_close > pm_high)
-                    if len(st["p_recent_closes"]) > P_CONFIRM_WINDOW:
-                        st["p_recent_closes"] = st["p_recent_closes"][-P_CONFIRM_WINDOW:]
-                    if sum(st["p_recent_closes"]) >= P_CONFIRM_ABOVE:
-                        st["p_breakout_confirmed"] = True
+                    # Check spike magnitude once we have enough candles
+                    if not st["d_spike_detected"] and st["candle_count"] >= D_SPIKE_WINDOW:
+                        open_p = st["open_price"]
+                        if open_p and open_p > 0:
+                            spike_pct = (st["d_spike_high"] / open_p - 1) * 100
+                            if spike_pct >= D_MIN_SPIKE_PCT:
+                                st["d_spike_detected"] = True
+                            else:
+                                st["d_eligible"] = False  # Spike too small
 
-                # Phase 2: Pullback detection
-                elif not st["p_pullback_detected"]:
-                    st["p_candles_since_confirm"] += 1
-                    pullback_zone = pm_high * (1 + P_PULLBACK_PCT / 100)
-                    if c_low <= pullback_zone:
-                        st["p_pullback_detected"] = True
-                        if c_close > pm_high:
-                            st["strategy"] = "P"
-                            st["signal"] = True
-                            st["signal_price"] = c_close
-                            entry_candidates.append(st)
-                    elif st["p_candles_since_confirm"] >= P_PULLBACK_TIMEOUT:
-                        if c_close > pm_high:
-                            st["strategy"] = "P"
-                            st["signal"] = True
-                            st["signal_price"] = c_close
-                            entry_candidates.append(st)
+                    # After spike detected: wait for dip
+                    if st["d_spike_detected"] and not st["d_dip_detected"]:
+                        dip_level = st["d_spike_high"] * (1 - D_DIP_PCT / 100)
+                        if c_low <= dip_level:
+                            st["d_dip_detected"] = True
+
+                    # After dip: look for entry signal
+                    if st["d_dip_detected"]:
+                        # Get candle index for VWAP lookup
+                        candle_idx = st["candle_count"] - 1
+                        vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+
+                        # Track below-VWAP state
+                        if c_close < vwap_val:
+                            st["d_below_vwap"] = True
+
+                        st["d_recent_closes"].append(c_close)
+                        if len(st["d_recent_closes"]) > 5:
+                            st["d_recent_closes"] = st["d_recent_closes"][-5:]
+
+                        if D_ENTRY_MODE == "vwap":
+                            # VWAP reclaim: was below, now close above
+                            if st["d_below_vwap"] and c_close > vwap_val:
+                                st["strategy"] = "D"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
                         else:
-                            st["done"] = True
+                            # 5-candle high: close > max of last 5 closes
+                            if len(st["d_recent_closes"]) >= 5:
+                                prev_max = max(st["d_recent_closes"][:-1])
+                                if c_close > prev_max:
+                                    st["strategy"] = "D"
+                                    st["signal"] = True
+                                    st["signal_price"] = c_close
+                                    entry_candidates.append(st)
 
-                # Phase 3: Bounce
-                else:
-                    if c_close > pm_high:
-                        st["strategy"] = "P"
-                        st["signal"] = True
-                        st["signal_price"] = c_close
-                        entry_candidates.append(st)
+                # --- M: Midday Range Break detection ---
+                if st["m_eligible"] and st["candle_count"] <= M_MAX_ENTRY_CANDLE and not st["signal"]:
+                    candle_idx = st["candle_count"] - 1  # 0-based index into mh
 
-        # --- PASS 2: Allocate capital ---
-        # Priority: H > G > A > F
-        strat_priority = {"H": 0, "G": 1, "A": 2, "F": 3, "P": 4}
-        entry_candidates.sort(key=lambda s: (strat_priority.get(s["strategy"], 9), -s["first_candle_body_pct"]))
+                    # Phase 1: Morning spike check (once)
+                    if not st["m_morning_spike_ok"]:
+                        if st["candle_count"] >= M_MORNING_CANDLES:
+                            morning_highs = st["mh"].iloc[:M_MORNING_CANDLES]["High"].values.astype(float)
+                            morning_high = float(np.max(morning_highs))
+                            open_p = st["open_price"]
+                            if open_p and open_p > 0:
+                                spike_pct = (morning_high / open_p - 1) * 100
+                                if spike_pct >= M_MORNING_SPIKE_PCT:
+                                    st["m_morning_spike_ok"] = True
+                                else:
+                                    st["m_eligible"] = False
 
-        positions_today = sum(1 for s in states if s["entry_price"] is not None)
+                    # Phase 2: Consolidation zone check (once)
+                    elif not st["m_consol_checked"]:
+                        consol_end_candle = M_RANGE_START_CANDLE + M_CONSOLIDATION_LEN
+                        if st["candle_count"] >= consol_end_candle:
+                            if len(st["mh"]) >= consol_end_candle:
+                                consol_slice = st["mh"].iloc[M_RANGE_START_CANDLE:consol_end_candle]
+                                c_highs = consol_slice["High"].values.astype(float)
+                                c_lows = consol_slice["Low"].values.astype(float)
+                                c_vols = consol_slice["Volume"].values.astype(float)
+
+                                consol_high = float(np.max(c_highs))
+                                consol_low = float(np.min(c_lows))
+
+                                # Range check
+                                range_pct = (consol_high - consol_low) / consol_high * 100 if consol_high > 0 else 999
+                                if range_pct > M_MAX_RANGE_PCT:
+                                    st["m_eligible"] = False
+                                else:
+                                    # Volume contraction check
+                                    morning_avg_vol = float(np.mean(
+                                        st["mh"].iloc[:min(30, len(st["mh"]))]["Volume"].values.astype(float)))
+                                    consol_avg_vol = float(np.mean(c_vols))
+                                    if morning_avg_vol > 0 and consol_avg_vol / morning_avg_vol > M_VOL_RATIO:
+                                        st["m_eligible"] = False
+                                    else:
+                                        st["m_consol_high"] = consol_high
+                                        st["m_consol_checked"] = True
+                                        st["m_breakout_ready"] = True
+                            else:
+                                st["m_eligible"] = False
+
+                    # Phase 3: Breakout above consolidation high
+                    elif st["m_breakout_ready"]:
+                        if c_close > st["m_consol_high"]:
+                            st["strategy"] = "M"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+
+                # --- V: VWAP Reclaim detection ---
+                if st["v_eligible"] and st["candle_count"] <= V_MAX_ENTRY_CANDLE and not st["signal"]:
+                    candle_idx = st["candle_count"] - 1
+                    vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+
+                    if vwap_val > 0:
+                        # Track consecutive closes below VWAP
+                        if c_close < vwap_val:
+                            st["v_below_count"] += 1
+                            # Track max depth below VWAP
+                            below_pct = (vwap_val - c_close) / vwap_val * 100
+                            if below_pct > st["v_max_below_pct"]:
+                                st["v_max_below_pct"] = below_pct
+                        else:
+                            # Close above VWAP: check if reclaim conditions met
+                            if (st["v_below_count"] >= V_MIN_BELOW_CANDLES
+                                    and st["v_max_below_pct"] >= V_MIN_BELOW_PCT):
+                                # Volume spike check
+                                if candle_idx >= 10:
+                                    recent_vols = st["mh"].iloc[candle_idx-10:candle_idx]["Volume"].values.astype(float)
+                                    avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+                                else:
+                                    avg_vol = 0
+                                cur_vol = float(candle["Volume"])
+                                if avg_vol <= 0 or cur_vol >= avg_vol * V_VOL_SPIKE_RATIO:
+                                    st["strategy"] = "V"
+                                    st["signal"] = True
+                                    st["signal_price"] = c_close
+                                    entry_candidates.append(st)
+                                else:
+                                    st["v_below_count"] = 0  # Reset, keep tracking
+                            else:
+                                st["v_below_count"] = 0  # Reset, not enough below candles
+
+                # --- P: PM high breakout + pullback + bounce ---
+                if st["p_eligible"] and st["candle_count"] <= P_MAX_ENTRY_CANDLE and not st["signal"]:
+                    pm_high = st["premarket_high"]
+
+                    # Phase 1: Breakout confirmation
+                    if not st["p_breakout_confirmed"]:
+                        st["p_recent_closes"].append(c_close > pm_high)
+                        if len(st["p_recent_closes"]) > P_CONFIRM_WINDOW:
+                            st["p_recent_closes"] = st["p_recent_closes"][-P_CONFIRM_WINDOW:]
+                        if sum(st["p_recent_closes"]) >= P_CONFIRM_ABOVE:
+                            st["p_breakout_confirmed"] = True
+
+                    # Phase 2: Pullback detection
+                    elif not st["p_pullback_detected"]:
+                        st["p_candles_since_confirm"] += 1
+                        pullback_zone = pm_high * (1 + P_PULLBACK_PCT / 100)
+                        if c_low <= pullback_zone:
+                            st["p_pullback_detected"] = True
+                            if c_close > pm_high:
+                                st["strategy"] = "P"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+                        elif st["p_candles_since_confirm"] >= P_PULLBACK_TIMEOUT:
+                            if c_close > pm_high:
+                                st["strategy"] = "P"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+                            else:
+                                st["p_eligible"] = False
+
+                    # Phase 3: Bounce
+                    else:
+                        if c_close > pm_high:
+                            st["strategy"] = "P"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+
+                # --- W: Power Hour Breakout detection ---
+                if st["w_eligible"] and st["candle_count"] <= W_LATEST_CANDLE and not st["signal"]:
+                    candle_idx = st["candle_count"] - 1
+
+                    # Phase 1: Morning run check (at candle 30)
+                    if not st["w_morning_run_ok"]:
+                        if st["candle_count"] >= 30:
+                            morning_highs = st["mh"].iloc[:30]["High"].values.astype(float)
+                            morning_high = float(np.max(morning_highs))
+                            morning_vols = st["mh"].iloc[:30]["Volume"].values.astype(float)
+                            open_p = st["open_price"]
+                            if open_p and open_p > 0:
+                                run_pct = (morning_high / open_p - 1) * 100
+                                if run_pct >= W_MIN_MORNING_RUN:
+                                    st["w_morning_run_ok"] = True
+                                    st["w_morning_high"] = morning_high
+                                    st["w_morning_spike_vol"] = float(np.max(morning_vols))
+                                else:
+                                    st["w_eligible"] = False
+
+                    # Phase 2: Consolidation check (at earliest candle)
+                    elif not st["w_consol_checked"]:
+                        if st["candle_count"] >= W_EARLIEST_CANDLE:
+                            if len(st["mh"]) >= W_EARLIEST_CANDLE:
+                                consol_slice = st["mh"].iloc[W_CONSOL_START:W_EARLIEST_CANDLE]
+                                c_highs_w = consol_slice["High"].values.astype(float)
+                                c_lows_w = consol_slice["Low"].values.astype(float)
+                                c_closes_w = consol_slice["Close"].values.astype(float)
+                                c_vols_w = consol_slice["Volume"].values.astype(float)
+
+                                w_consol_high = float(np.max(c_highs_w))
+                                w_consol_low = float(np.min(c_lows_w))
+
+                                # Range check
+                                w_range_pct = (w_consol_high - w_consol_low) / w_consol_high * 100 if w_consol_high > 0 else 999
+                                if w_range_pct > W_MAX_RANGE_PCT:
+                                    st["w_eligible"] = False
+                                else:
+                                    # VWAP deviation check
+                                    c_vwap_w = st["vwap"][W_CONSOL_START:W_EARLIEST_CANDLE]
+                                    if len(c_vwap_w) > 0 and np.all(c_vwap_w > 0):
+                                        vwap_devs = np.abs(c_closes_w - c_vwap_w) / c_vwap_w * 100
+                                        max_dev = float(np.max(vwap_devs))
+                                        if max_dev > W_MAX_VWAP_DEV_PCT:
+                                            st["w_eligible"] = False
+                                        else:
+                                            # HOD breaks check
+                                            hod_breaks = 0
+                                            running_hod = float(st["mh"].iloc[0]["High"])
+                                            for k in range(1, min(W_EARLIEST_CANDLE, len(st["mh"]))):
+                                                kh = float(st["mh"].iloc[k]["High"])
+                                                if kh > running_hod:
+                                                    hod_breaks += 1
+                                                    running_hod = kh
+                                            if hod_breaks > W_MAX_HOD_BREAKS:
+                                                st["w_eligible"] = False
+                                            else:
+                                                st["w_consol_checked"] = True
+                                                st["w_consol_high"] = w_consol_high
+                                                st["w_consol_avg_vol"] = float(np.mean(c_vols_w))
+                                                st["w_breakout_ready"] = True
+                                    else:
+                                        st["w_eligible"] = False
+                            else:
+                                st["w_eligible"] = False
+
+                    # Phase 3: Breakout scan
+                    elif st["w_breakout_ready"]:
+                        if c_close > st["w_consol_high"]:
+                            cur_vol = float(candle["Volume"])
+                            # Volume surge vs consolidation avg
+                            vol_ok = (st["w_consol_avg_vol"] <= 0 or
+                                      cur_vol >= st["w_consol_avg_vol"] * W_VOL_SURGE_MULT)
+                            # Volume vs morning spike
+                            morning_vol_ok = (st["w_morning_spike_vol"] <= 0 or
+                                             cur_vol >= st["w_morning_spike_vol"] * W_VOL_VS_MORNING_MULT)
+                            # VWAP filter
+                            vwap_ok = True
+                            if W_REQUIRE_ABOVE_VWAP and candle_idx < len(st["vwap"]):
+                                vwap_ok = c_close >= st["vwap"][candle_idx]
+
+                            if vol_ok and morning_vol_ok and vwap_ok:
+                                st["strategy"] = "W"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+
+                # --- L: Low Float Squeeze detection ---
+                # Always track HOD for L-eligible stocks
+                if st["l_eligible"] and not st["signal"] and c_high > st["l_running_hod"]:
+                    st["l_running_hod"] = c_high
+                if st["l_eligible"] and st["candle_count"] >= L_EARLIEST_CANDLE and st["candle_count"] <= L_LATEST_CANDLE and not st["signal"]:
+                    candle_idx = st["candle_count"] - 1
+
+                    # Check if this candle made a new HOD (already tracked above)
+                    is_new_hod = (c_high >= st["l_running_hod"]) and (st["l_running_hod"] > 0)
+
+                    # 1. HOD break check
+                    if not L_HOD_BREAK_REQUIRED or is_new_hod:
+                        # 2. Volume surge check
+                        c_vol = float(candle["Volume"])
+                        if candle_idx >= 10:
+                            recent_vols = st["mh"].iloc[candle_idx-10:candle_idx]["Volume"].values.astype(float)
+                            avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+                        else:
+                            recent_vols = st["mh"].iloc[:candle_idx]["Volume"].values.astype(float)
+                            avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+
+                        vol_ok_l = avg_vol <= 0 or c_vol >= avg_vol * L_VOL_SURGE_MULT
+
+                        # 3. Price acceleration (green candle body)
+                        body_pct_l = (c_close / c_open - 1) * 100 if c_open > 0 else 0
+                        accel_ok = body_pct_l >= L_MIN_PRICE_ACCEL_PCT
+
+                        # 4. VWAP filter
+                        vwap_ok_l = True
+                        if L_REQUIRE_ABOVE_VWAP and candle_idx < len(st["vwap"]):
+                            vwap_ok_l = c_close >= st["vwap"][candle_idx]
+
+                        if vol_ok_l and accel_ok and vwap_ok_l:
+                            st["strategy"] = "L"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+                    else:
+                        # Still track HOD even when not breaking
+                        pass
+
+        # --- PASS 2: Capital allocation (single pool) ---
+        entry_candidates.sort(key=lambda s: (STRAT_PRIORITY.get(s["strategy"], 99), -s["first_candle_body_pct"]))
+
+        filled_this_ts = []
+        skipped_this_ts = []
 
         for st in entry_candidates:
             if st["done"] or st["entry_price"] is not None:
                 continue
-            if positions_today >= MAX_POSITIONS:
-                break
 
             try:
                 ts_et = ts.astimezone(ET_TZ)
@@ -442,27 +1388,33 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             if mins_to_close <= EOD_EXIT_MINUTES:
                 continue
 
-            if FULL_BALANCE_SIZING:
-                trade_size = cash
-            else:
-                trade_size = starting_cash * trade_pct
-            if cash < 100:
+            # Check cash
+            if cash_box[0] < 100:
+                skipped_this_ts.append(st["strategy"])
                 continue
-            if trade_size > cash:
-                trade_size = cash
+            trade_size = cash_box[0]  # FULL_BALANCE_SIZING
 
             fill_price = st["signal_price"]
             if fill_price is None or fill_price <= 0:
                 continue
 
-            # Volume cap
+            # Volume cap: total exposure on this ticker <= VOL_CAP_PCT of dollar vol.
+            # Uses shares * current_price (fill_price) for accurate market-value exposure.
             if VOL_CAP_PCT > 0:
                 pre_entry = st["mh"].loc[st["mh"].index <= ts]
                 vol_shares = pre_entry["Volume"].sum() if len(pre_entry) > 0 else 0
                 dollar_vol = fill_price * vol_shares
                 vol_limit = dollar_vol * (VOL_CAP_PCT / 100)
-                if vol_limit > 0 and trade_size > vol_limit:
-                    trade_size = vol_limit
+                # Subtract CURRENT market-value exposure on this ticker across ALL active states
+                existing_exposure = 0.0
+                for s in states:
+                    if s["entry_price"] is not None and s["ticker"] == st["ticker"]:
+                        existing_exposure += s["shares"] * fill_price
+                remaining_room = vol_limit - existing_exposure
+                if remaining_room < 50:
+                    continue
+                if trade_size > remaining_room:
+                    trade_size = remaining_room
                     st["vol_capped"] = True
                 if trade_size < 50:
                     continue
@@ -472,8 +1424,31 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             st["entry_time"] = ts
             st["position_cost"] = trade_size
             st["shares"] = trade_size / entry_price
-            cash -= trade_size
-            positions_today += 1
+            cash_box[0] -= trade_size
+            filled_this_ts.append(st["strategy"])
+
+            # Initialize strategy-specific exit tracking
+            if st["strategy"] == "D":
+                st["d_highest_since_entry"] = entry_price
+            elif st["strategy"] == "V":
+                st["v_highest_since_entry"] = entry_price
+            elif st["strategy"] == "R":
+                st["r_highest_since_entry"] = entry_price
+            elif st["strategy"] == "M":
+                st["m_highest_since_entry"] = entry_price
+            elif st["strategy"] == "P":
+                st["p_highest_since_entry"] = entry_price
+            elif st["strategy"] == "W":
+                st["w_highest_since_entry"] = entry_price
+            elif st["strategy"] == "L":
+                st["l_highest_since_entry"] = entry_price
+
+        # Log selection decisions when strategies were skipped
+        if filled_this_ts and skipped_this_ts:
+            selection_log.append({
+                "filled": list(filled_this_ts),
+                "skipped": list(skipped_this_ts),
+            })
 
     # EOD: close remaining
     for st in states:
@@ -482,7 +1457,12 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             last_close = float(st["mh"].iloc[-1]["Close"])
             sell_price = last_close * (1 - SLIPPAGE_PCT / 100)
             proceeds = st["shares"] * sell_price
-            st["pnl"] = st.get("p_partial_proceeds", 0) + proceeds - st["position_cost"]
+            partial_procs = (st.get("p_partial_proceeds", 0)
+                             + st.get("d_partial_proceeds", 0)
+                             + st.get("m_partial_proceeds", 0)
+                             + st.get("v_partial_proceeds", 0)
+                             + st.get("l_partial_proceeds", 0))
+            st["pnl"] = partial_procs + proceeds - st["position_cost"]
             st["exit_price"] = last_close
             st["exit_time"] = last_ts
             st["exit_reason"] = "EOD_CLOSE"
@@ -491,7 +1471,7 @@ def simulate_day_combined(picks, starting_cash, cash_account=False):
             st["done"] = True
             _receive_proceeds(proceeds)
 
-    return states, cash, unsettled
+    return states, cash_box[0], unsettled_box[0], selection_log
 
 
 # --- MAIN ----
@@ -501,7 +1481,9 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a != "--no-charts"]
     data_dirs = args if args else ["stored_data_combined"]
 
-    print(f"Combined Green Candle Strategy (H + G + A + F + P) Backtest")
+    STRAT_KEYS = ["H", "G", "A", "F", "D", "V", "P", "L"]
+
+    print(f"Combined Green Candle Strategy (H+G+A+F+D+V+M+R+P+W) Backtest")
     print(f"{'='*70}")
     print(f"  Strategy H: Gap>={H_MIN_GAP_PCT}% + body>={H_MIN_BODY_PCT}% + 2nd green + new hi + vol confirm")
     print(f"              Target: +{H_TARGET_PCT}% | Time Stop: {H_TIME_LIMIT_MINUTES} min")
@@ -511,11 +1493,28 @@ if __name__ == "__main__":
     print(f"              Target: +{A_TARGET_PCT}% | Time Stop: {A_TIME_LIMIT_MINUTES} min")
     print(f"  Strategy F: Gap>{F_MIN_GAP_PCT}% + 2nd green (catch-all)")
     print(f"              Target: +{F_TARGET_PCT}% | Time Stop: {F_TIME_LIMIT_MINUTES} min")
+    print(f"  Strategy D: Gap>{D_MIN_GAP_PCT}% + spike>={D_MIN_SPIKE_PCT}% + dip {D_DIP_PCT}% + {D_ENTRY_MODE}")
+    print(f"              Partial: sell {D_PARTIAL_SELL_PCT:.0f}% at +{D_TARGET1_PCT}% | Runner: +{D_TARGET2_PCT}%")
+    print(f"              Trail: {D_TRAIL_PCT}% (activates +{D_TRAIL_ACTIVATE_PCT}%) | Stop: -{D_STOP_PCT}% | {D_TIME_LIMIT_MINUTES}m")
+    print(f"  Strategy V: Gap>{V_MIN_GAP_PCT}% + {V_MIN_BELOW_CANDLES} closes below VWAP + reclaim w/ volume")
+    print(f"              Partial: sell {V_PARTIAL_SELL_PCT:.0f}% at +{V_TARGET1_PCT}% | Runner: +{V_TARGET2_PCT}%")
+    print(f"              Trail: {V_TRAIL_PCT}% (activates +{V_TRAIL_ACTIVATE_PCT}%) | Stop: -{V_STOP_PCT}% | {V_TIME_LIMIT_MINUTES}m")
+    print(f"  Strategy M: Gap>{M_MIN_GAP_PCT}% + morning spike {M_MORNING_SPIKE_PCT}% + consolidation + breakout")
+    print(f"              Partial: sell {M_PARTIAL_SELL_PCT:.0f}% at +{M_TARGET1_PCT}% | Trail: {M_TRAIL_PCT}%")
+    print(f"              Trail activates +{M_TRAIL_ACTIVATE_PCT}% | Stop: -{M_STOP_PCT}% | {M_TIME_LIMIT_MINUTES}m")
+    print(f"  Strategy R: Day1 gap>={R_DAY1_MIN_GAP:.0f}% + Day2 pullback {R_D2_PULLBACK_PCT:.0f}% + bounce > {R_BOUNCE_REF}")
+    print(f"              Target: +{R_TARGET1_PCT:.0f}% | Trail: {R_TRAIL_PCT}% (at +{R_TRAIL_ACTIVATE_PCT}%) | Stop: -{R_STOP_PCT}% | {R_TIME_LIMIT_MINUTES}m")
     print(f"  Strategy P: Gap>{P_MIN_GAP_PCT}% + PM high breakout + pullback + bounce (fallback)")
     print(f"              Partial: sell {P_PARTIAL_SELL_PCT:.0f}% at +{P_TARGET1_PCT}% | Runner: +{P_TARGET2_PCT}%")
     print(f"              Trail: {P_TRAIL_PCT}% (activates +{P_TRAIL_ACTIVATE_PCT}%) | Stop: -{P_STOP_PCT}% | {P_TIME_LIMIT_MINUTES}m")
-    print(f"  Priority:   H > G > A > F > P")
-    print(f"  Max Positions: {MAX_POSITIONS} (shared, 100% balance)")
+    print(f"  Strategy W: Gap>{W_MIN_GAP_PCT}% + morning run {W_MIN_MORNING_RUN}% + power hour breakout")
+    print(f"              Target: +{W_TARGET_PCT}% | Trail: {W_TRAIL_PCT}% (at +{W_TRAIL_ACTIVATE_PCT}%) | Stop: -{W_STOP_PCT}%")
+    print(f"  Strategy L: Low float (<{L_MAX_FLOAT/1e6:.0f}M) + gap>{L_MIN_GAP_PCT}% + HOD break + vol surge")
+    print(f"              Tiered targets: T1(<{L_TIER1_FLOAT/1e6:.0f}M) +{L_TIER1_TARGET1_PCT}/{L_TIER1_TARGET2_PCT}% | T2(<{L_TIER2_FLOAT/1e6:.0f}M) +{L_TIER2_TARGET1_PCT}/{L_TIER2_TARGET2_PCT}% | T3 +{L_TIER3_TARGET1_PCT}/{L_TIER3_TARGET2_PCT}%")
+    print(f"              Trail: {L_TRAIL_PCT}% (at +{L_TRAIL_ACTIVATE_PCT}%) | Stop: -{L_STOP_PCT}% | {L_TIME_LIMIT_MINUTES}m")
+    priority_str = " > ".join(k for k, _ in sorted(STRAT_PRIORITY.items(), key=lambda x: x[1]))
+    print(f"  Priority:   {priority_str}")
+    print(f"  Single pool: ${STARTING_CASH:,} | Full balance sizing")
     print(f"  No SPY regime filter")
     print(f"  Data: {data_dirs}")
     print(f"{'='*70}\n")
@@ -523,33 +1522,67 @@ if __name__ == "__main__":
     print("Loading data...")
     all_dates, daily_picks = load_all_picks(data_dirs)
     all_dates = [d for d in all_dates if "2024-01-01" <= d <= "2026-02-28"]
-    print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}\n")
+    print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
 
-    cash = STARTING_CASH
-    unsettled_cash = 0.0
+    # Pre-scan for R (Multi-Day Runner) candidates
+    r_day2_picks = {}
+    for idx in range(len(all_dates) - 1):
+        d1, d2 = all_dates[idx], all_dates[idx + 1]
+        for pick in daily_picks.get(d1, []):
+            if pick["gap_pct"] < R_DAY1_MIN_GAP:
+                continue
+            mh = pick.get("market_hour_candles")
+            if mh is None or len(mh) < 10:
+                continue
+            day1_close = float(mh["Close"].values[-1])
+            d2_data = _load_r_intraday(pick["ticker"], d2, data_dirs)
+            if d2_data is not None and len(d2_data) >= 20:
+                r_pick = {
+                    "ticker": pick["ticker"],
+                    "gap_pct": pick["gap_pct"],
+                    "premarket_high": 0,
+                    "pm_volume": 0,
+                    "market_hour_candles": d2_data,
+                    "is_r_candidate": True,
+                    "r_day1_close": day1_close,
+                }
+                r_day2_picks.setdefault(d2, []).append(r_pick)
+    r_total = sum(len(v) for v in r_day2_picks.values())
+    print(f"  R candidates: {r_total} across {len(r_day2_picks)} days\n")
+
+    cash = float(STARTING_CASH)
+    unsettled = 0.0
     all_results = []
+    all_selection_logs = []
+
+    print(f"\n  Starting Cash: ${cash:,.0f}")
+    print()
 
     print(f"{'Date':<12} {'Strat':>5} {'Trades':>6} {'Win':>4} {'Loss':>5} "
           f"{'Day P&L':>12} {'Balance':>14}")
     print("-" * 72)
 
     for d in all_dates:
-        if unsettled_cash > 0:
-            cash += unsettled_cash
-            unsettled_cash = 0.0
+        # Settle overnight
+        cash += unsettled
+        unsettled = 0.0
 
         picks = daily_picks.get(d, [])
+        # Inject R candidates (Day 2 of massive gappers)
+        r_picks = r_day2_picks.get(d, [])
+        all_picks = picks + r_picks
         cash_account = cash < MARGIN_THRESHOLD
 
-        states, new_cash, new_unsettled = simulate_day_combined(
-            picks, cash, cash_account
+        states, cash, unsettled, day_selection = simulate_day_combined(
+            all_picks, cash, cash_account
         )
+        all_selection_logs.extend(day_selection)
 
         day_pnl = 0.0
         day_trades = 0
         day_wins = 0
         day_losses = 0
-        counts = {"H": [0, 0], "G": [0, 0], "A": [0, 0], "F": [0, 0], "P": [0, 0]}
+        counts = {k: [0, 0] for k in STRAT_KEYS}
 
         for st in states:
             if st["exit_reason"] is not None:
@@ -565,13 +1598,11 @@ if __name__ == "__main__":
                     if st["pnl"] > 0:
                         counts[s][1] += 1
 
-        cash = new_cash
-        unsettled_cash = new_unsettled
-        equity = cash + unsettled_cash
+        equity = cash + unsettled
 
         # Build strat label like "H1G1A2F1"
         parts = []
-        for key in ["H", "G", "A", "F", "P"]:
+        for key in STRAT_KEYS:
             if counts[key][0] > 0:
                 parts.append(f"{key}{counts[key][0]}")
         strat_label = "".join(parts) if parts else ""
@@ -594,29 +1625,17 @@ if __name__ == "__main__":
             "date": d, "picks": picks, "states": states,
             "day_pnl": day_pnl, "equity": equity, "regime_skip": False,
             "trades": day_trades, "wins": day_wins, "losses": day_losses,
-            "h_trades": counts["H"][0], "g_trades": counts["G"][0],
-            "a_trades": counts["A"][0], "f_trades": counts["F"][0],
-            "p_trades": counts["P"][0],
-            "h_wins": counts["H"][1], "g_wins": counts["G"][1],
-            "a_wins": counts["A"][1], "f_wins": counts["F"][1],
-            "p_wins": counts["P"][1],
+            **{f"{k.lower()}_trades": counts[k][0] for k in STRAT_KEYS},
+            **{f"{k.lower()}_wins": counts[k][1] for k in STRAT_KEYS},
         })
 
     # --- Summary ---
-    final_equity = cash + unsettled_cash
+    final_equity = cash + unsettled
     total_trades = sum(r["trades"] for r in all_results)
     total_wins = sum(r["wins"] for r in all_results)
     total_losses = sum(r["losses"] for r in all_results)
-    total_h = sum(r["h_trades"] for r in all_results)
-    total_g = sum(r["g_trades"] for r in all_results)
-    total_a = sum(r["a_trades"] for r in all_results)
-    total_f = sum(r["f_trades"] for r in all_results)
-    total_p = sum(r["p_trades"] for r in all_results)
-    total_h_wins = sum(r["h_wins"] for r in all_results)
-    total_g_wins = sum(r["g_wins"] for r in all_results)
-    total_a_wins = sum(r["a_wins"] for r in all_results)
-    total_f_wins = sum(r["f_wins"] for r in all_results)
-    total_p_wins = sum(r["p_wins"] for r in all_results)
+    strat_totals = {k: sum(r[f"{k.lower()}_trades"] for r in all_results) for k in STRAT_KEYS}
+    strat_wins = {k: sum(r[f"{k.lower()}_wins"] for r in all_results) for k in STRAT_KEYS}
     daily_pnls = [r["day_pnl"] for r in all_results if r["trades"] > 0]
     green = sum(1 for p in daily_pnls if p > 0) if daily_pnls else 0
     red = sum(1 for p in daily_pnls if p <= 0) if daily_pnls else 0
@@ -624,7 +1643,7 @@ if __name__ == "__main__":
 
     all_exits = {}
     all_trade_pnls = []
-    strat_pnls = {"H": [], "G": [], "A": [], "F": [], "P": []}
+    strat_pnls = {k: [] for k in STRAT_KEYS}
     for r in all_results:
         for st in r["states"]:
             if st["exit_reason"] is not None:
@@ -638,13 +1657,28 @@ if __name__ == "__main__":
     avg_win = np.mean([p for p in all_trade_pnls if p > 0]) if total_wins > 0 else 0
     avg_loss = np.mean([p for p in all_trade_pnls if p <= 0]) if total_losses > 0 else 0
 
+    # Per-trade % returns
+    all_trade_pcts = []
+    for r in all_results:
+        for st in r["states"]:
+            if st["exit_reason"] is not None and st["position_cost"] > 0:
+                all_trade_pcts.append(st["pnl"] / st["position_cost"] * 100)
+
+    # Daily equity % changes
+    daily_eq_pcts = []
+    for i in range(1, len(all_results)):
+        prev_eq = all_results[i-1]["equity"]
+        curr_eq = all_results[i]["equity"]
+        if prev_eq > 0:
+            daily_eq_pcts.append((curr_eq / prev_eq - 1) * 100)
+
     print(f"\n{'='*70}")
-    print(f"  COMBINED STRATEGY SUMMARY (H + G + A + F + P)")
+    print(f"  COMBINED STRATEGY SUMMARY (H+G+A+F+D+V+P)")
     print(f"{'='*70}")
     print(f"  Starting Cash:    ${STARTING_CASH:,}")
     print(f"  Ending Equity:    ${final_equity:,.0f}  ({(final_equity/STARTING_CASH - 1)*100:+.1f}%)")
-    if unsettled_cash > 0:
-        print(f"    (Cash: ${cash:,.0f} + Unsettled: ${unsettled_cash:,.0f})")
+    if unsettled > 0:
+        print(f"    (Cash: ${cash:,.0f} + Unsettled: ${unsettled:,.0f})")
     print(f"  Trading Days:     {len(all_dates)}")
     print(f"  Total Trades:     {total_trades}")
     print(f"    Winners:        {total_wins} ({total_wins/max(total_trades,1)*100:.1f}%)")
@@ -654,27 +1688,47 @@ if __name__ == "__main__":
     pf = abs(avg_win * total_wins / (avg_loss * total_losses)) if total_losses > 0 and avg_loss != 0 else 0
     print(f"  Profit Factor:    {pf:.2f}" if pf > 0 else "")
 
+    # Daily % metrics
+    if daily_eq_pcts:
+        print(f"\n  Daily % Change:")
+        print(f"    Avg Daily:      {np.mean(daily_eq_pcts):+.2f}%")
+        print(f"    Median Daily:   {np.median(daily_eq_pcts):+.2f}%")
+        print(f"    Best Day:       {max(daily_eq_pcts):+.2f}%")
+        print(f"    Worst Day:      {min(daily_eq_pcts):+.2f}%")
+        print(f"    Std Dev:        {np.std(daily_eq_pcts):.2f}%")
+
+    # Per-trade % metrics
+    if all_trade_pcts:
+        win_pcts = [p for p in all_trade_pcts if p > 0]
+        loss_pcts = [p for p in all_trade_pcts if p <= 0]
+        print(f"\n  Per-Trade % Return:")
+        print(f"    Avg Trade:      {np.mean(all_trade_pcts):+.2f}%")
+        print(f"    Median Trade:   {np.median(all_trade_pcts):+.2f}%")
+        if win_pcts:
+            print(f"    Avg Winner:     {np.mean(win_pcts):+.2f}%")
+        if loss_pcts:
+            print(f"    Avg Loser:      {np.mean(loss_pcts):+.2f}%")
+
     # Per-strategy breakdown
-    for label, key, total, wins, target, time_lim in [
-        ("H (High Conviction)", "H", total_h, total_h_wins, H_TARGET_PCT, H_TIME_LIMIT_MINUTES),
-        ("G (Big Gap Runner)", "G", total_g, total_g_wins, G_TARGET_PCT, G_TIME_LIMIT_MINUTES),
-        ("A (Quick Scalp)", "A", total_a, total_a_wins, A_TARGET_PCT, A_TIME_LIMIT_MINUTES),
-        ("F (Catch-All)", "F", total_f, total_f_wins, F_TARGET_PCT, F_TIME_LIMIT_MINUTES),
-        ("P (PM High Breakout)", "P", total_p, total_p_wins, P_TARGET1_PCT, P_TIME_LIMIT_MINUTES),
-    ]:
+    strat_info = [
+        ("H (High Conviction)", "H"), ("G (Big Gap Runner)", "G"),
+        ("A (Quick Scalp)", "A"), ("F (Catch-All)", "F"),
+        ("D (Dip Buy)", "D"), ("V (VWAP Reclaim)", "V"),
+        ("P (PM High Breakout)", "P"), ("L (Low Float Squeeze)", "L"),
+    ]
+    for label, key in strat_info:
+        total_s = strat_totals[key]
+        wins_s = strat_wins[key]
+        pnls_s = strat_pnls[key]
         print(f"\n  {'---'*17}")
-        if key == "P":
-            print(f"  STRATEGY {label}: +{P_TARGET1_PCT}/{P_TARGET2_PCT}%, trail {P_TRAIL_PCT}%, {time_lim}m")
-        else:
-            print(f"  STRATEGY {label}: +{target}%, {time_lim}m")
+        print(f"  STRATEGY {label}")
         print(f"  {'---'*17}")
-        print(f"    Trades:  {total}")
-        print(f"    Winners: {wins} ({wins/max(total,1)*100:.1f}%)")
-        pnls = strat_pnls[key]
-        if pnls:
-            w = [p for p in pnls if p > 0]
-            l = [p for p in pnls if p <= 0]
-            print(f"    Total PnL: ${sum(pnls):+,.0f}")
+        print(f"    Trades:  {total_s}")
+        print(f"    Winners: {wins_s} ({wins_s/max(total_s,1)*100:.1f}%)")
+        if pnls_s:
+            w = [p for p in pnls_s if p > 0]
+            l = [p for p in pnls_s if p <= 0]
+            print(f"    Total PnL: ${sum(pnls_s):+,.0f}")
             if w:
                 print(f"    Avg Win:   ${np.mean(w):+,.0f}")
             if l:
@@ -691,6 +1745,30 @@ if __name__ == "__main__":
         print(f"  Worst Day:        ${min(daily_pnls):+,.0f}")
         print(f"  Avg P&L/Day:      ${np.mean(daily_pnls):+,.0f}")
         print(f"  Sharpe (ann.):    {sharpe:.2f}")
+
+    # --- STRATEGY SELECTION ANALYSIS ---
+    if all_selection_logs:
+        print(f"\n  {'='*50}")
+        print(f"  STRATEGY SELECTION ANALYSIS")
+        print(f"  {'='*50}")
+        skip_counts = {k: 0 for k in STRAT_KEYS}
+        steal_counts = {k: {k2: 0 for k2 in STRAT_KEYS} for k in STRAT_KEYS}
+        for entry in all_selection_logs:
+            for sk in entry["skipped"]:
+                if sk in skip_counts:
+                    skip_counts[sk] += 1
+                    for fl in entry["filled"]:
+                        if fl in steal_counts[sk]:
+                            steal_counts[sk][fl] += 1
+        print(f"  Times each strategy was SKIPPED (no cash):")
+        for k in STRAT_KEYS:
+            if skip_counts[k] > 0:
+                stealers = [(k2, c) for k2, c in steal_counts[k].items() if c > 0]
+                stealers.sort(key=lambda x: -x[1])
+                stealer_str = ", ".join(f"{s}({c}x)" for s, c in stealers[:5])
+                print(f"    {k}: {skip_counts[k]:>4}x  (cash taken by: {stealer_str})")
+        total_skips = sum(skip_counts.values())
+        print(f"  Total skip events: {total_skips}")
 
     # --- STRESS TEST ---
     print(f"\n  {'='*50}")
@@ -793,7 +1871,13 @@ if __name__ == "__main__":
         COLORS_G = ["#4CAF50", "#66BB6A", "#81C784"]   # Greens for G
         COLORS_A = ["#2196F3", "#42A5F5", "#64B5F6"]   # Blues for A
         COLORS_F = ["#FF9800", "#FFA726", "#FFB74D"]    # Oranges for F
+        COLORS_D = ["#00BCD4", "#26C6DA", "#4DD0E1"]    # Cyan for D
+        COLORS_V = ["#607D8B", "#78909C", "#90A4AE"]    # Blue-grey for V
+        COLORS_M = ["#795548", "#8D6E63", "#A1887F"]    # Brown for M
+        COLORS_R = ["#009688", "#26A69A", "#4DB6AC"]    # Teal for R
         COLORS_P = ["#E91E63", "#EC407A", "#F06292"]    # Pink for P
+        COLORS_W = ["#CDDC39", "#D4E157", "#DCE775"]    # Lime for W
+        COLORS_L = ["#FF5722", "#FF7043", "#FF8A65"]    # Deep orange for L
         DAYS_PER_PAGE = 5
 
         num_pages = math.ceil(len(all_dates) / DAYS_PER_PAGE)
@@ -811,13 +1895,18 @@ if __name__ == "__main__":
                 axes = [axes]
 
             fig.suptitle(
-                f"Combined H+G+A+F+P Page {page+1}/{num_pages}: "
+                f"Combined H+G+A+F+D+V+M+P Page {page+1}/{num_pages}: "
                 f"{page_results[0]['date']} to {page_results[-1]['date']}\n"
                 f"H: +{H_TARGET_PCT}%/{H_TIME_LIMIT_MINUTES}m (purple) | "
                 f"G: +{G_TARGET_PCT}%/{G_TIME_LIMIT_MINUTES}m (green) | "
                 f"A: +{A_TARGET_PCT}%/{A_TIME_LIMIT_MINUTES}m (blue) | "
-                f"F: +{F_TARGET_PCT}%/{F_TIME_LIMIT_MINUTES}m (orange) | "
-                f"P: +{P_TARGET1_PCT}/{P_TARGET2_PCT}%/trail{P_TRAIL_PCT}%/{P_TIME_LIMIT_MINUTES}m (pink)",
+                f"F: +{F_TARGET_PCT}%/{F_TIME_LIMIT_MINUTES}m (orange)\n"
+                f"D: +{D_TARGET1_PCT}/{D_TARGET2_PCT}%/{D_TIME_LIMIT_MINUTES}m (cyan) | "
+                f"V: +{V_TARGET1_PCT}/{V_TARGET2_PCT}%/{V_TIME_LIMIT_MINUTES}m (grey) | "
+                f"M: +{M_TARGET1_PCT}%/{M_TIME_LIMIT_MINUTES}m (brown)\n"
+                f"R: +{R_TARGET1_PCT}%/{R_TIME_LIMIT_MINUTES}m (teal) | "
+                f"P: +{P_TARGET1_PCT}/{P_TARGET2_PCT}%/{P_TIME_LIMIT_MINUTES}m (pink) | "
+                f"L: tiered/{L_TIME_LIMIT_MINUTES}m (d.orange)",
                 fontsize=11, fontweight="bold", y=1.01,
             )
 
@@ -828,8 +1917,8 @@ if __name__ == "__main__":
                 traded = [s for s in res["states"] if s["exit_reason"] is not None]
 
                 if traded:
-                    color_idx = {"H": 0, "G": 0, "A": 0, "F": 0, "P": 0}
-                    color_map = {"H": COLORS_H, "G": COLORS_G, "A": COLORS_A, "F": COLORS_F, "P": COLORS_P}
+                    color_idx = {k: 0 for k in STRAT_KEYS}
+                    color_map = {"H": COLORS_H, "G": COLORS_G, "A": COLORS_A, "F": COLORS_F, "D": COLORS_D, "V": COLORS_V, "M": COLORS_M, "R": COLORS_R, "P": COLORS_P, "W": COLORS_W, "L": COLORS_L}
                     for si, st in enumerate(traded):
                         mh = st["mh"]
                         if mh.index.tz is not None:
@@ -857,10 +1946,11 @@ if __name__ == "__main__":
                         # BUY marker
                         if st["entry_time"] is not None:
                             et_buy = _to_et(st["entry_time"])
-                            ax_price.plot(et_buy, 0, marker="^", color=color,
+                            buy_pct = (st.get("signal_price", ref_price) / ref_price - 1) * 100
+                            ax_price.plot(et_buy, buy_pct, marker="^", color=color,
                                           markersize=10, zorder=5)
                             ax_price.annotate(
-                                f"BUY({strat_tag})", xy=(et_buy, 0), xytext=(0, 12),
+                                f"BUY({strat_tag})", xy=(et_buy, buy_pct), xytext=(0, 12),
                                 textcoords="offset points", ha="center", va="bottom",
                                 fontsize=6, fontweight="bold", color=color,
                                 bbox=dict(boxstyle="round,pad=0.15", fc="white",
@@ -897,7 +1987,12 @@ if __name__ == "__main__":
                     target_lines = {
                         "H": (H_TARGET_PCT, "#9C27B0"), "G": (G_TARGET_PCT, "#4CAF50"),
                         "A": (A_TARGET_PCT, "#2196F3"), "F": (F_TARGET_PCT, "#FF9800"),
+                        "D": (D_TARGET1_PCT, "#00BCD4"), "V": (V_TARGET1_PCT, "#607D8B"),
+                        "M": (M_TARGET1_PCT, "#795548"),
+                        "R": (R_TARGET1_PCT, "#009688"),
                         "P": (P_TARGET1_PCT, "#E91E63"),
+                        "W": (W_TARGET_PCT, "#CDDC39"),
+                        "L": (L_TIER3_TARGET1_PCT, "#FF5722"),
                     }
                     shown_targets = set()
                     for sk, (tv, tc_line) in target_lines.items():
@@ -966,7 +2061,7 @@ if __name__ == "__main__":
         gs = fig2.add_gridspec(3, 3, width_ratios=[1.2, 1.2, 0.8],
                                height_ratios=[1.0, 1.0, 1.0], hspace=0.35, wspace=0.3)
         fig2.suptitle(
-            f"Combined H+G+A+F+P Summary: {all_dates[0]} to {all_dates[-1]} ({len(all_dates)} days)",
+            f"Combined H+G+A+F+D+V+M+R+P Summary: {all_dates[0]} to {all_dates[-1]} ({len(all_dates)} days)",
             fontsize=16, fontweight="bold",
         )
 
@@ -989,7 +2084,7 @@ if __name__ == "__main__":
         # 2. Equity curve
         ax = fig2.add_subplot(gs[1, :])
         equities = [r["equity"] for r in all_results]
-        ax.plot(range(len(dates_list)), equities, color="#2196F3", linewidth=2, label="Combined H+G+A+F+P")
+        ax.plot(range(len(dates_list)), equities, color="#2196F3", linewidth=2, label="Combined H+G+A+F+D+V+M+R+P+W")
         ax.fill_between(range(len(dates_list)), STARTING_CASH, equities,
                         where=[e >= STARTING_CASH for e in equities], alpha=0.15, color="#4CAF50")
         ax.fill_between(range(len(dates_list)), STARTING_CASH, equities,
@@ -998,6 +2093,29 @@ if __name__ == "__main__":
                    label=f"Start: ${STARTING_CASH:,}")
         ax.axhline(y=MARGIN_THRESHOLD, color="#FF9800", linestyle=":", alpha=0.6,
                    label=f"Margin ${MARGIN_THRESHOLD/1000:.0f}K")
+
+        # Milestone markers with vertical drop-lines and elevated labels
+        milestones = [(50_000, "$50K", "#FF9800"), (100_000, "$100K", "#E91E63"),
+                      (1_000_000, "$1M", "#9C27B0"), (10_000_000, "$10M", "#F44336")]
+        y_max = max(equities)
+        for mi, (mlevel, mlabel, mcolor) in enumerate(milestones):
+            if y_max >= mlevel:
+                ax.axhline(y=mlevel, color=mcolor, linestyle="--", alpha=0.3, linewidth=1)
+                for midx, eq in enumerate(equities):
+                    if eq >= mlevel:
+                        # Vertical drop-line from label to the crossing point
+                        label_y = y_max * (0.85 + mi * 0.04)  # stagger labels high
+                        ax.plot([midx, midx], [mlevel, label_y], color=mcolor,
+                                linestyle="-", linewidth=1, alpha=0.6)
+                        ax.plot(midx, mlevel, marker="o", color=mcolor, markersize=6, zorder=5)
+                        ax.annotate(f"{mlabel}\n{dates_list[midx]}",
+                                    xy=(midx, label_y), xytext=(0, 6),
+                                    textcoords="offset points", ha="center", va="bottom",
+                                    fontsize=8, color=mcolor, fontweight="bold",
+                                    bbox=dict(boxstyle="round,pad=0.3", fc="white",
+                                              ec=mcolor, alpha=0.9, lw=1))
+                        break
+
         ax.set_xticks(range(0, len(dates_list), max(1, len(dates_list) // 15)))
         ax.set_xticklabels([dates_list[i] for i in range(0, len(dates_list), max(1, len(dates_list) // 15))],
                            rotation=45, fontsize=8, ha="right")
@@ -1015,8 +2133,18 @@ if __name__ == "__main__":
                 "G_TARGET": "#4CAF50", "G_TIME_STOP": "#81C784", "G_EOD_CLOSE": "#C8E6C9",
                 "A_TARGET": "#2196F3", "A_TIME_STOP": "#64B5F6", "A_EOD_CLOSE": "#BBDEFB",
                 "F_TARGET": "#FF9800", "F_TIME_STOP": "#FFB74D", "F_EOD_CLOSE": "#FFE0B2",
+                "D_TARGET": "#00BCD4", "D_STOP": "#4DD0E1", "D_TRAIL": "#26C6DA",
+                "D_TIME_STOP": "#80DEEA", "D_EOD_CLOSE": "#B2EBF2",
+                "V_TARGET": "#607D8B", "V_STOP": "#90A4AE", "V_TRAIL": "#78909C",
+                "V_TIME_STOP": "#B0BEC5", "V_EOD_CLOSE": "#CFD8DC",
+                "M_TARGET": "#795548", "M_STOP": "#A1887F", "M_TRAIL": "#8D6E63",
+                "M_TIME_STOP": "#BCAAA4", "M_EOD_CLOSE": "#D7CCC8",
+                "R_TARGET": "#009688", "R_STOP": "#4DB6AC", "R_TRAIL": "#26A69A",
+                "R_TIME_STOP": "#80CBC4", "R_EOD_CLOSE": "#B2DFDB",
                 "P_TARGET": "#E91E63", "P_STOP": "#F48FB1", "P_TRAIL": "#F06292",
                 "P_TIME_STOP": "#F8BBD0", "P_EOD_CLOSE": "#FCE4EC",
+                "W_TARGET": "#CDDC39", "W_STOP": "#DCE775", "W_TRAIL": "#D4E157",
+                "W_TIME_STOP": "#E6EE9C", "W_EOD_CLOSE": "#F0F4C3",
             }
             labels = list(all_exits.keys())
             sizes = list(all_exits.values())
@@ -1035,16 +2163,13 @@ if __name__ == "__main__":
             f"Return:       {(final_equity/STARTING_CASH-1)*100:+.1f}%\n"
             f"{'─'*38}\n"
             f"Total Trades: {total_trades}\n"
-            f"  H: {total_h:>3} ({total_h_wins}W {total_h_wins/max(total_h,1)*100:.0f}%)"
-            f"  ${sum(strat_pnls['H']):+,.0f}\n"
-            f"  G: {total_g:>3} ({total_g_wins}W {total_g_wins/max(total_g,1)*100:.0f}%)"
-            f"  ${sum(strat_pnls['G']):+,.0f}\n"
-            f"  A: {total_a:>3} ({total_a_wins}W {total_a_wins/max(total_a,1)*100:.0f}%)"
-            f"  ${sum(strat_pnls['A']):+,.0f}\n"
-            f"  F: {total_f:>3} ({total_f_wins}W {total_f_wins/max(total_f,1)*100:.0f}%)"
-            f"  ${sum(strat_pnls['F']):+,.0f}\n"
-            f"  P: {total_p:>3} ({total_p_wins}W {total_p_wins/max(total_p,1)*100:.0f}%)"
-            f"  ${sum(strat_pnls['P']):+,.0f}\n"
+        )
+        for k in STRAT_KEYS:
+            st_t = strat_totals[k]
+            st_w = strat_wins[k]
+            st_pnl = sum(strat_pnls[k])
+            stats_text += f"  {k}: {st_t:>3} ({st_w}W {st_w/max(st_t,1)*100:.0f}%) ${st_pnl:+,.0f}\n"
+        stats_text += (
             f"{'─'*38}\n"
             f"Win Rate:     {total_wins/max(total_trades,1)*100:.1f}%\n"
             f"Avg Win:      ${avg_win:+,.0f}\n"
@@ -1115,6 +2240,39 @@ if __name__ == "__main__":
             f"  Gap >= {F_MIN_GAP_PCT:.0f}%\n"
             f"  2nd green (no hi req)\n"
             f"  Target: +{F_TARGET_PCT:.0f}%  Stop: {F_TIME_LIMIT_MINUTES}m\n"
+            f"\nD (Dip Buy)\n{'-'*32}\n"
+            f"  Gap >= {D_MIN_GAP_PCT:.0f}%\n"
+            f"  Spike >= {D_MIN_SPIKE_PCT:.0f}% in {D_SPIKE_WINDOW}c\n"
+            f"  Dip: {D_DIP_PCT:.0f}% | Mode: {D_ENTRY_MODE}\n"
+            f"  Max entry: c{D_MAX_ENTRY_CANDLE}\n"
+            f"  Target1: +{D_TARGET1_PCT:.0f}% (sell {D_PARTIAL_SELL_PCT:.0f}%)\n"
+            f"  Target2: +{D_TARGET2_PCT:.0f}% (runner)\n"
+            f"  Stop: -{D_STOP_PCT:.0f}%  Trail: {D_TRAIL_PCT:.0f}% (at +{D_TRAIL_ACTIVATE_PCT:.0f}%)\n"
+            f"  Time: {D_TIME_LIMIT_MINUTES}m\n"
+            f"\nV (VWAP Reclaim)\n{'-'*32}\n"
+            f"  Gap >= {V_MIN_GAP_PCT:.0f}%\n"
+            f"  Below VWAP: {V_MIN_BELOW_CANDLES}+ closes\n"
+            f"  Min depth: {V_MIN_BELOW_PCT:.0f}% below VWAP\n"
+            f"  Vol spike: >= {V_VOL_SPIKE_RATIO:.1f}x\n"
+            f"  Target1: +{V_TARGET1_PCT:.0f}% (sell {V_PARTIAL_SELL_PCT:.0f}%)\n"
+            f"  Target2: +{V_TARGET2_PCT:.0f}% (runner)\n"
+            f"  Stop: -{V_STOP_PCT:.0f}%  Trail: {V_TRAIL_PCT:.0f}% (at +{V_TRAIL_ACTIVATE_PCT:.0f}%)\n"
+            f"  Time: {V_TIME_LIMIT_MINUTES}m\n"
+            f"\nM (Midday Break)\n{'-'*32}\n"
+            f"  Gap >= {M_MIN_GAP_PCT:.0f}%\n"
+            f"  Morning spike >= {M_MORNING_SPIKE_PCT:.0f}%\n"
+            f"  Consol: c{M_RANGE_START_CANDLE}-{M_RANGE_START_CANDLE+M_CONSOLIDATION_LEN}\n"
+            f"  Range <= {M_MAX_RANGE_PCT:.0f}%, Vol <= {M_VOL_RATIO:.1f}x\n"
+            f"  Target1: +{M_TARGET1_PCT:.0f}% (sell {M_PARTIAL_SELL_PCT:.0f}%)\n"
+            f"  Stop: -{M_STOP_PCT:.0f}%  Trail: {M_TRAIL_PCT:.0f}% (at +{M_TRAIL_ACTIVATE_PCT:.0f}%)\n"
+            f"  Time: {M_TIME_LIMIT_MINUTES}m\n"
+            f"\nR (Multi-Day)\n{'-'*32}\n"
+            f"  Day1 gap >= {R_DAY1_MIN_GAP:.0f}%\n"
+            f"  D2 pullback: {R_D2_PULLBACK_PCT:.0f}%\n"
+            f"  Bounce > {R_BOUNCE_REF}\n"
+            f"  Target: +{R_TARGET1_PCT:.0f}%\n"
+            f"  Stop: -{R_STOP_PCT:.0f}%  Trail: {R_TRAIL_PCT:.0f}% (at +{R_TRAIL_ACTIVATE_PCT:.0f}%)\n"
+            f"  Time: {R_TIME_LIMIT_MINUTES}m\n"
             f"\nP (PM High Breakout)\n{'-'*32}\n"
             f"  Gap >= {P_MIN_GAP_PCT:.0f}%\n"
             f"  Confirm: {P_CONFIRM_ABOVE}/{P_CONFIRM_WINDOW} closes\n"
@@ -1124,9 +2282,17 @@ if __name__ == "__main__":
             f"  Target2: +{P_TARGET2_PCT:.0f}% (runner)\n"
             f"  Stop: -{P_STOP_PCT:.0f}%  Trail: {P_TRAIL_PCT:.0f}% (at +{P_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {P_TIME_LIMIT_MINUTES}m\n"
+            f"\nW (Power Hour)\n{'-'*32}\n"
+            f"  Gap >= {W_MIN_GAP_PCT:.0f}%\n"
+            f"  Morning run >= {W_MIN_MORNING_RUN:.0f}%\n"
+            f"  Consol: c{W_CONSOL_START}-{W_EARLIEST_CANDLE}\n"
+            f"  Range <= {W_MAX_RANGE_PCT:.0f}%\n"
+            f"  VWAP dev <= {W_MAX_VWAP_DEV_PCT:.0f}%\n"
+            f"  Vol surge >= {W_VOL_SURGE_MULT:.1f}x\n"
+            f"  Target: +{W_TARGET_PCT:.0f}%\n"
+            f"  Stop: -{W_STOP_PCT:.1f}%  Trail: {W_TRAIL_PCT:.0f}%\n"
             f"\nSHARED\n{'-'*32}\n"
-            f"  Priority:  H > G > A > F > P\n"
-            f"  Max pos:   {MAX_POSITIONS}\n"
+            f"  Priority:  H>G>A>F>D>V>M>R>P>W\n"
             f"  Sizing:    100% balance\n"
             f"  Slippage:  {SLIPPAGE_PCT}%\n"
             f"  Vol cap:   {VOL_CAP_PCT}%\n"

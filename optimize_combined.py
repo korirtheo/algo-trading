@@ -1,358 +1,568 @@
 """
-Optuna Optimizer for Combined Green Candle Strategy (H + G + A + F)
-===================================================================
-Optimizes all strategy parameters: gap thresholds, body filters,
-target percentages, and time stops for each strategy.
-
-Uses compounding (100% balance sizing, MAX_POSITIONS=1).
-No SPY regime filter.
+Combined Optuna Optimizer v7: Single Pool + Strategy Selection
+===============================================================
+Optimizes H, G, A, F, D, V, P, L with single $25K cash pool.
+Optuna decides which strategies to enable (1-8) and their priority.
+Multiple strategies can enter the same ticker; 5% vol cap limits exposure.
+L has dedicated states (signal independence from H/G/A/F on same tickers).
+M, R, W are disabled.
 
 Usage:
-  python optimize_combined.py              # 300 trials (default)
-  python optimize_combined.py --trials 500 # custom trial count
+  python optimize_combined.py                   # 500 trials (default)
+  python optimize_combined.py --trials 5        # quick smoke test
+  python optimize_combined.py --trials 1000     # extended search
 """
+
 import os
 import sys
 import time
+import argparse
 import numpy as np
+import pandas as pd
 import optuna
+from optuna.samplers import TPESampler
 
-from test_full import (
-    load_all_picks,
-    SLIPPAGE_PCT,
-    STARTING_CASH,
-    MARGIN_THRESHOLD,
-    VOL_CAP_PCT,
-    ET_TZ,
-)
-import test_green_candle_combined as tgcc
+import io
+if hasattr(sys.stdout, 'buffer'):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8",
+                                  errors="replace", line_buffering=True)
 
-optuna.logging.set_verbosity(optuna.logging.WARNING)
+import test_green_candle_combined as tgc
+from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
-# Force line-buffered stdout so output appears in real-time
-if hasattr(sys.stdout, 'reconfigure'):
-    sys.stdout.reconfigure(line_buffering=True)
-
-_builtin_print = print
-def _print(*args, **kwargs):
-    """Print with immediate flush."""
-    kwargs.setdefault("flush", True)
-    _builtin_print(*args, **kwargs)
-
-N_TRIALS = 300
 DATA_DIRS = ["stored_data_combined"]
-DATE_RANGE = ("2025-01-01", "2026-02-28")
+DATE_RANGE = ("2024-01-01", "2026-02-28")
+
+STRAT_KEYS = ["H", "G", "A", "F", "D", "V", "P", "L"]
 
 
-def run_backtest(picks_by_date, all_dates, params):
-    """Run full backtest with given params, return metrics."""
-    # Patch module-level config — H
-    tgcc.H_MIN_GAP_PCT = params["h_min_gap"]
-    tgcc.H_MIN_BODY_PCT = params["h_min_body"]
-    tgcc.H_REQUIRE_VOL_CONFIRM = params["h_vol_confirm"]
-    tgcc.H_TARGET_PCT = params["h_target"]
-    tgcc.H_TIME_LIMIT_MINUTES = params["h_time"]
+# ---------------------------------------------------------------------------
+# Set strategy params on tgc module globals
+# ---------------------------------------------------------------------------
+def set_strategy_params(params):
+    """Set all strategy globals on the tgc module."""
+    # Reset H/G/A/F min_gap to defaults (enable/disable may have set to 9999)
+    tgc.H_MIN_GAP_PCT = 35.0
+    tgc.G_MIN_GAP_PCT = 30.0
+    tgc.A_MIN_GAP_PCT = 15.0
+    tgc.F_MIN_GAP_PCT = 10.0
 
-    # Patch module-level config — G
-    tgcc.G_MIN_GAP_PCT = params["g_min_gap"]
-    tgcc.G_MIN_BODY_PCT = params["g_min_body"]
-    tgcc.G_TARGET_PCT = params["g_target"]
-    tgcc.G_TIME_LIMIT_MINUTES = params["g_time"]
+    # --- H (High Conviction) ---
+    tgc.H_TARGET_PCT = params["h_target_pct"]
+    tgc.H_TIME_LIMIT_MINUTES = params["h_time_limit_min"]
+    tgc.H_STOP_PCT = params["h_stop_pct"]
+    tgc.H_TRAIL_PCT = params["h_trail_pct"]
+    tgc.H_TRAIL_ACTIVATE_PCT = params["h_trail_activate_pct"]
 
-    # Patch module-level config — A
-    tgcc.A_MIN_GAP_PCT = params["a_min_gap"]
-    tgcc.A_MIN_BODY_PCT = params["a_min_body"]
-    tgcc.A_TARGET_PCT = params["a_target"]
-    tgcc.A_TIME_LIMIT_MINUTES = params["a_time"]
+    # --- G (Big Gap Runner) ---
+    tgc.G_TARGET_PCT = params["g_target_pct"]
+    tgc.G_TIME_LIMIT_MINUTES = params["g_time_limit_min"]
+    tgc.G_STOP_PCT = params["g_stop_pct"]
+    tgc.G_TRAIL_PCT = params["g_trail_pct"]
+    tgc.G_TRAIL_ACTIVATE_PCT = params["g_trail_activate_pct"]
 
-    # Patch module-level config — F
-    tgcc.F_MIN_GAP_PCT = params["f_min_gap"]
-    tgcc.F_MIN_BODY_PCT = params["f_min_body"]
-    tgcc.F_TARGET_PCT = params["f_target"]
-    tgcc.F_TIME_LIMIT_MINUTES = params["f_time"]
+    # --- A (Quick Scalp) ---
+    tgc.A_TARGET_PCT = params["a_target_pct"]
+    tgc.A_TIME_LIMIT_MINUTES = params["a_time_limit_min"]
+    tgc.A_STOP_PCT = params["a_stop_pct"]
+    tgc.A_TRAIL_PCT = params["a_trail_pct"]
+    tgc.A_TRAIL_ACTIVATE_PCT = params["a_trail_activate_pct"]
 
-    cash = STARTING_CASH
+    # --- F (Catch-All) ---
+    tgc.F_TARGET_PCT = params["f_target_pct"]
+    tgc.F_TIME_LIMIT_MINUTES = params["f_time_limit_min"]
+    tgc.F_STOP_PCT = params["f_stop_pct"]
+    tgc.F_TRAIL_PCT = params["f_trail_pct"]
+    tgc.F_TRAIL_ACTIVATE_PCT = params["f_trail_activate_pct"]
+
+    # --- D (Opening Dip Buy) ---
+    tgc.D_MIN_GAP_PCT = float(params["d_min_gap"])
+    tgc.D_MIN_SPIKE_PCT = float(params["d_min_spike_pct"])
+    tgc.D_SPIKE_WINDOW = params["d_spike_window"]
+    tgc.D_DIP_PCT = float(params["d_dip_pct"])
+    tgc.D_ENTRY_MODE = params["d_entry_mode"]
+    tgc.D_MAX_ENTRY_CANDLE = params["d_max_entry_candle"]
+    tgc.D_TARGET1_PCT = params["d_target1_pct"]
+    tgc.D_TARGET2_PCT = params["d_target2_pct"]
+    tgc.D_STOP_PCT = params["d_stop_pct"]
+    tgc.D_PARTIAL_SELL_PCT = params["d_partial_sell_pct"]
+    tgc.D_TRAIL_PCT = params["d_trail_pct"]
+    tgc.D_TRAIL_ACTIVATE_PCT = params["d_trail_activate_pct"]
+    tgc.D_TIME_LIMIT_MINUTES = params["d_time_limit_min"]
+
+    # --- V (VWAP Reclaim) ---
+    tgc.V_MIN_GAP_PCT = float(params["v_min_gap"])
+    tgc.V_MIN_BELOW_CANDLES = params["v_min_below_candles"]
+    tgc.V_MIN_BELOW_PCT = float(params["v_min_below_pct"])
+    tgc.V_VOL_SPIKE_RATIO = params["v_vol_spike_ratio"]
+    tgc.V_MAX_ENTRY_CANDLE = params["v_max_entry_candle"]
+    tgc.V_TARGET1_PCT = params["v_target1_pct"]
+    tgc.V_TARGET2_PCT = params["v_target2_pct"]
+    tgc.V_STOP_PCT = params["v_stop_pct"]
+    tgc.V_PARTIAL_SELL_PCT = params["v_partial_sell_pct"]
+    tgc.V_TRAIL_PCT = params["v_trail_pct"]
+    tgc.V_TRAIL_ACTIVATE_PCT = params["v_trail_activate_pct"]
+    tgc.V_TIME_LIMIT_MINUTES = params["v_time_limit_min"]
+
+    # --- P (PM High Breakout) ---
+    tgc.P_MIN_GAP_PCT = float(params["p_min_gap"])
+    tgc.P_CONFIRM_ABOVE = params["p_confirm_above"]
+    tgc.P_CONFIRM_WINDOW = params["p_confirm_window"]
+    tgc.P_PULLBACK_PCT = params["p_pullback_pct"]
+    tgc.P_PULLBACK_TIMEOUT = params["p_pullback_timeout"]
+    tgc.P_MAX_ENTRY_CANDLE = params["p_max_entry_candle"]
+    tgc.P_TARGET1_PCT = params["p_target1_pct"]
+    tgc.P_TARGET2_PCT = params["p_target2_pct"]
+    tgc.P_STOP_PCT = params["p_stop_pct"]
+    tgc.P_PARTIAL_SELL_PCT = params["p_partial_sell_pct"]
+    tgc.P_TRAIL_PCT = params["p_trail_pct"]
+    tgc.P_TRAIL_ACTIVATE_PCT = params["p_trail_activate_pct"]
+    tgc.P_TIME_LIMIT_MINUTES = params["p_time_limit_min"]
+
+    # --- L (Low Float Squeeze) ---
+    tgc.L_MIN_GAP_PCT = float(params["l_min_gap"])
+    tgc.L_MAX_FLOAT = params["l_max_float"]
+    tgc.L_EARLIEST_CANDLE = params["l_earliest_candle"]
+    tgc.L_LATEST_CANDLE = params["l_latest_candle"]
+    tgc.L_VOL_SURGE_MULT = params["l_vol_surge_mult"]
+    tgc.L_MIN_PRICE_ACCEL_PCT = params["l_min_price_accel_pct"]
+    tgc.L_TIER1_FLOAT = params["l_tier1_float"]
+    tgc.L_TIER2_FLOAT = params["l_tier2_float"]
+    tgc.L_TIER1_TARGET1_PCT = params["l_tier1_target1_pct"]
+    tgc.L_TIER1_TARGET2_PCT = params["l_tier1_target2_pct"]
+    tgc.L_TIER2_TARGET1_PCT = params["l_tier2_target1_pct"]
+    tgc.L_TIER2_TARGET2_PCT = params["l_tier2_target2_pct"]
+    tgc.L_TIER3_TARGET1_PCT = params["l_tier3_target1_pct"]
+    tgc.L_TIER3_TARGET2_PCT = params["l_tier3_target2_pct"]
+    tgc.L_STOP_PCT = params["l_stop_pct"]
+    tgc.L_PARTIAL_SELL_PCT = params["l_partial_sell_pct"]
+    tgc.L_TRAIL_PCT = params["l_trail_pct"]
+    tgc.L_TRAIL_ACTIVATE_PCT = params["l_trail_activate_pct"]
+    tgc.L_TIME_LIMIT_MINUTES = params["l_time_limit_min"]
+
+    # --- M/R/W disabled ---
+    tgc.M_MIN_GAP_PCT = 9999.0
+    tgc.R_DAY1_MIN_GAP = 9999.0
+    tgc.W_MIN_GAP_PCT = 9999.0
+
+    # --- Strategy enable/disable (Optuna decides which strategies to include) ---
+    # Disabled strategies get min_gap set to 9999 (effectively removes them)
+    if not params.get("enable_h", True):
+        tgc.H_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_g", True):
+        tgc.G_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_a", True):
+        tgc.A_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_f", True):
+        tgc.F_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_d", True):
+        tgc.D_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_v", True):
+        tgc.V_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_p", True):
+        tgc.P_MIN_GAP_PCT = 9999.0
+    if not params.get("enable_l", True):
+        tgc.L_MIN_GAP_PCT = 9999.0
+
+    # --- Strategy priority (Optuna decides entry order) ---
+    tgc.STRAT_PRIORITY = {
+        "H": params["priority_h"],
+        "G": params["priority_g"],
+        "A": params["priority_a"],
+        "F": params["priority_f"],
+        "D": params["priority_d"],
+        "V": params["priority_v"],
+        "P": params["priority_p"],
+        "L": params["priority_l"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Suggest all params from an Optuna trial
+# ---------------------------------------------------------------------------
+def suggest_all_params(trial):
+    """Suggest params for all 7 active strategies + priority ordering."""
+    params = {}
+
+    # === H: High Conviction (5 params) ===
+    params["h_target_pct"] = trial.suggest_float("h_target_pct", 5.0, 25.0, step=1.0)
+    params["h_time_limit_min"] = trial.suggest_int("h_time_limit_min", 3, 30, step=3)
+    params["h_stop_pct"] = trial.suggest_float("h_stop_pct", 0.0, 12.0, step=2.0)
+    params["h_trail_pct"] = trial.suggest_float("h_trail_pct", 0.0, 5.0, step=1.0)
+    params["h_trail_activate_pct"] = trial.suggest_float("h_trail_activate_pct", 0.0, 8.0, step=2.0)
+
+    # === G: Big Gap Runner (5 params) ===
+    params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
+    params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
+    params["g_stop_pct"] = trial.suggest_float("g_stop_pct", 0.0, 12.0, step=2.0)
+    params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
+    params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
+
+    # === A: Quick Scalp (5 params) ===
+    params["a_target_pct"] = trial.suggest_float("a_target_pct", 2.0, 15.0, step=1.0)
+    params["a_time_limit_min"] = trial.suggest_int("a_time_limit_min", 3, 30, step=3)
+    params["a_stop_pct"] = trial.suggest_float("a_stop_pct", 0.0, 12.0, step=2.0)
+    params["a_trail_pct"] = trial.suggest_float("a_trail_pct", 0.0, 5.0, step=1.0)
+    params["a_trail_activate_pct"] = trial.suggest_float("a_trail_activate_pct", 0.0, 8.0, step=2.0)
+
+    # === F: Catch-All (5 params) ===
+    params["f_target_pct"] = trial.suggest_float("f_target_pct", 2.0, 15.0, step=1.0)
+    params["f_time_limit_min"] = trial.suggest_int("f_time_limit_min", 3, 30, step=3)
+    params["f_stop_pct"] = trial.suggest_float("f_stop_pct", 0.0, 12.0, step=2.0)
+    params["f_trail_pct"] = trial.suggest_float("f_trail_pct", 0.0, 5.0, step=1.0)
+    params["f_trail_activate_pct"] = trial.suggest_float("f_trail_activate_pct", 0.0, 8.0, step=2.0)
+
+    # === D: Opening Dip Buy (13 params) ===
+    params["d_min_gap"] = trial.suggest_int("d_min_gap", 8, 30, step=2)
+    params["d_min_spike_pct"] = trial.suggest_int("d_min_spike_pct", 3, 15)
+    params["d_spike_window"] = trial.suggest_int("d_spike_window", 5, 20, step=5)
+    params["d_dip_pct"] = trial.suggest_int("d_dip_pct", 5, 15)
+    params["d_entry_mode"] = trial.suggest_categorical("d_entry_mode", ["vwap", "5candle"])
+    params["d_max_entry_candle"] = trial.suggest_int("d_max_entry_candle", 15, 60, step=5)
+    params["d_target1_pct"] = trial.suggest_float("d_target1_pct", 3.0, 15.0, step=1.0)
+    d_t1 = params["d_target1_pct"]
+    params["d_stop_pct"] = trial.suggest_float("d_stop_pct", 3.0, 12.0, step=1.0)
+    params["d_partial_sell_pct"] = trial.suggest_float("d_partial_sell_pct", 0.0, 75.0, step=25.0)
+    if params["d_partial_sell_pct"] > 0:
+        params["d_target2_pct"] = trial.suggest_float("d_target2_pct", d_t1 + 2, 25.0, step=2.0)
+    else:
+        params["d_target2_pct"] = d_t1
+    params["d_trail_pct"] = trial.suggest_float("d_trail_pct", 1.0, 6.0, step=1.0)
+    params["d_trail_activate_pct"] = trial.suggest_float("d_trail_activate_pct", 1.0, 6.0, step=1.0)
+    params["d_time_limit_min"] = trial.suggest_int("d_time_limit_min", 30, 120, step=10)
+
+    # === V: VWAP Reclaim (12 params) ===
+    params["v_min_gap"] = trial.suggest_int("v_min_gap", 8, 30, step=2)
+    params["v_min_below_candles"] = trial.suggest_int("v_min_below_candles", 2, 15)
+    params["v_min_below_pct"] = trial.suggest_int("v_min_below_pct", 0, 5)
+    params["v_vol_spike_ratio"] = trial.suggest_float("v_vol_spike_ratio", 1.0, 4.0, step=0.5)
+    params["v_max_entry_candle"] = trial.suggest_int("v_max_entry_candle", 30, 120, step=10)
+    params["v_target1_pct"] = trial.suggest_float("v_target1_pct", 3.0, 15.0, step=1.0)
+    v_t1 = params["v_target1_pct"]
+    params["v_stop_pct"] = trial.suggest_float("v_stop_pct", 3.0, 12.0, step=1.0)
+    params["v_partial_sell_pct"] = trial.suggest_float("v_partial_sell_pct", 0.0, 75.0, step=25.0)
+    if params["v_partial_sell_pct"] > 0:
+        params["v_target2_pct"] = trial.suggest_float("v_target2_pct", v_t1 + 2, 25.0, step=2.0)
+    else:
+        params["v_target2_pct"] = v_t1
+    params["v_trail_pct"] = trial.suggest_float("v_trail_pct", 1.0, 6.0, step=1.0)
+    params["v_trail_activate_pct"] = trial.suggest_float("v_trail_activate_pct", 1.0, 6.0, step=1.0)
+    params["v_time_limit_min"] = trial.suggest_int("v_time_limit_min", 30, 120, step=10)
+
+    # === P: PM High Breakout (13 params) ===
+    params["p_min_gap"] = trial.suggest_int("p_min_gap", 8, 25, step=2)
+    params["p_confirm_above"] = trial.suggest_int("p_confirm_above", 2, 6)
+    params["p_confirm_window"] = trial.suggest_int("p_confirm_window", 3, 8)
+    params["p_pullback_pct"] = trial.suggest_float("p_pullback_pct", 3.0, 12.0, step=1.0)
+    params["p_pullback_timeout"] = trial.suggest_int("p_pullback_timeout", 10, 40, step=5)
+    params["p_max_entry_candle"] = trial.suggest_int("p_max_entry_candle", 45, 120, step=15)
+    params["p_target1_pct"] = trial.suggest_float("p_target1_pct", 3.0, 20.0, step=1.0)
+    p_t1 = params["p_target1_pct"]
+    params["p_stop_pct"] = trial.suggest_float("p_stop_pct", 3.0, 15.0, step=1.0)
+    params["p_partial_sell_pct"] = trial.suggest_float("p_partial_sell_pct", 0.0, 75.0, step=25.0)
+    if params["p_partial_sell_pct"] > 0:
+        params["p_target2_pct"] = trial.suggest_float("p_target2_pct", p_t1 + 2, 30.0, step=2.0)
+    else:
+        params["p_target2_pct"] = p_t1
+    params["p_trail_pct"] = trial.suggest_float("p_trail_pct", 1.0, 8.0, step=1.0)
+    params["p_trail_activate_pct"] = trial.suggest_float("p_trail_activate_pct", 1.0, 8.0, step=1.0)
+    params["p_time_limit_min"] = trial.suggest_int("p_time_limit_min", 30, 180, step=10)
+
+    # Guard: p_confirm_above must be <= p_confirm_window
+    if params["p_confirm_above"] > params["p_confirm_window"]:
+        raise optuna.TrialPruned()
+
+    # === L: Low Float Squeeze (19 params) ===
+    params["l_min_gap"] = trial.suggest_int("l_min_gap", 15, 50, step=5)
+    params["l_max_float"] = trial.suggest_int("l_max_float", 5_000_000, 20_000_000, step=5_000_000)
+    params["l_earliest_candle"] = trial.suggest_int("l_earliest_candle", 3, 15, step=3)
+    params["l_latest_candle"] = trial.suggest_int("l_latest_candle", 60, 150, step=15)
+    params["l_vol_surge_mult"] = trial.suggest_float("l_vol_surge_mult", 1.0, 3.0, step=0.5)
+    params["l_min_price_accel_pct"] = trial.suggest_float("l_min_price_accel_pct", 0.5, 3.0, step=0.5)
+    # Float tier boundaries
+    params["l_tier1_float"] = trial.suggest_int("l_tier1_float", 500_000, 2_000_000, step=500_000)
+    params["l_tier2_float"] = trial.suggest_int("l_tier2_float", 3_000_000, 7_000_000, step=1_000_000)
+    # Tier 1 targets (ultra-low float: biggest movers)
+    params["l_tier1_target1_pct"] = trial.suggest_float("l_tier1_target1_pct", 15.0, 50.0, step=5.0)
+    params["l_tier1_target2_pct"] = trial.suggest_float("l_tier1_target2_pct", 30.0, 60.0, step=5.0)
+    # Tier 2 targets (low float)
+    params["l_tier2_target1_pct"] = trial.suggest_float("l_tier2_target1_pct", 8.0, 30.0, step=2.0)
+    params["l_tier2_target2_pct"] = trial.suggest_float("l_tier2_target2_pct", 20.0, 50.0, step=5.0)
+    # Tier 3 targets (mid float)
+    params["l_tier3_target1_pct"] = trial.suggest_float("l_tier3_target1_pct", 5.0, 20.0, step=1.0)
+    params["l_tier3_target2_pct"] = trial.suggest_float("l_tier3_target2_pct", 15.0, 40.0, step=5.0)
+    # Exit params
+    params["l_stop_pct"] = trial.suggest_float("l_stop_pct", 5.0, 20.0, step=1.0)
+    params["l_partial_sell_pct"] = trial.suggest_float("l_partial_sell_pct", 0.0, 50.0, step=25.0)
+    params["l_trail_pct"] = trial.suggest_float("l_trail_pct", 1.0, 6.0, step=1.0)
+    params["l_trail_activate_pct"] = trial.suggest_float("l_trail_activate_pct", 1.0, 8.0, step=1.0)
+    params["l_time_limit_min"] = trial.suggest_int("l_time_limit_min", 30, 120, step=10)
+
+    # === Strategy Enable/Disable (8 params — Optuna decides which to include) ===
+    for s in ["h", "g", "a", "f", "d", "v", "p", "l"]:
+        params[f"enable_{s}"] = trial.suggest_categorical(f"enable_{s}", [True, False])
+
+    # At least 1 strategy must be enabled
+    enabled = [params[f"enable_{s}"] for s in ["h", "g", "a", "f", "d", "v", "p", "l"]]
+    if not any(enabled):
+        raise optuna.TrialPruned()
+
+    # === Strategy Priority (8 params — Optuna decides entry order) ===
+    for s in ["h", "g", "a", "f", "d", "v", "p", "l"]:
+        params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 7)
+
+    return params
+
+
+# ---------------------------------------------------------------------------
+# Run full combined backtest with current tgc globals
+# ---------------------------------------------------------------------------
+def run_combined_backtest(daily_picks, all_dates):
+    """Run the full backtest with single cash pool and return per-strategy stats."""
+    cash = float(STARTING_CASH)
     unsettled = 0.0
-    total_trades = 0
-    total_wins = 0
-    h_trades = 0
-    g_trades = 0
-    a_trades = 0
-    f_trades = 0
-    daily_pnls = []
-    peak = cash
-    max_dd_pct = 0.0
+    all_trades = []
 
     for d in all_dates:
-        if unsettled > 0:
-            cash += unsettled
-            unsettled = 0.0
+        cash += unsettled
+        unsettled = 0.0
 
-        picks = picks_by_date.get(d, [])
+        picks = daily_picks.get(d, [])
         cash_account = cash < MARGIN_THRESHOLD
 
-        states, new_cash, new_unsettled = tgcc.simulate_day_combined(
+        states, cash, unsettled, _ = tgc.simulate_day_combined(
             picks, cash, cash_account
         )
 
-        day_pnl = 0.0
         for st in states:
             if st["exit_reason"] is not None:
-                total_trades += 1
-                day_pnl += st["pnl"]
-                if st["pnl"] > 0:
-                    total_wins += 1
-                s = st["strategy"]
-                if s == "H":
-                    h_trades += 1
-                elif s == "G":
-                    g_trades += 1
-                elif s == "A":
-                    a_trades += 1
-                elif s == "F":
-                    f_trades += 1
+                all_trades.append({
+                    "strategy": st.get("strategy", "?"),
+                    "pnl": st["pnl"],
+                    "position_cost": st["position_cost"],
+                })
 
-        daily_pnls.append(day_pnl)
-        cash = new_cash
-        unsettled = new_unsettled
+    equity = cash + unsettled
 
-        # Track drawdown
-        equity = cash + unsettled
-        if equity > peak:
-            peak = equity
-        dd_pct = (peak - equity) / peak * 100 if peak > 0 else 0
-        if dd_pct > max_dd_pct:
-            max_dd_pct = dd_pct
+    n = len(all_trades)
+    if n == 0:
+        return {"n": 0, "pf": 0, "total_pnl": -9999, "equity": equity, "strats": {}}
 
-    final_equity = cash + unsettled
-    win_rate = total_wins / max(total_trades, 1) * 100
-    sharpe = 0.0
-    if daily_pnls and np.std(daily_pnls) > 0:
-        sharpe = (np.mean(daily_pnls) / np.std(daily_pnls)) * np.sqrt(252)
+    total_pnl = sum(t["pnl"] for t in all_trades)
+    wins = [t["pnl"] for t in all_trades if t["pnl"] > 0]
+    losses = [t["pnl"] for t in all_trades if t["pnl"] <= 0]
+    gross_win = sum(wins) if wins else 0
+    gross_loss = abs(sum(losses)) if losses else 1e-9
+    pf = gross_win / gross_loss if gross_loss > 0 else 99
+    wr = len(wins) / n * 100 if n > 0 else 0
+
+    strats = {}
+    for t in all_trades:
+        s = t["strategy"]
+        if s not in strats:
+            strats[s] = {"n": 0, "wins": 0, "pnl": 0.0}
+        strats[s]["n"] += 1
+        strats[s]["pnl"] += t["pnl"]
+        if t["pnl"] > 0:
+            strats[s]["wins"] += 1
 
     return {
-        "final_equity": final_equity,
-        "return_pct": (final_equity / STARTING_CASH - 1) * 100,
-        "total_trades": total_trades,
-        "win_rate": win_rate,
-        "sharpe": sharpe,
-        "max_dd_pct": max_dd_pct,
-        "h_trades": h_trades,
-        "g_trades": g_trades,
-        "a_trades": a_trades,
-        "f_trades": f_trades,
-        "daily_pnls": daily_pnls,
+        "n": n, "pf": pf, "wr": wr,
+        "total_pnl": total_pnl,
+        "equity": equity,
+        "strats": strats,
     }
 
 
-def objective(trial, picks_by_date, all_dates):
-    """Optuna objective: maximize final equity."""
-    params = {
-        # Strategy H: High Conviction
-        "h_min_gap": trial.suggest_int("h_min_gap", 20, 40, step=5),
-        "h_min_body": trial.suggest_float("h_min_body", 3.0, 8.0, step=1.0),
-        "h_vol_confirm": trial.suggest_categorical("h_vol_confirm", [True, False]),
-        "h_target": trial.suggest_float("h_target", 8.0, 16.0, step=1.0),
-        "h_time": trial.suggest_int("h_time", 10, 25, step=5),
+# ---------------------------------------------------------------------------
+# Optuna objective
+# ---------------------------------------------------------------------------
+def objective(trial, daily_picks, all_dates):
+    """Objective function: suggest params -> run full backtest -> score."""
+    params = suggest_all_params(trial)
+    set_strategy_params(params)
 
-        # Strategy G: Big Gap Runner
-        "g_min_gap": trial.suggest_int("g_min_gap", 20, 40, step=5),
-        "g_min_body": 0.0,  # Fixed: no body filter for G
-        "g_target": trial.suggest_float("g_target", 5.0, 14.0, step=1.0),
-        "g_time": trial.suggest_int("g_time", 10, 30, step=2),
+    result = run_combined_backtest(daily_picks, all_dates)
 
-        # Strategy A: Quick Scalp
-        "a_min_gap": trial.suggest_int("a_min_gap", 10, 25, step=5),
-        "a_min_body": trial.suggest_float("a_min_body", 0.0, 4.0, step=1.0),
-        "a_target": trial.suggest_float("a_target", 2.0, 6.0, step=0.5),
-        "a_time": trial.suggest_int("a_time", 4, 16, step=2),
+    n = result["n"]
+    if n < 30:
+        return -9999
 
-        # Strategy F: Catch-All
-        "f_min_gap": trial.suggest_int("f_min_gap", 5, 15, step=5),
-        "f_min_body": 0.0,  # Fixed: no body filter for F
-        "f_target": trial.suggest_float("f_target", 3.0, 12.0, step=1.0),
-        "f_time": trial.suggest_int("f_time", 1, 8, step=1),
-    }
+    pf = result["pf"]
+    if pf < 0.5:
+        return -9999
 
-    # Constraints: gap thresholds must cascade H >= G > A > F
-    if params["h_min_gap"] < params["g_min_gap"]:
-        return 0.0
-    if params["g_min_gap"] <= params["a_min_gap"]:
-        return 0.0
-    if params["a_min_gap"] <= params["f_min_gap"]:
-        return 0.0
+    total_pnl = result["total_pnl"]
 
-    result = run_backtest(picks_by_date, all_dates, params)
+    trial.set_user_attr("n", n)
+    trial.set_user_attr("pf", round(pf, 3))
+    trial.set_user_attr("wr", round(result["wr"], 1))
+    trial.set_user_attr("total_pnl", round(total_pnl, 2))
+    trial.set_user_attr("equity", round(result["equity"], 2))
 
-    # Penalty: reject if too few trades (overfitting to lucky trades)
-    if result["total_trades"] < 100:
-        return 0.0
+    # Priority order for display (only enabled strategies)
+    enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
+    prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
+    prio_str = ">".join(s for s, _ in sorted(prio.items(), key=lambda x: x[1]))
+    trial.set_user_attr("priority", prio_str)
+    trial.set_user_attr("enabled", ",".join(enabled_strats))
+    trial.set_user_attr("n_strategies", len(enabled_strats))
 
-    # Penalty: reject if max drawdown > 50%
-    if result["max_dd_pct"] > 50:
-        return result["final_equity"] * 0.5
+    for s, v in result["strats"].items():
+        trial.set_user_attr(f"{s}_n", v["n"])
+        trial.set_user_attr(f"{s}_pnl", round(v["pnl"], 2))
+        wr_s = v["wins"] / v["n"] * 100 if v["n"] > 0 else 0
+        trial.set_user_attr(f"{s}_wr", round(wr_s, 1))
 
-    # Store metrics for reporting
-    trial.set_user_attr("return_pct", result["return_pct"])
-    trial.set_user_attr("total_trades", result["total_trades"])
-    trial.set_user_attr("win_rate", result["win_rate"])
-    trial.set_user_attr("sharpe", result["sharpe"])
-    trial.set_user_attr("max_dd_pct", result["max_dd_pct"])
-    trial.set_user_attr("h_trades", result["h_trades"])
-    trial.set_user_attr("g_trades", result["g_trades"])
-    trial.set_user_attr("a_trades", result["a_trades"])
-    trial.set_user_attr("f_trades", result["f_trades"])
-
-    return result["final_equity"]
+    return total_pnl * min(pf, 3.0)
 
 
-if __name__ == "__main__":
-    # Parse args
-    n_trials = N_TRIALS
-    for i, arg in enumerate(sys.argv[1:]):
-        if arg == "--trials" and i + 2 <= len(sys.argv[1:]):
-            n_trials = int(sys.argv[i + 2])
+# ---------------------------------------------------------------------------
+# Progress callback
+# ---------------------------------------------------------------------------
+def make_callback(start_time):
+    best_score = [float("-inf")]
+    def callback(study, trial):
+        elapsed = time.time() - start_time
+        n_complete = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+        if trial.value is not None and trial.value > best_score[0]:
+            best_score[0] = trial.value
+            pnl = trial.user_attrs.get("total_pnl", 0)
+            pf = trial.user_attrs.get("pf", 0)
+            wr = trial.user_attrs.get("wr", 0)
+            n_trades = trial.user_attrs.get("n", 0)
+            equity = trial.user_attrs.get("equity", 0)
+            prio_str = trial.user_attrs.get("priority", "?")
+            print(f"\n  *** NEW BEST (trial {trial.number}) ***")
+            print(f"      Score: {trial.value:,.0f} | PnL: ${pnl:,.0f} | PF: {pf:.2f} | "
+                  f"WR: {wr:.1f}% | Trades: {n_trades}")
+            enabled_str = trial.user_attrs.get("enabled", "?")
+            n_strats = trial.user_attrs.get("n_strategies", "?")
+            print(f"      Equity: ${equity:,.0f} | Priority: {prio_str} | {n_strats} strategies: {enabled_str}")
+            for strat in STRAT_KEYS:
+                sn = trial.user_attrs.get(f"{strat}_n", 0)
+                if sn > 0:
+                    spnl = trial.user_attrs.get(f"{strat}_pnl", 0)
+                    swr = trial.user_attrs.get(f"{strat}_wr", 0)
+                    print(f"      {strat}: {sn} trades, {swr:.0f}% WR, ${spnl:+,.0f}")
+            print()
 
-    _print(f"Optuna Optimizer: Combined H+G+A+F Strategy")
-    _print(f"{'='*60}")
-    _print(f"  Trials:    {n_trials}")
-    _print(f"  Start:     ${STARTING_CASH:,}")
-    _print(f"  Sizing:    100% balance, MAX_POSITIONS=1")
-    _print(f"  Data:      {DATA_DIRS}")
-    _print(f"  Dates:     {DATE_RANGE[0]} to {DATE_RANGE[1]}")
-    _print(f"{'='*60}\n")
+        if n_complete % 10 == 0:
+            rate = n_complete / elapsed if elapsed > 0 else 0
+            print(f"  Trial {n_complete} | {elapsed/60:.1f}m elapsed | {rate:.2f} trials/s | "
+                  f"Best: {best_score[0]:,.0f}")
+    return callback
 
-    # Load data once
-    _print("Loading data...")
-    t0 = time.time()
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--trials", type=int, default=500)
+    args = parser.parse_args()
+    n_trials = args.trials
+
+    print("=" * 70)
+    print("Combined Optuna Optimizer v7: Single Pool + Strategy Selection")
+    print(f"  Candidates: H, G, A, F, D, V, P, L")
+    print(f"  Optuna decides: which strategies to enable (1-8) + priority order")
+    print(f"  Single pool: ${STARTING_CASH:,}")
+    print(f"  Trials: {n_trials}")
+    print(f"  Objective: total_pnl * min(pf, 3.0)")
+    print(f"  Data: {DATA_DIRS}")
+    print("=" * 70)
+
+    print("\nLoading data...")
     all_dates, daily_picks = load_all_picks(DATA_DIRS)
     all_dates = [d for d in all_dates if DATE_RANGE[0] <= d <= DATE_RANGE[1]]
-    _print(f"  {len(all_dates)} trading days loaded in {time.time()-t0:.1f}s\n")
+    print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
 
-    # Run baseline (current config)
-    _print("Running baseline (current config)...")
-    baseline_params = {
-        "h_min_gap": tgcc.H_MIN_GAP_PCT,
-        "h_min_body": tgcc.H_MIN_BODY_PCT,
-        "h_vol_confirm": tgcc.H_REQUIRE_VOL_CONFIRM,
-        "h_target": tgcc.H_TARGET_PCT,
-        "h_time": tgcc.H_TIME_LIMIT_MINUTES,
-        "g_min_gap": tgcc.G_MIN_GAP_PCT,
-        "g_min_body": tgcc.G_MIN_BODY_PCT,
-        "g_target": tgcc.G_TARGET_PCT,
-        "g_time": tgcc.G_TIME_LIMIT_MINUTES,
-        "a_min_gap": tgcc.A_MIN_GAP_PCT,
-        "a_min_body": tgcc.A_MIN_BODY_PCT,
-        "a_target": tgcc.A_TARGET_PCT,
-        "a_time": tgcc.A_TIME_LIMIT_MINUTES,
-        "f_min_gap": tgcc.F_MIN_GAP_PCT,
-        "f_min_body": tgcc.F_MIN_BODY_PCT,
-        "f_target": tgcc.F_TARGET_PCT,
-        "f_time": tgcc.F_TIME_LIMIT_MINUTES,
-    }
-    baseline = run_backtest(daily_picks, all_dates, baseline_params)
-    _print(f"  Baseline: ${baseline['final_equity']:,.0f} ({baseline['return_pct']:+.1f}%)")
-    _print(f"            {baseline['total_trades']} trades, {baseline['win_rate']:.1f}% WR, "
-          f"Sharpe {baseline['sharpe']:.2f}, DD {baseline['max_dd_pct']:.1f}%")
-    _print(f"            H:{baseline['h_trades']} G:{baseline['g_trades']} "
-          f"A:{baseline['a_trades']} F:{baseline['f_trades']}\n")
-
-    # Create study (fresh — delete old DB if schema changed)
-    db_path = "optuna_gc_hgaf.db"
+    db_path = "optuna_combined_v7.db"
     study = optuna.create_study(
         direction="maximize",
-        study_name="gc_hgaf_optimize",
+        study_name="combined_v7_single_pool_2024_2026",
         storage=f"sqlite:///{db_path}",
         load_if_exists=True,
+        sampler=TPESampler(n_startup_trials=50),
     )
 
-    # Progress callback
-    best_so_far = [0]
+    n_existing = len(study.trials)
+    if n_existing > 0:
+        print(f"\n  Resuming: {n_existing} existing trials found")
+        best = study.best_trial
+        print(f"  Current best: score={best.value:,.0f}, "
+              f"PnL=${best.user_attrs.get('total_pnl', 0):,.0f}, "
+              f"PF={best.user_attrs.get('pf', 0):.2f}")
+
+    print(f"\n  Starting optimization ({n_trials} trials)...\n")
     start_time = time.time()
 
-    def progress_callback(study, trial):
-        elapsed = time.time() - start_time
-        n = trial.number + 1
-        val = trial.value if trial.value else 0
-        best = study.best_value
-        if best > best_so_far[0]:
-            best_so_far[0] = best
-            bp = study.best_params
-            wr = study.best_trial.user_attrs.get("win_rate", 0)
-            trades = study.best_trial.user_attrs.get("total_trades", 0)
-            dd = study.best_trial.user_attrs.get("max_dd_pct", 0)
-            _print(f"  [{n:>3}/{n_trials}] NEW BEST ${best:>12,.0f}  "
-                  f"({trades} tr, {wr:.0f}% WR, DD {dd:.0f}%)  "
-                  f"H:{bp.get('h_target',0):.0f}%/{bp.get('h_time',0)}m  "
-                  f"G:{bp.get('g_target',0):.0f}%/{bp.get('g_time',0)}m  "
-                  f"A:{bp.get('a_target',0):.1f}%/{bp.get('a_time',0)}m  "
-                  f"F:{bp.get('f_target',0):.0f}%/{bp.get('f_time',0)}m  "
-                  f"[{elapsed:.0f}s]")
-        elif n % 25 == 0:
-            _print(f"  [{n:>3}/{n_trials}] trial ${val:>12,.0f}  best ${best:>12,.0f}  [{elapsed:.0f}s]")
-
-    _print(f"Running {n_trials} Optuna trials...")
-    _print("-" * 90)
     study.optimize(
         lambda trial: objective(trial, daily_picks, all_dates),
         n_trials=n_trials,
-        callbacks=[progress_callback],
+        callbacks=[make_callback(start_time)],
     )
 
-    # Results
+    total_time = time.time() - start_time
+    print(f"\n{'='*70}")
+    print(f"Optimization complete: {total_time/60:.1f} minutes ({total_time/3600:.1f} hours)")
+    print(f"{'='*70}")
+
     best = study.best_trial
     bp = best.params
-    _print(f"\n{'='*90}")
-    _print(f"  OPTIMIZATION COMPLETE")
-    _print(f"{'='*90}")
-    _print(f"  Best Final Equity: ${best.value:,.0f} ({best.user_attrs['return_pct']:+.1f}%)")
-    _print(f"  vs Baseline:       ${baseline['final_equity']:,.0f} ({baseline['return_pct']:+.1f}%)")
-    improvement = best.value - baseline['final_equity']
-    _print(f"  Improvement:       ${improvement:+,.0f}")
-    _print(f"\n  Trades: {best.user_attrs['total_trades']}  "
-          f"WR: {best.user_attrs['win_rate']:.1f}%  "
-          f"Sharpe: {best.user_attrs['sharpe']:.2f}  "
-          f"Max DD: {best.user_attrs['max_dd_pct']:.1f}%")
-    _print(f"  H:{best.user_attrs['h_trades']} G:{best.user_attrs['g_trades']} "
-          f"A:{best.user_attrs['a_trades']} F:{best.user_attrs['f_trades']}")
+    ua = best.user_attrs
 
-    _print(f"\n  OPTIMAL PARAMETERS")
-    _print(f"  {'-'*50}")
-    _print(f"  Strategy H (High Conviction):")
-    _print(f"    H_MIN_GAP_PCT       = {bp['h_min_gap']}")
-    _print(f"    H_MIN_BODY_PCT      = {bp['h_min_body']}")
-    _print(f"    H_REQUIRE_VOL_CONFIRM = {bp['h_vol_confirm']}")
-    _print(f"    H_TARGET_PCT        = {bp['h_target']}")
-    _print(f"    H_TIME_LIMIT        = {bp['h_time']} min")
-    _print(f"  Strategy G (Big Gap Runner):")
-    _print(f"    G_MIN_GAP_PCT = {bp['g_min_gap']}")
-    _print(f"    G_TARGET_PCT  = {bp['g_target']}")
-    _print(f"    G_TIME_LIMIT  = {bp['g_time']} min")
-    _print(f"  Strategy A (Quick Scalp):")
-    _print(f"    A_MIN_GAP_PCT  = {bp['a_min_gap']}")
-    _print(f"    A_MIN_BODY_PCT = {bp['a_min_body']}")
-    _print(f"    A_TARGET_PCT   = {bp['a_target']}")
-    _print(f"    A_TIME_LIMIT   = {bp['a_time']} min")
-    _print(f"  Strategy F (Catch-All):")
-    _print(f"    F_MIN_GAP_PCT = {bp['f_min_gap']}")
-    _print(f"    F_TARGET_PCT  = {bp['f_target']}")
-    _print(f"    F_TIME_LIMIT  = {bp['f_time']} min")
-    _print(f"{'='*90}")
+    print(f"\n  Best trial: #{best.number}")
+    print(f"  Score:      {best.value:,.0f}")
+    print(f"  Equity:     ${ua.get('equity', 0):,.0f}")
+    print(f"  Total PnL:  ${ua.get('total_pnl', 0):,.0f}")
+    print(f"  PF:         {ua.get('pf', 0):.3f}")
+    print(f"  WR:         {ua.get('wr', 0):.1f}%")
+    print(f"  Trades:     {ua.get('n', 0)}")
+    print(f"  Priority:   {ua.get('priority', '?')}")
+    print(f"  Enabled:    {ua.get('enabled', '?')} ({ua.get('n_strategies', '?')} strategies)")
 
-    # Top 10 trials
-    _print(f"\n  TOP 10 TRIALS")
-    _print(f"  {'#':>3} {'Equity':>14} {'Return':>8} {'Tr':>4} {'WR':>5} {'DD':>5} "
-          f"{'H_t':>4} {'H_m':>3} {'G_t':>4} {'G_m':>3} {'A_t':>4} {'A_m':>3} {'F_t':>4} {'F_m':>3}")
-    _print(f"  {'-'*90}")
-    sorted_trials = sorted(study.trials, key=lambda t: t.value if t.value else 0, reverse=True)
-    for i, t in enumerate(sorted_trials[:10]):
-        if t.value is None or t.value <= 0:
-            continue
-        p = t.params
-        _print(f"  {i+1:>3} ${t.value:>13,.0f} {t.user_attrs.get('return_pct',0):>+7.0f}% "
-              f"{t.user_attrs.get('total_trades',0):>4} {t.user_attrs.get('win_rate',0):>4.0f}% "
-              f"{t.user_attrs.get('max_dd_pct',0):>4.0f}% "
-              f"{p.get('h_target',0):>4.0f} {p.get('h_time',0):>3} "
-              f"{p.get('g_target',0):>4.0f} {p.get('g_time',0):>3} "
-              f"{p.get('a_target',0):>4.1f} {p.get('a_time',0):>3} "
-              f"{p.get('f_target',0):>4.0f} {p.get('f_time',0):>3}")
+    print(f"\n  --- Per-Strategy Breakdown ---")
+    for strat in STRAT_KEYS:
+        sn = ua.get(f"{strat}_n", 0)
+        spnl = ua.get(f"{strat}_pnl", 0)
+        swr = ua.get(f"{strat}_wr", 0)
+        verdict = ""
+        if sn == 0:
+            verdict = "  (NO TRADES)"
+        elif spnl < 0:
+            verdict = "  ** NEGATIVE **"
+        elif sn < 10:
+            verdict = "  (negligible)"
+        print(f"    {strat}: {sn:>4} trades | WR {swr:>5.1f}% | PnL ${spnl:>+12,.0f}{verdict}")
+
+    print(f"\n  --- Best Parameters ---")
+    # Priority
+    prio = {s: bp.get(f"priority_{s.lower()}", 99) for s in STRAT_KEYS}
+    prio_order = sorted(prio.items(), key=lambda x: x[1])
+    print(f"\n  Priority order: {' > '.join(s for s, _ in prio_order)}")
+
+    for prefix, label in [("h_", "H (High Conv)"), ("g_", "G (Gap Runner)"),
+                           ("a_", "A (Quick Scalp)"), ("f_", "F (Catch-All)"),
+                           ("d_", "D (Dip Buy)"), ("v_", "V (VWAP)"),
+                           ("p_", "P (PM High)"), ("l_", "L (Low Float)")]:
+        pkeys = sorted(k for k in bp if k.startswith(prefix) and not k.startswith("priority"))
+        if pkeys:
+            print(f"\n  Strategy {label}:")
+            for k in pkeys:
+                print(f"    {k}: {bp[k]}")
+
+    # Strategy selection
+    enabled_list = []
+    for s in ["h", "g", "a", "f", "d", "v", "p", "l"]:
+        if bp.get(f"enable_{s}", True):
+            enabled_list.append(s.upper())
+    print(f"\n  Enabled strategies: {', '.join(enabled_list)} ({len(enabled_list)} of 8)")
+
+    print(f"\n  DB saved to: {db_path}")
+    print(f"  Study name: combined_v7_single_pool_2024_2026")
+
+
+if __name__ == "__main__":
+    main()
