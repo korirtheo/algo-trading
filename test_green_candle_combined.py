@@ -127,9 +127,9 @@ D_PARTIAL_SELL_PCT = 0.0         # Optuna v2: no partial sell — trail only
 D_TRAIL_PCT = 2.0                # Fixed trailing stop %
 D_TRAIL_ACTIVATE_PCT = 2.0       # Start trailing after +2% unrealized
 
-# --- STRATEGY M CONFIG: Midday Range Break (DISABLED by Optuna v2) ---
+# --- STRATEGY M CONFIG: Midday Range Break ---
 # Morning spike → midday consolidation → afternoon breakout
-M_MIN_GAP_PCT = 9999.0           # DISABLED: set gap to 9999
+M_MIN_GAP_PCT = 10.0
 M_MORNING_SPIKE_PCT = 8.0        # Morning high >= 8% above open
 M_MORNING_CANDLES = 40           # Check spike in first 40 candles
 M_RANGE_START_CANDLE = 55        # Consolidation starts at candle 55
@@ -159,9 +159,9 @@ V_PARTIAL_SELL_PCT = 25.0        # Sell 25% at target1
 V_TRAIL_PCT = 3.0                # Optuna v2: raised from 2%
 V_TRAIL_ACTIVATE_PCT = 5.0       # Optuna v2: raised from 2%
 
-# --- STRATEGY R CONFIG: Multi-Day Runner (DISABLED) ---
+# --- STRATEGY R CONFIG: Multi-Day Runner ---
 # Day 1: massive gap-up. Day 2: pullback then bounce continuation.
-R_DAY1_MIN_GAP = 9999.0          # DISABLED
+R_DAY1_MIN_GAP = 40.0
 R_D2_PULLBACK_PCT = 10.0         # Optuna v2: raised from 3%
 R_PULLBACK_WINDOW = 30           # Pullback within first 30 candles
 R_BOUNCE_REF = "d2_open"         # Optuna v2: changed from d1_close
@@ -189,9 +189,9 @@ P_PARTIAL_SELL_PCT = 0.0        # Optuna v2: no partial sell — trail only
 P_TRAIL_PCT = 2.0               # Fixed trailing stop %
 P_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing after +2% unrealized
 
-# --- STRATEGY W CONFIG: Power Hour Breakout (DISABLED) ---
+# --- STRATEGY W CONFIG: Power Hour Breakout ---
 # Gap-up + morning run + all-day consolidation + 3 PM+ volume breakout
-W_MIN_GAP_PCT = 9999.0           # DISABLED
+W_MIN_GAP_PCT = 10.0
 W_MIN_MORNING_RUN = 4.0          # Optuna v2: raised from 3%
 W_CONSOL_START = 35              # Optuna v2: earlier start
 W_MAX_RANGE_PCT = 10.0           # Optuna v2: tightened from 16%
@@ -231,12 +231,140 @@ L_TRAIL_PCT = 1.0               # Tight trailing stop %
 L_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing early at +2%
 L_TIME_LIMIT_MINUTES = 70       # Time limit in minutes
 
+# --- STRATEGY O CONFIG: Opening Range Breakout ---
+O_MIN_GAP_PCT = 10.0
+O_RANGE_CANDLES = 5              # candles to form opening range (5 = 10 min)
+O_BREAKOUT_VOL_MULT = 1.5       # breakout candle vol vs avg range vol
+O_MAX_ENTRY_CANDLE = 30
+O_TARGET1_PCT = 8.0
+O_TARGET2_PCT = 15.0
+O_STOP_PCT = 0.0                # 0 = dynamic stop at range low
+O_PARTIAL_SELL_PCT = 50.0
+O_TRAIL_PCT = 2.0
+O_TRAIL_ACTIVATE_PCT = 3.0
+O_TIME_LIMIT_MINUTES = 60
+
+# --- STRATEGY B CONFIG: Red-to-Green (R2G) ---
+B_MIN_GAP_PCT = 15.0
+B_MAX_DIP_PCT = 5.0             # max dip below open before abandoning
+B_MIN_RECLAIM_VOL_MULT = 1.5    # volume surge on reclaim candle
+B_MAX_ENTRY_CANDLE = 20
+B_TARGET1_PCT = 6.0
+B_TARGET2_PCT = 12.0
+B_STOP_PCT = 4.0
+B_PARTIAL_SELL_PCT = 50.0
+B_TRAIL_PCT = 2.0
+B_TRAIL_ACTIVATE_PCT = 3.0
+B_TIME_LIMIT_MINUTES = 30
+
+# --- STRATEGY K CONFIG: First Pullback Buy ---
+K_MIN_GAP_PCT = 10.0
+K_MIN_RUN_PCT = 5.0             # min morning run-up before pullback
+K_RUN_WINDOW = 15               # candles to establish run
+K_PULLBACK_PCT = 3.0            # min pullback % from run high
+K_PULLBACK_VOL_RATIO = 0.5      # pullback vol <= ratio * run vol (orderly)
+K_BOUNCE_VOL_MULT = 1.5         # bounce vol >= mult * pullback avg vol
+K_MAX_ENTRY_CANDLE = 45
+K_TARGET1_PCT = 8.0
+K_TARGET2_PCT = 15.0
+K_STOP_PCT = 5.0
+K_PARTIAL_SELL_PCT = 50.0
+K_TRAIL_PCT = 2.0
+K_TRAIL_ACTIVATE_PCT = 3.0
+K_TIME_LIMIT_MINUTES = 60
+
+# --- STRATEGY C CONFIG: Micro Flag / Base Pattern ---
+C_MIN_GAP_PCT = 10.0
+C_MIN_SPIKE_PCT = 5.0           # initial spike before consolidation
+C_MIN_BASE_CANDLES = 3          # min candles in tight base
+C_MAX_BASE_CANDLES = 8          # max candles in base before abandon
+C_MAX_BASE_RANGE_PCT = 3.0      # max range of base (tight consolidation)
+C_BREAKOUT_VOL_MULT = 1.5       # vol surge on breakout
+C_MAX_ENTRY_CANDLE = 60
+C_TARGET1_PCT = 8.0
+C_TARGET2_PCT = 15.0
+C_STOP_PCT = 4.0
+C_PARTIAL_SELL_PCT = 50.0
+C_TRAIL_PCT = 2.0
+C_TRAIL_ACTIVATE_PCT = 3.0
+C_TIME_LIMIT_MINUTES = 60
+
+# --- STRATEGY S CONFIG: Stuff-and-Break ---
+S_MIN_GAP_PCT = 10.0
+S_MIN_HOD_TESTS = 2             # min times HOD tested and rejected
+S_HOD_TOLERANCE_PCT = 0.5       # within X% of HOD = "test"
+S_REJECTION_PCT = 1.0           # must pull back X% to count as rejection
+S_BREAKOUT_VOL_MULT = 1.5       # vol surge on final break
+S_MAX_ENTRY_CANDLE = 90
+S_TARGET1_PCT = 8.0
+S_TARGET2_PCT = 15.0
+S_STOP_PCT = 4.0
+S_PARTIAL_SELL_PCT = 50.0
+S_TRAIL_PCT = 2.0
+S_TRAIL_ACTIVATE_PCT = 3.0
+S_TIME_LIMIT_MINUTES = 90
+
+# --- STRATEGY E CONFIG: Gap-and-Go RelVol ---
+E_MIN_GAP_PCT = 15.0
+E_MIN_PM_VOL_MULT = 5.0         # premarket vol >= X * typical daily avg
+E_MAX_ENTRY_CANDLE = 5           # enter very early
+E_TARGET1_PCT = 6.0
+E_TARGET2_PCT = 12.0
+E_STOP_PCT = 4.0
+E_PARTIAL_SELL_PCT = 50.0
+E_TRAIL_PCT = 2.0
+E_TRAIL_ACTIVATE_PCT = 3.0
+E_TIME_LIMIT_MINUTES = 20
+
+# --- STRATEGY I CONFIG: P1 Immediate PM High Breakout ---
+I_MIN_GAP_PCT = 10.0
+I_MAX_ENTRY_CANDLE = 30          # must break PM high early
+I_BREAKOUT_VOL_MULT = 1.5
+I_TARGET1_PCT = 8.0
+I_TARGET2_PCT = 15.0
+I_STOP_PCT = 5.0
+I_PARTIAL_SELL_PCT = 50.0
+I_TRAIL_PCT = 2.0
+I_TRAIL_ACTIVATE_PCT = 3.0
+I_TIME_LIMIT_MINUTES = 60
+
+# --- STRATEGY J CONFIG: P3 VWAP + PM High Breakout ---
+J_MIN_GAP_PCT = 10.0
+J_MAX_ENTRY_CANDLE = 90
+J_VWAP_PROXIMITY_PCT = 2.0      # price within X% of VWAP at breakout
+J_TARGET1_PCT = 8.0
+J_TARGET2_PCT = 15.0
+J_STOP_PCT = 5.0
+J_PARTIAL_SELL_PCT = 50.0
+J_TRAIL_PCT = 2.0
+J_TRAIL_ACTIVATE_PCT = 3.0
+J_TIME_LIMIT_MINUTES = 90
+
+# --- STRATEGY N CONFIG: P4 HOD Reclaim ---
+N_MIN_GAP_PCT = 10.0
+N_MIN_HOD_AGE = 10              # HOD must be at least X candles old
+N_PULLBACK_FROM_HOD_PCT = 3.0   # must pull back X% from HOD
+N_MAX_ENTRY_CANDLE = 120
+N_TARGET1_PCT = 8.0
+N_TARGET2_PCT = 15.0
+N_STOP_PCT = 5.0
+N_PARTIAL_SELL_PCT = 50.0
+N_TRAIL_PCT = 2.0
+N_TRAIL_ACTIVATE_PCT = 3.0
+N_TIME_LIMIT_MINUTES = 90
+
 # --- SHARED CONFIG ---
 EOD_EXIT_MINUTES = 15
 FULL_BALANCE_SIZING = True      # Use full balance for each trade
 
 # Strategy priority (lower = higher priority; Optuna can override)
-STRAT_PRIORITY = {"H": 0, "G": 1, "A": 2, "F": 3, "D": 4, "V": 5, "P": 6, "L": 7}
+STRAT_PRIORITY = {
+    "H": 0, "G": 1, "A": 2, "F": 3, "D": 4, "V": 5, "P": 6,
+    "M": 7, "R": 8, "W": 9,
+    "O": 10, "B": 11, "K": 12, "C": 13, "S": 14, "E": 15,
+    "I": 16, "J": 17, "N": 18, "L": 19
+}
+STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L"]
 
 
 
@@ -450,6 +578,94 @@ def simulate_day_combined(picks, cash, cash_account=False):
             "l_trailing_active": False,
             "l_partial_taken": False,
             "l_partial_proceeds": 0.0,
+            # State — O (Opening Range Breakout)
+            "o_eligible": pick["gap_pct"] >= O_MIN_GAP_PCT,
+            "o_range_high": 0.0,
+            "o_range_low": 999999.0,
+            "o_range_formed": False,
+            "o_range_avg_vol": 0.0,
+            "o_highest_since_entry": 0.0,
+            "o_trailing_active": False,
+            "o_partial_taken": False,
+            "o_partial_proceeds": 0.0,
+            "o_dynamic_stop": 0.0,       # range low used as stop
+            # State — B (Red-to-Green R2G)
+            "b_eligible": pick["gap_pct"] >= B_MIN_GAP_PCT,
+            "b_candle1_red": False,
+            "b_open_price": 0.0,
+            "b_dip_seen": False,
+            "b_avg_vol_sum": 0.0,
+            "b_avg_vol_count": 0,
+            "b_highest_since_entry": 0.0,
+            "b_trailing_active": False,
+            "b_partial_taken": False,
+            "b_partial_proceeds": 0.0,
+            # State — K (First Pullback Buy)
+            "k_eligible": False,
+            "k_run_high": 0.0,
+            "k_run_detected": False,
+            "k_run_vol_sum": 0.0,
+            "k_pullback_low": 999999.0,
+            "k_pullback_detected": False,
+            "k_pullback_vol_sum": 0.0,
+            "k_pullback_candles": 0,
+            "k_highest_since_entry": 0.0,
+            "k_trailing_active": False,
+            "k_partial_taken": False,
+            "k_partial_proceeds": 0.0,
+            # State — C (Micro Flag / Base Pattern)
+            "c_eligible": False,
+            "c_spike_detected": False,
+            "c_spike_high": 0.0,
+            "c_base_start_candle": 0,
+            "c_base_candle_count": 0,
+            "c_base_high": 0.0,
+            "c_base_low": 999999.0,
+            "c_highest_since_entry": 0.0,
+            "c_trailing_active": False,
+            "c_partial_taken": False,
+            "c_partial_proceeds": 0.0,
+            # State — S (Stuff-and-Break)
+            "s_eligible": False,
+            "s_hod": 0.0,
+            "s_hod_candle": 0,
+            "s_hod_tests": 0,
+            "s_last_test_candle": 0,
+            "s_rejected": False,
+            "s_highest_since_entry": 0.0,
+            "s_trailing_active": False,
+            "s_partial_taken": False,
+            "s_partial_proceeds": 0.0,
+            # State — E (Gap-and-Go RelVol)
+            "e_eligible": (pick["gap_pct"] >= E_MIN_GAP_PCT
+                           and pick.get("pm_volume", 0) > 0),
+            "e_pm_vol_ok": False,        # checked at candle 1
+            "e_highest_since_entry": 0.0,
+            "e_trailing_active": False,
+            "e_partial_taken": False,
+            "e_partial_proceeds": 0.0,
+            # State — I (P1 Immediate PM High Breakout)
+            "i_eligible": False,
+            "i_highest_since_entry": 0.0,
+            "i_trailing_active": False,
+            "i_partial_taken": False,
+            "i_partial_proceeds": 0.0,
+            # State — J (P3 VWAP + PM High Breakout)
+            "j_eligible": False,
+            "j_highest_since_entry": 0.0,
+            "j_trailing_active": False,
+            "j_partial_taken": False,
+            "j_partial_proceeds": 0.0,
+            # State — N (P4 HOD Reclaim)
+            "n_eligible": False,
+            "n_hod": 0.0,
+            "n_hod_candle": 0,
+            "n_pullback_seen": False,
+            "n_pullback_low": 999999.0,
+            "n_highest_since_entry": 0.0,
+            "n_trailing_active": False,
+            "n_partial_taken": False,
+            "n_partial_proceeds": 0.0,
             # State — H/G/A/F trail tracking
             "hgaf_trail_stop": 0.0,
             # Position
@@ -482,6 +698,15 @@ def simulate_day_combined(picks, cash, cash_account=False):
             l_st["is_r_candidate"] = False
             l_st["r_eligible"] = False
             l_st["r_pullback_seen"] = False
+            l_st["o_eligible"] = False
+            l_st["b_eligible"] = False
+            l_st["e_eligible"] = False
+            l_st["k_eligible"] = False
+            l_st["c_eligible"] = False
+            l_st["s_eligible"] = False
+            l_st["i_eligible"] = False
+            l_st["j_eligible"] = False
+            l_st["n_eligible"] = False
             # Reset per-instance state
             l_st["signal"] = False
             l_st["signal_price"] = None
@@ -506,6 +731,129 @@ def simulate_day_combined(picks, cash, cash_account=False):
             # Prevent original state from also detecting L (avoid double entries)
             st["l_eligible"] = False
     states.extend(l_only_states)
+
+    # Create dedicated O-only states (ORB works regardless of candle 1 color)
+    o_only_states = []
+    for st in states:
+        if st.get("l_only"):
+            continue
+        if st["o_eligible"]:
+            o_st = dict(st)
+            o_st["o_only"] = True
+            # Disable everything except O
+            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
+                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+                o_st[k] = False
+            o_st["l_eligible"] = False
+            o_st["is_r_candidate"] = False
+            o_st["r_eligible"] = False
+            o_st["b_eligible"] = False
+            o_st["e_eligible"] = False
+            # Reset per-instance state
+            o_st["signal"] = False
+            o_st["signal_price"] = None
+            o_st["strategy"] = None
+            o_st["candle_count"] = 0
+            o_st["first_candle_ok"] = False
+            o_st["first_candle_body_pct"] = 0.0
+            o_st["done"] = False
+            o_st["entry_price"] = None
+            o_st["shares"] = 0
+            o_st["position_cost"] = 0.0
+            o_st["pnl"] = 0.0
+            o_st["o_range_high"] = 0.0
+            o_st["o_range_low"] = 999999.0
+            o_st["o_range_formed"] = False
+            o_st["o_range_avg_vol"] = 0.0
+            o_st["o_highest_since_entry"] = 0.0
+            o_st["o_trailing_active"] = False
+            o_st["o_partial_taken"] = False
+            o_st["o_partial_proceeds"] = 0.0
+            o_st["d_recent_closes"] = []
+            o_st["p_recent_closes"] = []
+            o_only_states.append(o_st)
+            st["o_eligible"] = False  # prevent original from also detecting O
+    states.extend(o_only_states)
+
+    # Create dedicated B-only states (R2G specifically needs RED candle 1)
+    b_only_states = []
+    for st in states:
+        if st.get("l_only") or st.get("o_only"):
+            continue
+        if st["b_eligible"]:
+            b_st = dict(st)
+            b_st["b_only"] = True
+            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
+                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+                b_st[k] = False
+            b_st["l_eligible"] = False
+            b_st["o_eligible"] = False
+            b_st["is_r_candidate"] = False
+            b_st["r_eligible"] = False
+            b_st["e_eligible"] = False
+            b_st["signal"] = False
+            b_st["signal_price"] = None
+            b_st["strategy"] = None
+            b_st["candle_count"] = 0
+            b_st["first_candle_ok"] = False
+            b_st["first_candle_body_pct"] = 0.0
+            b_st["done"] = False
+            b_st["entry_price"] = None
+            b_st["shares"] = 0
+            b_st["position_cost"] = 0.0
+            b_st["pnl"] = 0.0
+            b_st["b_candle1_red"] = False
+            b_st["b_open_price"] = 0.0
+            b_st["b_dip_seen"] = False
+            b_st["b_avg_vol_sum"] = 0.0
+            b_st["b_avg_vol_count"] = 0
+            b_st["b_highest_since_entry"] = 0.0
+            b_st["b_trailing_active"] = False
+            b_st["b_partial_taken"] = False
+            b_st["b_partial_proceeds"] = 0.0
+            b_st["d_recent_closes"] = []
+            b_st["p_recent_closes"] = []
+            b_only_states.append(b_st)
+            st["b_eligible"] = False
+    states.extend(b_only_states)
+
+    # Create dedicated E-only states (Gap-and-Go RelVol, fires early regardless of candle color)
+    e_only_states = []
+    for st in states:
+        if st.get("l_only") or st.get("o_only") or st.get("b_only"):
+            continue
+        if st["e_eligible"]:
+            e_st = dict(st)
+            e_st["e_only"] = True
+            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
+                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+                e_st[k] = False
+            e_st["l_eligible"] = False
+            e_st["o_eligible"] = False
+            e_st["b_eligible"] = False
+            e_st["is_r_candidate"] = False
+            e_st["r_eligible"] = False
+            e_st["signal"] = False
+            e_st["signal_price"] = None
+            e_st["strategy"] = None
+            e_st["candle_count"] = 0
+            e_st["first_candle_ok"] = False
+            e_st["first_candle_body_pct"] = 0.0
+            e_st["done"] = False
+            e_st["entry_price"] = None
+            e_st["shares"] = 0
+            e_st["position_cost"] = 0.0
+            e_st["pnl"] = 0.0
+            e_st["e_pm_vol_ok"] = False
+            e_st["e_highest_since_entry"] = 0.0
+            e_st["e_trailing_active"] = False
+            e_st["e_partial_taken"] = False
+            e_st["e_partial_proceeds"] = 0.0
+            e_st["d_recent_closes"] = []
+            e_st["p_recent_closes"] = []
+            e_only_states.append(e_st)
+            st["e_eligible"] = False
+    states.extend(e_only_states)
 
     for ts in all_timestamps:
         entry_candidates = []
@@ -545,7 +893,16 @@ def simulate_day_combined(picks, cash, cash_account=False):
                                      + st.get("d_partial_proceeds", 0)
                                      + st.get("m_partial_proceeds", 0)
                                      + st.get("v_partial_proceeds", 0)
-                                     + st.get("l_partial_proceeds", 0))
+                                     + st.get("l_partial_proceeds", 0)
+                                     + st.get("o_partial_proceeds", 0)
+                                     + st.get("b_partial_proceeds", 0)
+                                     + st.get("k_partial_proceeds", 0)
+                                     + st.get("c_partial_proceeds", 0)
+                                     + st.get("s_partial_proceeds", 0)
+                                     + st.get("e_partial_proceeds", 0)
+                                     + st.get("i_partial_proceeds", 0)
+                                     + st.get("j_partial_proceeds", 0)
+                                     + st.get("n_partial_proceeds", 0))
                     st["pnl"] = partial_procs + proceeds - st["position_cost"]
                     st["exit_price"] = price
                     st["exit_time"] = ts_now
@@ -917,6 +1274,82 @@ def simulate_day_combined(picks, cash, cash_account=False):
 
                     continue
 
+                # ===== NEW STRATEGIES (O,B,K,C,S,E,I,J,N): generic exit logic =====
+                if st["strategy"] in ("O","B","K","C","S","E","I","J","N"):
+                    _strat = st["strategy"].lower()
+                    # Strategy-specific params lookup
+                    _exit_cfg = {
+                        "o": (O_TARGET1_PCT, O_TARGET2_PCT, O_STOP_PCT, O_TRAIL_PCT, O_TRAIL_ACTIVATE_PCT, O_PARTIAL_SELL_PCT, O_TIME_LIMIT_MINUTES),
+                        "b": (B_TARGET1_PCT, B_TARGET2_PCT, B_STOP_PCT, B_TRAIL_PCT, B_TRAIL_ACTIVATE_PCT, B_PARTIAL_SELL_PCT, B_TIME_LIMIT_MINUTES),
+                        "k": (K_TARGET1_PCT, K_TARGET2_PCT, K_STOP_PCT, K_TRAIL_PCT, K_TRAIL_ACTIVATE_PCT, K_PARTIAL_SELL_PCT, K_TIME_LIMIT_MINUTES),
+                        "c": (C_TARGET1_PCT, C_TARGET2_PCT, C_STOP_PCT, C_TRAIL_PCT, C_TRAIL_ACTIVATE_PCT, C_PARTIAL_SELL_PCT, C_TIME_LIMIT_MINUTES),
+                        "s": (S_TARGET1_PCT, S_TARGET2_PCT, S_STOP_PCT, S_TRAIL_PCT, S_TRAIL_ACTIVATE_PCT, S_PARTIAL_SELL_PCT, S_TIME_LIMIT_MINUTES),
+                        "e": (E_TARGET1_PCT, E_TARGET2_PCT, E_STOP_PCT, E_TRAIL_PCT, E_TRAIL_ACTIVATE_PCT, E_PARTIAL_SELL_PCT, E_TIME_LIMIT_MINUTES),
+                        "i": (I_TARGET1_PCT, I_TARGET2_PCT, I_STOP_PCT, I_TRAIL_PCT, I_TRAIL_ACTIVATE_PCT, I_PARTIAL_SELL_PCT, I_TIME_LIMIT_MINUTES),
+                        "j": (J_TARGET1_PCT, J_TARGET2_PCT, J_STOP_PCT, J_TRAIL_PCT, J_TRAIL_ACTIVATE_PCT, J_PARTIAL_SELL_PCT, J_TIME_LIMIT_MINUTES),
+                        "n": (N_TARGET1_PCT, N_TARGET2_PCT, N_STOP_PCT, N_TRAIL_PCT, N_TRAIL_ACTIVATE_PCT, N_PARTIAL_SELL_PCT, N_TIME_LIMIT_MINUTES),
+                    }
+                    tgt1_pct, tgt2_pct, stop_pct, trail_pct, trail_act, partial_pct, time_lim = _exit_cfg[_strat]
+                    hkey = f"{_strat}_highest_since_entry"
+                    tkey = f"{_strat}_trailing_active"
+                    pkey = f"{_strat}_partial_taken"
+                    ppkey = f"{_strat}_partial_proceeds"
+
+                    # 1. Update highest since entry
+                    if c_high > st[hkey]:
+                        st[hkey] = c_high
+
+                    # 2. Trailing stop (if active)
+                    if st[tkey]:
+                        trail_stop = st[hkey] * (1 - trail_pct / 100)
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 3. Hard stop — O uses dynamic stop (range low) if stop_pct==0
+                        if _strat == "o" and stop_pct == 0:
+                            dyn_stop = st.get("o_dynamic_stop", 0)
+                            if dyn_stop > 0 and c_low <= dyn_stop:
+                                _close_position(st, dyn_stop, "STOP", ts)
+                                continue
+                        elif stop_pct > 0:
+                            stop_price = st["entry_price"] * (1 - stop_pct / 100)
+                            if c_low <= stop_price:
+                                _close_position(st, stop_price, "STOP", ts)
+                                continue
+
+                    # 4. Activate trailing stop
+                    if not st[tkey]:
+                        unrealized = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized >= trail_act:
+                            st[tkey] = True
+
+                    # 5. Partial sell at target1
+                    if not st[pkey] and partial_pct > 0:
+                        tgt1_price = st["entry_price"] * (1 + tgt1_pct / 100)
+                        if c_high >= tgt1_price:
+                            sell_shares = int(st["shares"] * partial_pct / 100)
+                            if sell_shares > 0:
+                                sell_price = tgt1_price * (1 - SLIPPAGE_PCT / 100)
+                                proceeds = sell_shares * sell_price
+                                st["shares"] -= sell_shares
+                                st[ppkey] += proceeds
+                                _receive_proceeds(proceeds)
+                            st[pkey] = True
+
+                    # 6. Full target at target2
+                    tgt2_price = st["entry_price"] * (1 + tgt2_pct / 100)
+                    if c_high >= tgt2_price:
+                        _close_position(st, tgt2_price, "TARGET", ts)
+                        continue
+
+                    # 7. Time stop
+                    if minutes_in_trade >= time_lim:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
                 # ===== STRATEGIES H/G/A/F: target + stop + trail + time stop =====
                 strat_map = {
                     "H": (H_TARGET_PCT, H_TIME_LIMIT_MINUTES, H_STOP_PCT, H_TRAIL_PCT, H_TRAIL_ACTIVATE_PCT),
@@ -998,11 +1431,28 @@ def simulate_day_combined(picks, cash, cash_account=False):
                     st["open_price"] = c_open
                     if body_pct > 0:
                         st["first_candle_ok"] = True
-                if not st["first_candle_ok"] and not st.get("l_only"):
+                if not st["first_candle_ok"] and not st.get("l_only") and not st.get("o_only") and not st.get("b_only") and not st.get("e_only"):
                     st["done"] = True
 
-            # CANDLE 2: Classify for H, G, A, F (skip for L-only states)
-            elif st["candle_count"] == 2 and st["first_candle_ok"] and not st.get("l_only"):
+                # B-only: on candle 1, check if it's RED (that's what R2G needs)
+                if st.get("b_only") and st["candle_count"] == 1:
+                    st["b_open_price"] = c_open
+                    if c_close < c_open:  # RED candle 1
+                        st["b_candle1_red"] = True
+                    else:
+                        st["done"] = True  # Not red → R2G doesn't apply
+
+                # E-only: on candle 1, check premarket volume vs first candle volume
+                if st.get("e_only") and st["candle_count"] == 1:
+                    st["open_price"] = c_open
+                    c_vol = float(candle["Volume"])
+                    if c_vol > 0 and st["pm_volume"] > 0:
+                        # Use first candle volume as proxy for "typical"
+                        if st["pm_volume"] >= E_MIN_PM_VOL_MULT * c_vol:
+                            st["e_pm_vol_ok"] = True
+
+            # CANDLE 2: Classify for H, G, A, F (skip for L/O/B/E-only states)
+            elif st["candle_count"] == 2 and st["first_candle_ok"] and not st.get("l_only") and not st.get("o_only") and not st.get("b_only") and not st.get("e_only"):
                 second_green = c_close > c_open
                 second_new_high = c_high > st["first_candle_high"]
                 vol_confirm = float(candle["Volume"]) > st["first_candle_volume"]
@@ -1035,6 +1485,24 @@ def simulate_day_combined(picks, cash, cash_account=False):
                     if st["gap_pct"] >= W_MIN_GAP_PCT:
                         st["w_eligible"] = True
                         eligible = True
+                    if st["gap_pct"] >= K_MIN_GAP_PCT:
+                        st["k_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= C_MIN_GAP_PCT:
+                        st["c_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= S_MIN_GAP_PCT:
+                        st["s_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= I_MIN_GAP_PCT:
+                        st["i_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= J_MIN_GAP_PCT:
+                        st["j_eligible"] = True
+                        eligible = True
+                    if st["gap_pct"] >= N_MIN_GAP_PCT:
+                        st["n_eligible"] = True
+                        eligible = True
                     if st["l_eligible"]:  # Already set at init based on float + gap
                         eligible = True
                     if not eligible:
@@ -1046,16 +1514,31 @@ def simulate_day_combined(picks, cash, cash_account=False):
                     st["signal_price"] = c_close
                     entry_candidates.append(st)
 
-            # --- D + V + M + P + W + L: All track simultaneously, first to fire wins ---
-            elif (st["d_eligible"] or st["v_eligible"] or st["m_eligible"] or st["p_eligible"] or st["w_eligible"] or st["l_eligible"]) and st["entry_price"] is None and not st["done"]:
-                # Check if all D, V, M, P, W, L have timed out
+            # --- All fallback strategies track simultaneously, first to fire wins ---
+            elif (st["d_eligible"] or st["v_eligible"] or st["m_eligible"] or st["p_eligible"] or st["w_eligible"]
+                  or st["l_eligible"] or st["k_eligible"] or st["c_eligible"] or st["s_eligible"]
+                  or st["i_eligible"] or st["j_eligible"] or st["n_eligible"]
+                  or st.get("o_only") or st.get("b_only") or st.get("e_only")) and st["entry_price"] is None and not st["done"]:
+                # Check if ALL strategies have timed out
                 d_timed_out = not st["d_eligible"] or st["candle_count"] > D_MAX_ENTRY_CANDLE
                 v_timed_out = not st["v_eligible"] or st["candle_count"] > V_MAX_ENTRY_CANDLE
                 m_timed_out = not st["m_eligible"] or st["candle_count"] > M_MAX_ENTRY_CANDLE
                 p_timed_out = not st["p_eligible"] or st["candle_count"] > P_MAX_ENTRY_CANDLE
                 w_timed_out = not st["w_eligible"] or st["candle_count"] > W_LATEST_CANDLE
                 l_timed_out = not st["l_eligible"] or st["candle_count"] > L_LATEST_CANDLE
-                if d_timed_out and v_timed_out and m_timed_out and p_timed_out and w_timed_out and l_timed_out:
+                k_timed_out = not st["k_eligible"] or st["candle_count"] > K_MAX_ENTRY_CANDLE
+                c_timed_out = not st["c_eligible"] or st["candle_count"] > C_MAX_ENTRY_CANDLE
+                s_timed_out = not st["s_eligible"] or st["candle_count"] > S_MAX_ENTRY_CANDLE
+                o_timed_out = not st["o_eligible"] or st["candle_count"] > O_MAX_ENTRY_CANDLE
+                b_timed_out = not st["b_eligible"] or st["candle_count"] > B_MAX_ENTRY_CANDLE
+                e_timed_out = not st["e_eligible"] or st["candle_count"] > E_MAX_ENTRY_CANDLE
+                i_timed_out = not st["i_eligible"] or st["candle_count"] > I_MAX_ENTRY_CANDLE
+                j_timed_out = not st["j_eligible"] or st["candle_count"] > J_MAX_ENTRY_CANDLE
+                n_timed_out = not st["n_eligible"] or st["candle_count"] > N_MAX_ENTRY_CANDLE
+                if (d_timed_out and v_timed_out and m_timed_out and p_timed_out and w_timed_out
+                    and l_timed_out and k_timed_out and c_timed_out and s_timed_out
+                    and o_timed_out and b_timed_out and e_timed_out
+                    and i_timed_out and j_timed_out and n_timed_out):
                     st["done"] = True
                     continue
 
@@ -1329,6 +1812,227 @@ def simulate_day_combined(picks, cash, cash_account=False):
                                 st["signal_price"] = c_close
                                 entry_candidates.append(st)
 
+                # --- O: Opening Range Breakout detection (O-only states) ---
+                if st["o_eligible"] and st["candle_count"] <= O_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    if not st["o_range_formed"]:
+                        # Building opening range
+                        if c_high > st["o_range_high"]:
+                            st["o_range_high"] = c_high
+                        if c_low < st["o_range_low"]:
+                            st["o_range_low"] = c_low
+                        st["o_range_avg_vol"] += c_vol
+                        if st["candle_count"] >= O_RANGE_CANDLES:
+                            st["o_range_formed"] = True
+                            st["o_range_avg_vol"] /= O_RANGE_CANDLES
+                            st["o_dynamic_stop"] = st["o_range_low"]
+                    else:
+                        # Range formed — look for breakout above range high
+                        if c_close > st["o_range_high"]:
+                            vol_ok = (st["o_range_avg_vol"] <= 0
+                                      or c_vol >= O_BREAKOUT_VOL_MULT * st["o_range_avg_vol"])
+                            if vol_ok:
+                                st["strategy"] = "O"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+
+                # --- B: Red-to-Green (R2G) detection (B-only states) ---
+                if st["b_eligible"] and st.get("b_candle1_red") and st["candle_count"] <= B_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    open_p = st["b_open_price"]
+                    if open_p > 0:
+                        # Track average volume
+                        st["b_avg_vol_sum"] += c_vol
+                        st["b_avg_vol_count"] += 1
+                        avg_vol = st["b_avg_vol_sum"] / st["b_avg_vol_count"]
+
+                        # Check if price dipped below open
+                        if c_low < open_p:
+                            st["b_dip_seen"] = True
+                            # Check max dip not exceeded
+                            dip_pct = (open_p - c_low) / open_p * 100
+                            if dip_pct > B_MAX_DIP_PCT:
+                                st["b_eligible"] = False
+
+                        # After dip: look for reclaim back above open with volume
+                        if st["b_dip_seen"] and c_close > open_p:
+                            vol_ok = avg_vol <= 0 or c_vol >= B_MIN_RECLAIM_VOL_MULT * avg_vol
+                            if vol_ok:
+                                st["strategy"] = "B"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+
+                # --- K: First Pullback Buy detection ---
+                if st["k_eligible"] and st["candle_count"] <= K_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    open_p = st["open_price"] or c_open
+                    if not st["k_run_detected"]:
+                        # Phase 1: Detect morning run-up
+                        if c_high > st["k_run_high"]:
+                            st["k_run_high"] = c_high
+                        st["k_run_vol_sum"] += c_vol
+                        if st["candle_count"] >= K_RUN_WINDOW and open_p > 0:
+                            run_pct = (st["k_run_high"] / open_p - 1) * 100
+                            if run_pct >= K_MIN_RUN_PCT:
+                                st["k_run_detected"] = True
+                            else:
+                                st["k_eligible"] = False
+                    elif not st["k_pullback_detected"]:
+                        # Phase 2: Detect orderly pullback
+                        if c_low < st["k_pullback_low"]:
+                            st["k_pullback_low"] = c_low
+                        st["k_pullback_vol_sum"] += c_vol
+                        st["k_pullback_candles"] += 1
+                        pullback_pct = (st["k_run_high"] - st["k_pullback_low"]) / st["k_run_high"] * 100
+                        if pullback_pct >= K_PULLBACK_PCT:
+                            # Check if pullback was orderly (low volume)
+                            avg_run_vol = st["k_run_vol_sum"] / max(K_RUN_WINDOW, 1)
+                            avg_pb_vol = st["k_pullback_vol_sum"] / max(st["k_pullback_candles"], 1)
+                            if avg_run_vol <= 0 or avg_pb_vol <= K_PULLBACK_VOL_RATIO * avg_run_vol:
+                                st["k_pullback_detected"] = True
+                    else:
+                        # Phase 3: Bounce with volume
+                        avg_pb_vol = st["k_pullback_vol_sum"] / max(st["k_pullback_candles"], 1)
+                        vol_ok = avg_pb_vol <= 0 or c_vol >= K_BOUNCE_VOL_MULT * avg_pb_vol
+                        if c_close > st["k_pullback_low"] * (1 + K_PULLBACK_PCT / 100) and vol_ok:
+                            st["strategy"] = "K"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+
+                # --- C: Micro Flag / Base Pattern detection ---
+                if st["c_eligible"] and st["candle_count"] <= C_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    open_p = st["open_price"] or c_open
+                    if not st["c_spike_detected"]:
+                        # Phase 1: Initial spike
+                        if c_high > st["c_spike_high"]:
+                            st["c_spike_high"] = c_high
+                        if open_p > 0 and st["c_spike_high"] > 0:
+                            spike_pct = (st["c_spike_high"] / open_p - 1) * 100
+                            if spike_pct >= C_MIN_SPIKE_PCT:
+                                st["c_spike_detected"] = True
+                                st["c_base_start_candle"] = st["candle_count"]
+                    elif st["c_base_candle_count"] < C_MAX_BASE_CANDLES:
+                        # Phase 2: Track consolidation (tight base)
+                        st["c_base_candle_count"] += 1
+                        if c_high > st["c_base_high"]:
+                            st["c_base_high"] = c_high
+                        if c_low < st["c_base_low"]:
+                            st["c_base_low"] = c_low
+                        # Check if range is still tight
+                        if st["c_base_low"] > 0:
+                            base_range = (st["c_base_high"] - st["c_base_low"]) / st["c_base_low"] * 100
+                            if base_range > C_MAX_BASE_RANGE_PCT:
+                                # Range broken — reset base tracking
+                                st["c_spike_detected"] = False
+                                st["c_spike_high"] = c_high
+                                st["c_base_candle_count"] = 0
+                                st["c_base_high"] = 0.0
+                                st["c_base_low"] = 999999.0
+                    else:
+                        # Phase 3: Breakout above base high with volume
+                        if c_close > st["c_base_high"]:
+                            # Need min candles in base
+                            if st["c_base_candle_count"] >= C_MIN_BASE_CANDLES:
+                                vol_ok = c_vol >= C_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                                if vol_ok:
+                                    st["strategy"] = "C"
+                                    st["signal"] = True
+                                    st["signal_price"] = c_close
+                                    entry_candidates.append(st)
+                            else:
+                                st["c_eligible"] = False
+
+                # --- S: Stuff-and-Break detection ---
+                if st["s_eligible"] and st["candle_count"] <= S_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    # Track HOD
+                    if c_high > st["s_hod"]:
+                        old_hod = st["s_hod"]
+                        st["s_hod"] = c_high
+                        st["s_hod_candle"] = st["candle_count"]
+                        # If we already have rejections and price breaks to new HOD with volume
+                        if st["s_hod_tests"] >= S_MIN_HOD_TESTS and old_hod > 0:
+                            break_pct = (c_high - old_hod) / old_hod * 100
+                            if break_pct > 0:
+                                vol_ok = c_vol >= S_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                                if vol_ok:
+                                    st["strategy"] = "S"
+                                    st["signal"] = True
+                                    st["signal_price"] = c_close
+                                    entry_candidates.append(st)
+                    elif st["s_hod"] > 0:
+                        # Check if testing HOD (within tolerance)
+                        hod_dist_pct = (st["s_hod"] - c_high) / st["s_hod"] * 100
+                        if hod_dist_pct <= S_HOD_TOLERANCE_PCT and not st["s_rejected"]:
+                            st["s_rejected"] = True  # Mark as testing
+                            st["s_last_test_candle"] = st["candle_count"]
+                        # Check for rejection (pulled back after test)
+                        if st["s_rejected"]:
+                            pullback_pct = (st["s_hod"] - c_low) / st["s_hod"] * 100
+                            if pullback_pct >= S_REJECTION_PCT:
+                                st["s_hod_tests"] += 1
+                                st["s_rejected"] = False  # Reset for next test
+
+                # --- E: Gap-and-Go RelVol detection (E-only states) ---
+                if st["e_eligible"] and st.get("e_pm_vol_ok") and st["candle_count"] <= E_MAX_ENTRY_CANDLE and not st["signal"]:
+                    # Enter on first green candle with elevated volume
+                    if c_close > c_open:
+                        st["strategy"] = "E"
+                        st["signal"] = True
+                        st["signal_price"] = c_close
+                        entry_candidates.append(st)
+
+                # --- I: P1 Immediate PM High Breakout detection ---
+                if st["i_eligible"] and st["candle_count"] <= I_MAX_ENTRY_CANDLE and not st["signal"]:
+                    c_vol = float(candle["Volume"])
+                    pm_high = st["premarket_high"]
+                    if pm_high > 0 and c_close > pm_high:
+                        vol_ok = c_vol >= I_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                        if vol_ok:
+                            st["strategy"] = "I"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+
+                # --- J: P3 VWAP + PM High Breakout detection ---
+                if st["j_eligible"] and st["candle_count"] <= J_MAX_ENTRY_CANDLE and not st["signal"]:
+                    pm_high = st["premarket_high"]
+                    candle_idx = st["candle_count"] - 1
+                    vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                    if pm_high > 0 and vwap_val > 0:
+                        # Price must be near VWAP AND breaking above PM high
+                        vwap_dist = abs(c_close - vwap_val) / vwap_val * 100
+                        if vwap_dist <= J_VWAP_PROXIMITY_PCT and c_close > pm_high:
+                            st["strategy"] = "J"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+
+                # --- N: P4 HOD Reclaim detection ---
+                if st["n_eligible"] and st["candle_count"] <= N_MAX_ENTRY_CANDLE and not st["signal"]:
+                    # Track HOD
+                    if c_high > st["n_hod"]:
+                        if st["n_hod"] > 0 and st["n_pullback_seen"]:
+                            # HOD reclaim after pullback!
+                            age = st["candle_count"] - st["n_hod_candle"]
+                            if age >= N_MIN_HOD_AGE:
+                                st["strategy"] = "N"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+                        st["n_hod"] = c_high
+                        st["n_hod_candle"] = st["candle_count"]
+                        st["n_pullback_seen"] = False
+                    elif st["n_hod"] > 0:
+                        # Check for pullback from HOD
+                        pullback_pct = (st["n_hod"] - c_low) / st["n_hod"] * 100
+                        if pullback_pct >= N_PULLBACK_FROM_HOD_PCT:
+                            st["n_pullback_seen"] = True
+
                 # --- L: Low Float Squeeze detection ---
                 # Always track HOD for L-eligible stocks
                 if st["l_eligible"] and not st["signal"] and c_high > st["l_running_hod"]:
@@ -1461,7 +2165,16 @@ def simulate_day_combined(picks, cash, cash_account=False):
                              + st.get("d_partial_proceeds", 0)
                              + st.get("m_partial_proceeds", 0)
                              + st.get("v_partial_proceeds", 0)
-                             + st.get("l_partial_proceeds", 0))
+                             + st.get("l_partial_proceeds", 0)
+                             + st.get("o_partial_proceeds", 0)
+                             + st.get("b_partial_proceeds", 0)
+                             + st.get("k_partial_proceeds", 0)
+                             + st.get("c_partial_proceeds", 0)
+                             + st.get("s_partial_proceeds", 0)
+                             + st.get("e_partial_proceeds", 0)
+                             + st.get("i_partial_proceeds", 0)
+                             + st.get("j_partial_proceeds", 0)
+                             + st.get("n_partial_proceeds", 0))
             st["pnl"] = partial_procs + proceeds - st["position_cost"]
             st["exit_price"] = last_close
             st["exit_time"] = last_ts
@@ -1481,7 +2194,7 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a != "--no-charts"]
     data_dirs = args if args else ["stored_data_combined"]
 
-    STRAT_KEYS = ["H", "G", "A", "F", "D", "V", "P", "L"]
+    STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L"]
 
     print(f"Combined Green Candle Strategy (H+G+A+F+D+V+M+R+P+W) Backtest")
     print(f"{'='*70}")
@@ -1714,7 +2427,13 @@ if __name__ == "__main__":
         ("H (High Conviction)", "H"), ("G (Big Gap Runner)", "G"),
         ("A (Quick Scalp)", "A"), ("F (Catch-All)", "F"),
         ("D (Dip Buy)", "D"), ("V (VWAP Reclaim)", "V"),
-        ("P (PM High Breakout)", "P"), ("L (Low Float Squeeze)", "L"),
+        ("P (PM High Breakout)", "P"), ("M (Midday Breakout)", "M"),
+        ("R (Multi-Day Runner)", "R"), ("W (Power Hour)", "W"),
+        ("O (Opening Range Breakout)", "O"), ("B (Red-to-Green)", "B"),
+        ("K (First Pullback)", "K"), ("C (Micro Flag)", "C"),
+        ("S (Stuff-and-Break)", "S"), ("E (Gap-and-Go)", "E"),
+        ("I (PM High Immediate)", "I"), ("J (VWAP+PMH Breakout)", "J"),
+        ("N (HOD Reclaim)", "N"), ("L (Low Float Squeeze)", "L"),
     ]
     for label, key in strat_info:
         total_s = strat_totals[key]

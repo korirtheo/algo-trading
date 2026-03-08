@@ -226,12 +226,27 @@ regime_data/
 
 # Market cap cache (re-downloadable via yfinance)
 market_cap_data.json
+float_data.json
 
-# Optuna study databases
+# Optuna study databases & output
 *.db
-
-# Optuna output logs
 optuna_output.txt
+
+# Live trading logs
+logs/
+
+# Docker
+.dockerignore
 
 # Claude Code
 .claude/
+
+# Environment / secrets
+.env
+.env.*
+
+# Node modules (frontend)
+node_modules/
+
+# Frontend build output (rebuilt in Docker)
+dashboard/frontend/dist/

@@ -99,13 +99,14 @@ A multi-strategy backtesting system for day-trading small-cap gap-up stocks. Fiv
 
 ### Per-Strategy Breakdown
 
-| Strategy | Trades | Win Rate | Total PnL | Avg Win | Avg Loss |
-|----------|--------|----------|-----------|---------|----------|
-| H (High Conviction) | 141 | 69.5% | +$7,389,903 | $102,493 | -$61,731 |
-| G (Big Gap Runner) | 198 | 65.2% | +$5,349,370 | $72,796 | -$58,570 |
-| A (Quick Scalp) | 98 | 68.4% | +$810,794 | $33,604 | -$46,474 |
-| F (Catch-All) | 332 | 54.2% | +$758,197 | $26,008 | -$25,811 |
-| P (PM High Breakout) | 234 | 79.1% | +$22,165,519 | $178,772 | -$222,598 |
+| Strategy | Trades | Win Rate | PF | Total PnL | Avg Win | Avg Loss |
+|----------|--------|----------|----|-----------|---------|----------|
+| H (High Conviction) | 141 | 69.5% | 3.78 | +$7,389,903 | $102,493 | -$61,731 |
+| G (Big Gap Runner) | 198 | 65.2% | 2.32 | +$5,349,370 | $72,796 | -$58,570 |
+| A (Quick Scalp) | 98 | 68.4% | 1.56 | +$810,794 | $33,604 | -$46,474 |
+| F (Catch-All) | 332 | 54.2% | 1.19 | +$758,197 | $26,008 | -$25,811 |
+| P (PM High Breakout) | 234 | 79.1% | 3.03 | +$22,165,519 | $178,772 | -$222,598 |
+| **Combined** | **1,003** | **65.7%** | **2.59** | **+$36,473,784** | **$90,198** | **-$66,764** |
 
 ### Exit Reason Distribution
 

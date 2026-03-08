@@ -33,8 +33,8 @@ def _print(*args, **kwargs):
     _builtin_print(*args, **kwargs)
 
 N_TRIALS = 500
-DATA_DIRS = ["stored_data_combined"]
-DATE_RANGE = ("2025-01-01", "2026-02-28")
+DATA_DIRS = ["stored_data_jan_feb_2024", "stored_data_jan_mar_2024", "stored_data_apr_jun_2024", "stored_data_jul_sep_2024", "stored_data_oct_dec_2024", "stored_data_combined"]
+DATE_RANGE = ("2024-01-01", "2026-02-28")
 
 
 def precompute_stocks(daily_picks, all_dates):
@@ -467,8 +467,8 @@ if __name__ == "__main__":
 
     study = optuna.create_study(
         direction="maximize",
-        study_name="p_advanced",
-        storage="sqlite:///optuna_p_advanced.db",
+        study_name="p_advanced_2024_2026",
+        storage="sqlite:///optuna_p_advanced_2024_2026.db",
         load_if_exists=True,
     )
 
