@@ -12,6 +12,7 @@ export function usePolling<T>(fetcher: () => Promise<T>, intervalMs: number = 50
       setError(null);
     } catch (e: any) {
       setError(e.message || 'Failed to fetch');
+      // Keep previous data instead of reverting to null
     } finally {
       setLoading(false);
     }

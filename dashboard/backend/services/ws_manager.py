@@ -41,18 +41,17 @@ class WSManager:
         for ws in disconnected:
             self.disconnect(ws)
 
+    def set_loop(self, loop: asyncio.AbstractEventLoop):
+        """Store the uvicorn event loop so broadcast_sync can schedule into it."""
+        self._loop = loop
+
     def broadcast_sync(self, message: Dict[str, Any]):
-        """Non-async broadcast — schedules into the event loop.
+        """Non-async broadcast — schedules into the uvicorn event loop.
         Call this from the engine's bar callback (runs in streamer thread).
         """
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(self.broadcast(message), loop)
-            else:
-                loop.run_until_complete(self.broadcast(message))
-        except RuntimeError:
-            pass  # No event loop available yet
+        loop = getattr(self, '_loop', None)
+        if loop and loop.is_running():
+            asyncio.run_coroutine_threadsafe(self.broadcast(message), loop)
 
 
 # Singleton

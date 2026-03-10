@@ -25,6 +25,7 @@ bridge = EngineBridge()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ws_manager.set_loop(asyncio.get_event_loop())
     log.info("Dashboard server starting")
     yield
     log.info("Dashboard server shutting down")
