@@ -267,31 +267,40 @@ def run(args):
             log.info("  No candidates found")
         return c
 
-    candidates = do_scan("9:00")
+    now = datetime.now(ET)
+    if now >= datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
+        # Restarted during market hours — scan immediately
+        candidates = do_scan("RESTART")
+    else:
+        candidates = do_scan("9:00")
+
+        if args.scan_only:
+            log.info("--scan-only mode. Exiting.")
+            return
+
+        # Rescan at 9:25
+        now = datetime.now(ET)
+        if now < datetime.combine(now.date(), dt_time(9, 25), tzinfo=ET):
+            wait_until(dt_time(9, 25), log)
+            candidates = do_scan("9:25")
+
+        # Final scan at 9:27
+        now = datetime.now(ET)
+        if now < datetime.combine(now.date(), dt_time(9, 27), tzinfo=ET):
+            wait_until(dt_time(9, 27), log)
+            candidates = do_scan("9:27 FINAL")
+
+        # 9:30 scan — catches stocks that only show volume at open
+        now = datetime.now(ET)
+        if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
+            wait_until(dt_time(9, 30), log)
+            new_candidates = do_scan("9:30")
+            if new_candidates:
+                candidates = new_candidates
 
     if args.scan_only:
         log.info("--scan-only mode. Exiting.")
         return
-
-    # Rescan at 9:25
-    now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 25), tzinfo=ET):
-        wait_until(dt_time(9, 25), log)
-        candidates = do_scan("9:25")
-
-    # Final scan at 9:27
-    now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 27), tzinfo=ET):
-        wait_until(dt_time(9, 27), log)
-        candidates = do_scan("9:27 FINAL")
-
-    # 9:30 scan — catches stocks that only show volume at open
-    now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
-        wait_until(dt_time(9, 30), log)
-        new_candidates = do_scan("9:30")
-        if new_candidates:
-            candidates = new_candidates
 
     if not candidates:
         log.info("No candidates after all scans. Exiting.")
