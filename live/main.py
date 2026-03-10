@@ -102,6 +102,11 @@ def run(args):
     log.info(f"Account: cash=${float(acct.cash):,.2f}, "
              f"buying_power=${float(acct.buying_power):,.2f}")
 
+    # Start dashboard immediately so it's accessible before scan
+    if not args.no_dash:
+        start_dashboard(None, executor, [], port=args.port)
+        log.info(f"Dashboard running at http://localhost:{args.port}")
+
     from datetime import time as dt_time
 
     # Phase 1: Pre-market scan loop (9:00 → 9:25 → 9:27 → lock)
@@ -154,10 +159,11 @@ def run(args):
     if args.dry_run:
         log.info("--dry-run mode: will process bars but not place orders")
 
-    # Phase 3: Start dashboard
+    # Phase 3: Wire engine into dashboard bridge
     if not args.no_dash:
-        start_dashboard(engine, executor, candidates, port=args.port)
-        log.info(f"Dashboard running at http://localhost:{args.port}")
+        from dashboard.backend.app import bridge
+        bridge.engine = engine
+        bridge.scanner_candidates = candidates
 
     # Phase 4: Wait for market open
     now = datetime.now(ET)
