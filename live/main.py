@@ -215,6 +215,8 @@ def start_dashboard(engine, executor, candidates, port=8000):
 
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
+    # Disable signal handlers — they only work in the main thread on Linux
+    server.install_signal_handlers = lambda: None
 
     def _run():
         try:
