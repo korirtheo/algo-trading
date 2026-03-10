@@ -16,6 +16,7 @@ import sys
 import time
 import json
 import argparse
+import multiprocessing
 import numpy as np
 import pandas as pd
 import optuna
@@ -29,8 +30,8 @@ if __name__ == "__main__" and hasattr(sys.stdout, 'buffer'):
 import test_green_candle_combined as tgc
 from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
-DATA_DIRS = ["stored_data_combined"]
-DATE_RANGE = ("2024-01-01", "2026-02-28")
+DATA_DIRS = ["stored_data_2022", "stored_data_combined"]
+DATE_RANGE = ("2022-01-01", "2026-02-28")
 
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
@@ -841,7 +842,7 @@ def main():
     args = parser.parse_args()
     n_trials = args.trials
 
-    db_path = "optuna_combined_v8.db"
+    db_path = "optuna_combined_v9.db"
 
     # --dump-best: extract best params from existing DB without running trials
     if args.dump_best:
@@ -850,7 +851,7 @@ def main():
             sys.exit(1)
         study = optuna.create_study(
             direction="maximize",
-            study_name="combined_v8_20strats_2024_2026",
+            study_name="combined_v9_20strats_2022_2026",
             storage=f"sqlite:///{db_path}",
             load_if_exists=True,
         )
@@ -885,10 +886,13 @@ def main():
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
     study = optuna.create_study(
         direction="maximize",
-        study_name="combined_v8_20strats_2024_2026",
-        storage=f"sqlite:///{db_path}",
+        study_name="combined_v9_20strats_2022_2026",
+        storage=optuna.storages.RDBStorage(
+            url=f"sqlite:///{db_path}",
+            engine_kwargs={"connect_args": {"timeout": 30}},
+        ),
         load_if_exists=True,
-        sampler=TPESampler(n_startup_trials=80),
+        sampler=TPESampler(n_startup_trials=200),
     )
 
     n_existing = len(study.trials)
@@ -902,9 +906,12 @@ def main():
     print(f"\n  Starting optimization ({n_trials} trials)...\n")
     start_time = time.time()
 
+    n_jobs = max(1, multiprocessing.cpu_count() // 2)
+    print(f"  Using {n_jobs} parallel workers\n")
     study.optimize(
         lambda trial: objective(trial, daily_picks, all_dates),
         n_trials=n_trials,
+        n_jobs=n_jobs,
         callbacks=[make_callback(start_time)],
     )
 
@@ -970,7 +977,7 @@ def main():
     dump_best_params(best, total_time / 60)
     print(f"\n  DB saved to: {db_path}")
     print(f"  Params saved to: {BEST_PARAMS_FILE}")
-    print(f"  Study name: combined_v8_20strats_2024_2026")
+    print(f"  Study name: combined_v9_20strats_2022_2026")
 
 
 if __name__ == "__main__":

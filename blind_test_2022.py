@@ -80,9 +80,9 @@ def main():
     print(f"\nApplying params to strategy engine...")
     set_strategy_params(params)
 
-    print(f"\nLoading 2022 data from {DATA_DIRS}...")
+    print(f"\nLoading 2022 data from {DATA_DIRS}...", flush=True)
     all_dates, daily_picks = load_all_picks(DATA_DIRS)
-    print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
+    print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}", flush=True)
 
     # Pre-scan for R (Multi-Day Runner) candidates
     r_day2_picks = {}
@@ -121,7 +121,9 @@ def main():
           f"{'Day P&L':>12} {'Balance':>14}")
     print("-" * 72)
 
-    for d in all_dates:
+    for day_idx, d in enumerate(all_dates, 1):
+        with open("blind_test_progress.txt", "w") as pf:
+            pf.write(f"{day_idx}/{len(all_dates)} | {d} | equity=${cash+unsettled:,.0f}")
         cash += unsettled
         unsettled = 0.0
 
@@ -162,8 +164,8 @@ def main():
                 parts.append(f"{key}{counts[key][0]}")
         strat_label = "".join(parts) if parts else ""
 
-        print(f"{d:<12} {strat_label:>5} {day_trades:>6} {day_wins:>4} {day_losses:>5} "
-              f"${day_pnl:>+11,.0f} ${equity:>13,.0f}")
+        print(f"\r{d:<12} {strat_label:>5} {day_trades:>6} {day_wins:>4} {day_losses:>5} "
+              f"${day_pnl:>+11,.0f} ${equity:>13,.0f}", flush=True)
 
         # Per-trade detail
         traded_states = [s for s in states if s["exit_reason"] is not None]

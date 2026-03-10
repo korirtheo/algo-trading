@@ -11,7 +11,10 @@ from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 from collections import defaultdict
 
+from alpaca.data.enums import DataFeed
 from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
+
+_FEED_ENUM = DataFeed.IEX if ALPACA_FEED == "iex" else DataFeed.SIP
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -67,7 +70,7 @@ class BarStreamer:
         """
         self.on_2min_bar = on_2min_bar
         from alpaca.data.live import StockDataStream
-        self.stream = StockDataStream(ALPACA_API_KEY, ALPACA_API_SECRET, feed=ALPACA_FEED)
+        self.stream = StockDataStream(ALPACA_API_KEY, ALPACA_API_SECRET, feed=_FEED_ENUM)
         self.pending = {}  # symbol -> (slot_index, TwoMinBar)
         self._symbols = []
         self._running = False
@@ -85,6 +88,7 @@ class BarStreamer:
     def _handle_bar(self, bar):
         """Process incoming 1-min bar, aggregate to 2-min."""
         symbol = bar.symbol
+        log.info(f"1min bar: {symbol} close={bar.close:.2f} vol={bar.volume:,} t={bar.timestamp}")
         slot = _bar_slot(bar.timestamp)
 
         if symbol in self.pending:

@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createChart, IChartApi, ISeriesApi, CandlestickData, Time } from 'lightweight-charts';
 import { api, ChartData } from '../api/client';
 import { strategyColor } from './StrategyTag';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Props {
   symbol: string | null;
+}
+
+function toUnixTime(t: string): Time {
+  return (new Date(t).getTime() / 1000) as Time;
 }
 
 export function Chart({ symbol }: Props) {
@@ -12,8 +17,11 @@ export function Chart({ symbol }: Props) {
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const hasInitialFit = useRef(false);
   const [chartData, setChartData] = useState<ChartData | null>(null);
+  const { lastMessage } = useWebSocket('/ws/live');
 
+  // Create chart once
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -39,7 +47,27 @@ export function Chart({ symbol }: Props) {
         borderColor: 'rgba(255,255,255,0.05)',
         timeVisible: true,
         secondsVisible: false,
+        rightOffset: 5,
+        tickMarkFormatter: (time: number) => {
+          const d = new Date(time * 1000);
+          const et = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
+          const h = et.getHours().toString().padStart(2, '0');
+          const m = et.getMinutes().toString().padStart(2, '0');
+          return `${h}:${m}`;
+        },
       },
+      localization: {
+        timeFormatter: (time: number) => {
+          const d = new Date(time * 1000);
+          return d.toLocaleString('en-US', {
+            timeZone: 'America/New_York',
+            month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', hour12: false,
+          });
+        },
+      },
+      handleScroll: true,
+      handleScale: true,
     });
 
     const candleSeries = chart.addCandlestickSeries({
@@ -77,67 +105,91 @@ export function Chart({ symbol }: Props) {
     return () => {
       resizeObserver.disconnect();
       chart.remove();
+      chartRef.current = null;
+      candleRef.current = null;
+      volumeRef.current = null;
     };
   }, []);
 
+  // Load historical data when symbol changes
+  const loadData = useCallback(async (sym: string) => {
+    if (!candleRef.current || !volumeRef.current) return;
+    try {
+      const data = await api.chart(sym);
+      setChartData(data);
+      if (data.bars.length === 0) {
+        candleRef.current.setData([]);
+        volumeRef.current.setData([]);
+        return;
+      }
+
+      const candles: CandlestickData<Time>[] = data.bars.map((b) => ({
+        time: toUnixTime(b.time),
+        open: b.open,
+        high: b.high,
+        low: b.low,
+        close: b.close,
+      }));
+
+      const volumes = data.bars.map((b) => ({
+        time: toUnixTime(b.time),
+        value: b.volume,
+        color: b.close >= b.open ? 'rgba(0,230,118,0.18)' : 'rgba(255,82,82,0.18)',
+      }));
+
+      candleRef.current.setData(candles);
+      volumeRef.current.setData(volumes);
+
+      const markers = data.markers.map((m) => ({
+        time: toUnixTime(m.time),
+        position: m.type === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
+        color: m.type === 'buy' ? strategyColor(m.strategy) : (m.pnl && m.pnl >= 0 ? '#00e676' : '#ff5252'),
+        shape: m.type === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
+        text: m.text,
+      }));
+      if (markers.length > 0) candleRef.current.setMarkers(markers);
+
+      // Only fit on first load — don't reset user's zoom on refresh
+      if (!hasInitialFit.current) {
+        chartRef.current?.timeScale().fitContent();
+        hasInitialFit.current = true;
+      }
+    } catch (e) {
+      console.error('Chart fetch error:', e);
+    }
+  }, []);
+
+  // Reset and reload when symbol changes
   useEffect(() => {
     if (!symbol) return;
+    hasInitialFit.current = false;
+    candleRef.current?.setData([]);
+    volumeRef.current?.setData([]);
+    loadData(symbol);
 
-    const fetchData = async () => {
-      try {
-        const data = await api.chart(symbol);
-        setChartData(data);
-
-        if (!candleRef.current || !volumeRef.current) return;
-
-        if (data.bars.length === 0) {
-          candleRef.current.setData([]);
-          volumeRef.current.setData([]);
-          return;
-        }
-
-        const candles: CandlestickData<Time>[] = data.bars.map((b) => ({
-          time: (new Date(b.time).getTime() / 1000) as Time,
-          open: b.open,
-          high: b.high,
-          low: b.low,
-          close: b.close,
-        }));
-
-        const volumes = data.bars.map((b) => ({
-          time: (new Date(b.time).getTime() / 1000) as Time,
-          value: b.volume,
-          color: b.close >= b.open ? 'rgba(0,230,118,0.15)' : 'rgba(255,82,82,0.15)',
-        }));
-
-        candleRef.current.setData(candles);
-        volumeRef.current.setData(volumes);
-
-        const markers = data.markers.map((m) => ({
-          time: (new Date(m.time).getTime() / 1000) as Time,
-          position: m.type === 'buy' ? ('belowBar' as const) : ('aboveBar' as const),
-          color: m.type === 'buy' ? strategyColor(m.strategy) : (m.pnl && m.pnl >= 0 ? '#00e676' : '#ff5252'),
-          shape: m.type === 'buy' ? ('arrowUp' as const) : ('arrowDown' as const),
-          text: m.text,
-        }));
-
-        if (markers.length > 0) {
-          candleRef.current.setMarkers(markers);
-        }
-
-        chartRef.current?.timeScale().fitContent();
-      } catch (e) {
-        console.error('Chart fetch error:', e);
-      }
-    };
-
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
+    // Refresh markers every 15s but don't reset zoom
+    const interval = setInterval(() => loadData(symbol), 15000);
     return () => clearInterval(interval);
-  }, [symbol]);
+  }, [symbol, loadData]);
+
+  // Append new bars from WebSocket in real time
+  useEffect(() => {
+    if (!lastMessage || lastMessage.type !== 'bar') return;
+    if (!symbol || lastMessage.symbol !== symbol) return;
+    if (!candleRef.current || !volumeRef.current) return;
+
+    const b = lastMessage.data;
+    const t = toUnixTime(b.timestamp || b.time);
+    candleRef.current.update({ time: t, open: b.open, high: b.high, low: b.low, close: b.close });
+    volumeRef.current.update({
+      time: t,
+      value: b.volume,
+      color: b.close >= b.open ? 'rgba(0,230,118,0.18)' : 'rgba(255,82,82,0.18)',
+    });
+  }, [lastMessage, symbol]);
 
   return (
-    <div className="card animate-in">
+    <div className="card animate-in" style={{ display: 'flex', flexDirection: 'column' }}>
       <div className="chart-header">
         <div>
           <span className="chart-symbol">{symbol || 'Select a ticker'}</span>
@@ -145,25 +197,39 @@ export function Chart({ symbol }: Props) {
             <span className="chart-meta">{chartData.bars.length} candles · 2min</span>
           )}
         </div>
-        {chartData && chartData.markers.length > 0 && (
-          <div className="chart-markers">
-            {chartData.markers.map((m, i) => (
-              <span
-                key={i}
-                className="chart-marker-badge"
-                style={{
-                  background: m.type === 'buy' ? 'var(--blue-bg)' : (m.pnl && m.pnl >= 0 ? 'var(--green-bg)' : 'var(--red-bg)'),
-                  color: m.type === 'buy' ? 'var(--blue)' : (m.pnl && m.pnl >= 0 ? 'var(--green)' : 'var(--red)'),
-                  border: `1px solid ${m.type === 'buy' ? 'rgba(68,138,255,0.12)' : (m.pnl && m.pnl >= 0 ? 'rgba(0,230,118,0.12)' : 'rgba(255,82,82,0.12)')}`,
-                }}
-              >
-                {m.text}
-              </span>
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Fit button to reset zoom */}
+          {symbol && (
+            <button
+              className="chart-fit-btn"
+              onClick={() => {
+                chartRef.current?.timeScale().fitContent();
+              }}
+              title="Fit all candles"
+            >
+              ⤢ Fit
+            </button>
+          )}
+          {chartData && chartData.markers.length > 0 && (
+            <div className="chart-markers">
+              {chartData.markers.map((m, i) => (
+                <span
+                  key={i}
+                  className="chart-marker-badge"
+                  style={{
+                    background: m.type === 'buy' ? 'var(--blue-bg)' : (m.pnl && m.pnl >= 0 ? 'var(--green-bg)' : 'var(--red-bg)'),
+                    color: m.type === 'buy' ? 'var(--blue)' : (m.pnl && m.pnl >= 0 ? 'var(--green)' : 'var(--red)'),
+                    border: `1px solid ${m.type === 'buy' ? 'rgba(68,138,255,0.12)' : (m.pnl && m.pnl >= 0 ? 'rgba(0,230,118,0.12)' : 'rgba(255,82,82,0.12)')}`,
+                  }}
+                >
+                  {m.text}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
-      <div ref={containerRef} style={{ height: 420, width: '100%' }} />
+      <div ref={containerRef} style={{ flex: 1, minHeight: 420, width: '100%' }} />
     </div>
   );
 }

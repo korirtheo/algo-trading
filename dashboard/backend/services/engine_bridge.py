@@ -3,11 +3,57 @@ Engine Bridge: Reads state from the live CombinedEngine for the dashboard.
 Provides a clean interface between the trading engine and the dashboard API.
 """
 import logging
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
+
+
+def _fetch_alpaca_bars(symbol: str) -> list:
+    """Fetch today's 2-minute bars from Alpaca for chart display."""
+    try:
+        from alpaca.data.historical import StockHistoricalDataClient
+        from alpaca.data.requests import StockBarsRequest
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+        from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
+
+        now = datetime.now(ET)
+        today = now.date()
+        market_open = datetime.combine(today, dt_time(9, 30), tzinfo=ET)
+        # Don't request future data
+        end = min(now, datetime.combine(today, dt_time(16, 0), tzinfo=ET))
+
+        client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+        req = StockBarsRequest(
+            symbol_or_symbols=symbol,
+            timeframe=TimeFrame(2, TimeFrameUnit.Minute),
+            start=market_open,
+            end=end,
+            adjustment="raw",
+            feed=ALPACA_FEED,
+        )
+        bars_resp = client.get_stock_bars(req)
+        if bars_resp.df.empty:
+            return []
+        df = bars_resp.df.reset_index()
+        result = []
+        for _, row in df.iterrows():
+            t = row["timestamp"]
+            if hasattr(t, "to_pydatetime"):
+                t = t.to_pydatetime()
+            result.append({
+                "time": t.isoformat() if hasattr(t, "isoformat") else str(t),
+                "open": float(row["open"]),
+                "high": float(row["high"]),
+                "low": float(row["low"]),
+                "close": float(row["close"]),
+                "volume": float(row["volume"]),
+            })
+        return result
+    except Exception as e:
+        log.warning(f"Alpaca bar fetch failed for {symbol}: {e}")
+        return []
 
 
 class EngineBridge:
@@ -44,7 +90,7 @@ class EngineBridge:
         if not self.executor:
             return positions
         try:
-            alpaca_positions = self.executor.trading_client.get_all_positions()
+            alpaca_positions = self.executor.client.get_all_positions()
             for pos in alpaca_positions:
                 ticker = pos.symbol
                 engine_state = {}
@@ -88,6 +134,17 @@ class EngineBridge:
             elif engine_state.get("signal"):
                 status = "signal"
 
+            # Last price from engine bar data
+            last_price = None
+            change_pct = None
+            if self.engine:
+                bars = self.engine.bar_data.get(ticker, [])
+                if bars:
+                    last_price = bars[-1].get("Close")
+                    prev_close = cand.get("prev_close", 0)
+                    if last_price and prev_close:
+                        change_pct = (last_price / prev_close - 1) * 100
+
             watchlist.append({
                 "ticker": ticker,
                 "gap_pct": cand["gap_pct"],
@@ -98,6 +155,8 @@ class EngineBridge:
                 "status": status,
                 "strategy": engine_state.get("strategy", ""),
                 "candle_count": engine_state.get("candle_count", 0),
+                "last_price": last_price,
+                "change_pct": change_pct,
             })
         return watchlist
 
@@ -146,9 +205,11 @@ class EngineBridge:
         bars = []
         markers = []
 
+        # Try to get bars from engine's live buffer
+        engine_bars = []
         if self.engine and symbol in self.engine.bar_data:
             for bar in self.engine.bar_data[symbol]:
-                bars.append({
+                engine_bars.append({
                     "time": bar["timestamp"].isoformat() if hasattr(bar["timestamp"], "isoformat") else str(bar["timestamp"]),
                     "open": bar["Open"],
                     "high": bar["High"],
@@ -156,6 +217,23 @@ class EngineBridge:
                     "close": bar["Close"],
                     "volume": bar["Volume"],
                 })
+
+        # Always fetch full-day bars from Alpaca for context
+        alpaca_bars = _fetch_alpaca_bars(symbol)
+
+        if alpaca_bars:
+            # Merge: use Alpaca as base, overlay engine bars (more up-to-date) by time key
+            engine_by_time = {b["time"][:19]: b for b in engine_bars}
+            merged = {}
+            for b in alpaca_bars:
+                key = b["time"][:19]
+                merged[key] = b
+            for b in engine_bars:
+                key = b["time"][:19]
+                merged[key] = b
+            bars = sorted(merged.values(), key=lambda x: x["time"])
+        else:
+            bars = engine_bars
 
         # Add trade markers
         if self.engine:

@@ -102,29 +102,50 @@ def run(args):
     log.info(f"Account: cash=${float(acct.cash):,.2f}, "
              f"buying_power=${float(acct.buying_power):,.2f}")
 
-    # Phase 1: Pre-market scan
+    from datetime import time as dt_time
+
+    # Phase 1: Pre-market scan loop (9:00 → 9:25 → 9:27 → lock)
     now = datetime.now(ET)
-    if now.hour < 8:
-        from datetime import time as dt_time
-        wait_until(dt_time(8, 0), log)
+    if now < datetime.combine(now.date(), dt_time(9, 0), tzinfo=ET):
+        wait_until(dt_time(9, 0), log)
 
-    log.info("Phase 1: Pre-market scan")
     scanner = PreMarketScanner()
-    candidates = scanner.get_final_watchlist()
 
-    if not candidates:
-        log.info("No candidates found. Exiting.")
-        return
+    def do_scan(label):
+        log.info(f"Phase 1: Pre-market scan ({label})")
+        c = scanner.get_final_watchlist()
+        if c:
+            for x in c:
+                float_str = f"{x['float_shares']/1e6:.1f}M" if x.get('float_shares') else "N/A"
+                log.info(f"  {x['ticker']}: gap={x['gap_pct']:.1f}%, "
+                         f"PM vol={x['pm_volume']:,}, float={float_str}")
+        else:
+            log.info("  No candidates found")
+        return c
 
-    log.info(f"Watchlist: {len(candidates)} candidates")
-    for c in candidates:
-        float_str = f"{c['float_shares']/1e6:.1f}M" if c.get('float_shares') else "N/A"
-        log.info(f"  {c['ticker']}: gap={c['gap_pct']:.1f}%, "
-                 f"PM vol={c['pm_volume']:,}, float={float_str}")
+    candidates = do_scan("9:00")
 
     if args.scan_only:
         log.info("--scan-only mode. Exiting.")
         return
+
+    # Rescan at 9:25
+    now = datetime.now(ET)
+    if now < datetime.combine(now.date(), dt_time(9, 25), tzinfo=ET):
+        wait_until(dt_time(9, 25), log)
+        candidates = do_scan("9:25")
+
+    # Final scan at 9:27
+    now = datetime.now(ET)
+    if now < datetime.combine(now.date(), dt_time(9, 27), tzinfo=ET):
+        wait_until(dt_time(9, 27), log)
+        candidates = do_scan("9:27 FINAL")
+
+    if not candidates:
+        log.info("No candidates after final scan. Exiting.")
+        return
+
+    log.info(f"Watchlist locked: {len(candidates)} candidates")
 
     # Phase 2: Initialize combined engine
     engine = CombinedEngine(executor)
@@ -139,9 +160,8 @@ def run(args):
         log.info(f"Dashboard running at http://localhost:{args.port}")
 
     # Phase 4: Wait for market open
-    from datetime import time as dt_time
     now = datetime.now(ET)
-    if now.hour < 9 or (now.hour == 9 and now.minute < 29):
+    if now < datetime.combine(now.date(), dt_time(9, 29), tzinfo=ET):
         wait_until(dt_time(9, 29), log)
 
     # Phase 5: Start bar stream
