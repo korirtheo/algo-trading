@@ -215,7 +215,14 @@ def start_dashboard(engine, executor, candidates, port=8000):
 
     config = uvicorn.Config(app, host="0.0.0.0", port=port, log_level="warning")
     server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
+
+    def _run():
+        try:
+            server.run()
+        except Exception as e:
+            log.error(f"Dashboard server crashed: {e}", exc_info=True)
+
+    thread = threading.Thread(target=_run, daemon=True)
     thread.start()
     return thread
 
