@@ -34,6 +34,136 @@ from live.executor import OrderExecutor
 ET = ZoneInfo("America/New_York")
 
 
+def recover_open_positions(engine, executor, candidates, log):
+    """
+    On restart: detect any open Alpaca positions and restore engine state.
+    - Fetches today's 2-min bars for each open position
+    - Immediately sells if stop (-15%) or target (+25%) already breached
+    - Otherwise restores engine state and adds to candidates for stream
+    Returns updated candidates list.
+    """
+    try:
+        open_positions = executor.get_positions()
+    except Exception as e:
+        log.warning(f"Recovery: could not fetch positions: {e}")
+        return candidates
+
+    if not open_positions:
+        return candidates
+
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockBarsRequest, StockLatestQuoteRequest
+    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+    from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
+    from datetime import time as dt_time, date as dt_date
+
+    hist_client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+    candidate_tickers = {c["ticker"] for c in candidates}
+    today = datetime.now(ET).date()
+    market_open_dt = datetime.combine(today, dt_time(9, 30), tzinfo=ET)
+
+    for pos in open_positions:
+        ticker = pos.symbol
+        entry_price = float(pos.avg_entry_price)
+        qty = float(pos.qty)
+        current_price = float(pos.current_price)
+        change_pct = (current_price / entry_price - 1) * 100
+
+        log.info(f"RECOVERY: Found open position {ticker} | "
+                 f"entry=${entry_price:.2f} | current=${current_price:.2f} | "
+                 f"change={change_pct:+.1f}%")
+
+        # Immediate safety checks — derived from worst-case strategy params
+        stop_keys = [v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0]
+        target_keys = [v for k, v in engine.params.items() if k.endswith("_target_pct") or k.endswith("_target1_pct") or k.endswith("_target2_pct")]
+        HARD_STOP_PCT = -(max(stop_keys) if stop_keys else 12.0)
+        HARD_TARGET_PCT = max(target_keys) if target_keys else 23.0
+
+        if change_pct <= HARD_STOP_PCT:
+            log.warning(f"RECOVERY STOP: {ticker} down {change_pct:.1f}% — selling immediately")
+            executor.sell(ticker, reason="RECOVERY_STOP")
+            continue
+
+        if change_pct >= HARD_TARGET_PCT:
+            log.info(f"RECOVERY TARGET: {ticker} up {change_pct:.1f}% — taking profit")
+            executor.sell(ticker, reason="RECOVERY_TARGET")
+            continue
+
+        # Fetch today's 2-min bars
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=ticker,
+                timeframe=TimeFrame(2, TimeFrameUnit.Minute),
+                start=market_open_dt,
+                end=datetime.now(ET),
+                feed=ALPACA_FEED,
+            )
+            bars_resp = hist_client.get_stock_bars(req)
+            df = bars_resp.df.reset_index() if not bars_resp.df.empty else None
+        except Exception as e:
+            log.warning(f"RECOVERY: Could not fetch bars for {ticker}: {e}")
+            df = None
+
+        # Inject bars into engine
+        if df is not None and not df.empty:
+            for _, row in df.iterrows():
+                t = row["timestamp"]
+                if hasattr(t, "to_pydatetime"):
+                    t = t.to_pydatetime()
+                engine.bar_data.setdefault(ticker, []).append({
+                    "timestamp": t,
+                    "Open": float(row["open"]),
+                    "High": float(row["high"]),
+                    "Low": float(row["low"]),
+                    "Close": float(row["close"]),
+                    "Volume": float(row["volume"]),
+                })
+
+        # Restore engine position state
+        engine.active_position = ticker
+        engine.position_entry[ticker] = {
+            "entry_price": entry_price,
+            "shares": qty,
+            "cost": entry_price * qty,
+            "strategy": "RECOVERED",
+            "entry_time": datetime.now(ET),
+        }
+        # Pre-populate last_states so engine won't re-enter
+        engine.last_states[ticker] = {
+            "ticker": ticker,
+            "entry_price": entry_price,
+            "shares": qty,
+            "strategy": "RECOVERED",
+            "exit_price": None,
+        }
+
+        # Add to candidates if not already there
+        if ticker not in candidate_tickers:
+            candidates = list(candidates) + [{
+                "ticker": ticker,
+                "gap_pct": 0,
+                "pm_volume": 0,
+                "premarket_high": entry_price,
+                "prev_close": entry_price,
+                "float_shares": None,
+            }]
+            # Also add to engine picks
+            engine.picks.append({
+                "ticker": ticker,
+                "gap_pct": 0,
+                "market_open": entry_price,
+                "premarket_high": entry_price,
+                "prev_close": entry_price,
+                "pm_volume": 0,
+                "market_hour_candles": None,
+            })
+            candidate_tickers.add(ticker)
+
+        log.info(f"RECOVERY: {ticker} restored — will manage to EOD (stop={HARD_STOP_PCT}%, target={HARD_TARGET_PCT}%)")
+
+    return candidates
+
+
 def setup_logging():
     today = datetime.now(ET).strftime("%Y-%m-%d")
     log_dir = "logs"
@@ -156,6 +286,9 @@ def run(args):
     engine = CombinedEngine(executor)
     engine.initialize_watchlist(candidates)
 
+    # Recover any open positions from a previous session/crash
+    candidates = recover_open_positions(engine, executor, candidates, log)
+
     if args.dry_run:
         log.info("--dry-run mode: will process bars but not place orders")
 
@@ -195,6 +328,10 @@ def run(args):
     log.info("Streaming... waiting for signals")
 
     # Phase 6: Main loop - monitor until EOD
+    stop_keys = [v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0]
+    target_keys = [v for k, v in engine.params.items() if k.endswith("_target_pct") or k.endswith("_target1_pct") or k.endswith("_target2_pct")]
+    RECOVERY_STOP = -(max(stop_keys) if stop_keys else 12.0)
+    RECOVERY_TARGET = max(target_keys) if target_keys else 23.0
     try:
         while True:
             now = datetime.now(ET)
@@ -209,7 +346,28 @@ def run(args):
             if now.hour >= 16:
                 break
 
-            time.sleep(10)
+            # Monitor recovered positions with hard stop/target
+            active = engine.active_position
+            if active and engine.position_entry.get(active, {}).get("strategy") == "RECOVERED":
+                try:
+                    positions = executor.get_positions()
+                    for pos in positions:
+                        if pos.symbol == active:
+                            entry = engine.position_entry[active]["entry_price"]
+                            current = float(pos.current_price)
+                            chg = (current / entry - 1) * 100
+                            if chg <= RECOVERY_STOP:
+                                log.warning(f"RECOVERY STOP HIT: {active} {chg:+.1f}% — selling")
+                                executor.sell(active, reason="RECOVERY_STOP")
+                                engine.active_position = None
+                            elif chg >= RECOVERY_TARGET:
+                                log.info(f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling")
+                                executor.sell(active, reason="RECOVERY_TARGET")
+                                engine.active_position = None
+                except Exception:
+                    pass
+
+            time.sleep(30)
 
     except KeyboardInterrupt:
         log.info("Interrupted by user")
