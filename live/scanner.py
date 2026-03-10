@@ -96,13 +96,16 @@ class PreMarketScanner:
             for t in tables:
                 cols = [str(c).strip() for c in t.columns]
                 if "Ticker" in cols and "Price" in cols and "Change" in cols:
-                    df = t
-                    df.columns = cols
-                    break
+                    t.columns = cols
+                    valid = t["Ticker"].dropna().apply(
+                        lambda x: bool(str(x).strip()) and len(str(x).strip()) <= 5 and str(x).strip() != "nan"
+                    )
+                    if valid.sum() >= 3:
+                        df = t
+                        break
 
             if df is None:
-                log.warning("Finviz: screener table with Ticker/Price/Change not found — tables: "
-                            + str([[str(c).strip() for c in t.columns[:6]] for t in tables[:5]]))
+                log.warning("Finviz: no usable screener table found")
                 return []
 
             movers = []
@@ -249,13 +252,16 @@ class PreMarketScanner:
             for t in tables:
                 cols = [str(c).strip() for c in t.columns]
                 if "Ticker" in cols and "Price" in cols:
-                    df = t
-                    df.columns = cols
-                    break
+                    t.columns = cols
+                    valid = t["Ticker"].dropna().apply(
+                        lambda x: bool(str(x).strip()) and len(str(x).strip()) <= 5 and str(x).strip() != "nan"
+                    )
+                    if valid.sum() >= 3:
+                        df = t
+                        break
 
             if df is None:
-                log.warning("Finviz: screener table with Ticker/Price not found — tables: "
-                            + str([[str(c).strip() for c in t.columns[:6]] for t in tables[:5]]))
+                log.warning("Finviz: no usable screener table found")
                 return []
 
             tickers = []
