@@ -311,7 +311,14 @@ def run(args):
         return
 
     if not candidates:
-        log.info("No candidates after all scans. Exiting.")
+        log.info("No candidates after all scans.")
+        if not args.no_dash:
+            log.info("Dashboard still running at http://localhost:%d", args.port)
+            try:
+                while True:
+                    time.sleep(300)
+            except KeyboardInterrupt:
+                log.info("Shutting down.")
         return
 
     log.info(f"Watchlist locked: {len(candidates)} candidates")
@@ -405,22 +412,31 @@ def run(args):
 
     except KeyboardInterrupt:
         log.info("Interrupted by user")
-    finally:
-        streamer.flush_pending()
-        streamer.stop()
 
-        # Daily summary
-        summary = engine.get_summary()
-        log.info("=" * 60)
-        log.info("DAILY SUMMARY")
-        log.info(f"  Trades: {summary['trades']}")
-        log.info(f"  Wins:   {summary['wins']}")
-        log.info(f"  Losses: {summary['losses']}")
-        log.info(f"  PnL:    ${summary['daily_pnl']:+,.2f}")
-        for t in summary["trade_details"]:
-            log.info(f"    {t['ticker']} ({t.get('strategy','?')}): ${t['pnl']:+,.2f} "
-                     f"({t['reason']}) ${t['entry_price']:.2f} -> ${t['exit_price']:.2f}")
-        log.info("=" * 60)
+    # Stop streamer and print daily summary
+    streamer.flush_pending()
+    streamer.stop()
+
+    summary = engine.get_summary()
+    log.info("=" * 60)
+    log.info("DAILY SUMMARY")
+    log.info(f"  Trades: {summary['trades']}")
+    log.info(f"  Wins:   {summary['wins']}")
+    log.info(f"  Losses: {summary['losses']}")
+    log.info(f"  PnL:    ${summary['daily_pnl']:+,.2f}")
+    for t in summary["trade_details"]:
+        log.info(f"    {t['ticker']} ({t.get('strategy','?')}): ${t['pnl']:+,.2f} "
+                 f"({t['reason']}) ${t['entry_price']:.2f} -> ${t['exit_price']:.2f}")
+    log.info("=" * 60)
+
+    # Keep process alive so dashboard stays accessible after hours
+    if not args.no_dash:
+        log.info("Market closed. Dashboard still running at http://localhost:%d", args.port)
+        try:
+            while True:
+                time.sleep(300)
+        except KeyboardInterrupt:
+            log.info("Shutting down.")
 
 
 def main():
