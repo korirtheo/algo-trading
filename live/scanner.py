@@ -204,10 +204,7 @@ class PreMarketScanner:
             bar_info = bars_by_ticker.get(ticker, {})
             pm_volume = bar_info.get("pm_volume", 0)
             pm_high = bar_info.get("pm_high", info["current_price"])
-
-            if pm_volume < LIVE_MIN_PM_VOLUME:
-                log.debug(f"  {ticker} filtered out: IEX PM vol={pm_volume:,} < {LIVE_MIN_PM_VOLUME:,}")
-                continue
+            # No PM volume filter — IEX covers ~2.5% of real volume so it's unreliable
 
             float_shares = FLOAT_DATA.get(ticker)
             results.append({
@@ -233,23 +230,27 @@ class PreMarketScanner:
 
     def get_final_watchlist(self):
         """Get pre-market gap-up candidates from Alpaca movers + Finviz screener."""
-        log.info("Starting pre-market scan (Alpaca + Finviz)...")
+        now = datetime.now(ET)
+        is_premarket = now.hour < 9 or (now.hour == 9 and now.minute < 30)
 
-        # Gather from both sources
-        alpaca_movers = self.get_movers()
-        finviz_movers = self.get_finviz_premarket()
-
-        # Merge, deduplicating by symbol (Alpaca takes priority for gap_pct accuracy)
-        seen = {m["symbol"] for m in alpaca_movers}
-        combined = list(alpaca_movers)
-        for m in finviz_movers:
-            if m["symbol"] not in seen:
-                combined.append(m)
-                seen.add(m["symbol"])
+        if is_premarket:
+            log.info("Starting pre-market scan (Alpaca + Finviz)...")
+            alpaca_movers = self.get_movers()
+            finviz_movers = self.get_finviz_premarket()
+            seen = {m["symbol"] for m in alpaca_movers}
+            combined = list(alpaca_movers)
+            for m in finviz_movers:
+                if m["symbol"] not in seen:
+                    combined.append(m)
+                    seen.add(m["symbol"])
+            log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz)")
+        else:
+            # After open: Finviz Change column shows intraday %, not gap — skip it
+            log.info("Starting market-hours scan (Alpaca movers only)...")
+            combined = self.get_movers()
 
         if not combined:
-            log.warning("No movers returned from Alpaca or Finviz")
+            log.warning("No movers returned")
             return []
 
-        log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz)")
         return self.scan_premarket(combined)
