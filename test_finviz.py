@@ -10,20 +10,24 @@ headers = {
 resp = requests.get(
     "https://finviz.com/screener.ashx",
     headers=headers,
-    params={"v": "111", "f": "sh_price_u50", "o": "-prechange"},
+    params={"v": "111", "f": "sh_price_u50", "o": "-change"},
     timeout=15,
 )
 print("Status:", resp.status_code)
 print("Response size:", len(resp.text), "bytes")
 
 tables = pd.read_html(StringIO(resp.text))
-print(f"Total tables found: {len(tables)}")
+print(f"Total tables: {len(tables)}")
 print()
 
 for i, t in enumerate(tables):
     cols = [str(c).strip() for c in t.columns]
-    print(f"Table {i}: {len(t)} rows, cols={cols}")
-    if "Ticker" in cols:
-        print(f"  *** HAS TICKER — also has Price={('Price' in cols)}, Change={('Change' in cols)}")
-        print(t.head(5).to_string())
+    has_ticker = "Ticker" in cols
+    has_price = "Price" in cols
+    has_change = "Change" in cols
+    marker = " <-- MATCH" if (has_ticker and has_price and has_change) else ""
+    print(f"Table {i}: {len(t)} rows x {len(cols)} cols | Ticker={has_ticker} Price={has_price} Change={has_change}{marker}")
+    print(f"  cols: {cols[:12]}")
+    if has_ticker and has_price:
+        print(f"  first 3 tickers: {list(t['Ticker'][:3])}")
     print()
