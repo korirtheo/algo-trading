@@ -164,22 +164,30 @@ def recover_open_positions(engine, executor, candidates, log):
     return candidates
 
 
+class _ETFormatter(logging.Formatter):
+    """Logging formatter that stamps times in US/Eastern (ET)."""
+    def formatTime(self, record, datefmt=None):
+        from datetime import datetime as _dt
+        ct = _dt.fromtimestamp(record.created, tz=ET)
+        return ct.strftime(datefmt or "%H:%M:%S")
+
+
 def setup_logging():
     today = datetime.now(ET).strftime("%Y-%m-%d")
     log_dir = "logs"
     import os
     os.makedirs(log_dir, exist_ok=True)
 
-    fmt = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    fmt = "%(asctime)s ET [%(levelname)s] %(name)s: %(message)s"
     datefmt = "%H:%M:%S"
 
     console = logging.StreamHandler(sys.stdout)
     console.setLevel(logging.INFO)
-    console.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    console.setFormatter(_ETFormatter(fmt, datefmt=datefmt))
 
     fh = logging.FileHandler(f"{log_dir}/{today}_live.log", encoding="utf-8")
     fh.setLevel(logging.DEBUG)
-    fh.setFormatter(logging.Formatter(fmt, datefmt=datefmt))
+    fh.setFormatter(_ETFormatter(fmt, datefmt=datefmt))
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
