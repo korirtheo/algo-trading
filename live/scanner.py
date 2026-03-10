@@ -1,17 +1,17 @@
 """
 Pre-Market Scanner: Identifies gap-up candidates before market open.
 
-Uses Alpaca's screener/movers endpoint to get top % gainers instantly,
-then fetches PM bars for volume and premarket high.
+Uses Alpaca's screener/movers endpoint + Finviz pre-market screener to get
+top % gainers, then fetches PM bars for premarket high.
 
 Produces a watchlist for the strategy engine.
 """
 import re
-import time
 import logging
 import requests
 import pandas as pd
-from datetime import datetime, timedelta
+from io import StringIO
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from alpaca.data.historical import StockHistoricalDataClient
@@ -21,13 +21,17 @@ from alpaca.trading.client import TradingClient
 
 from config.settings import (
     ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED,
-    MIN_GAP_PCT, TOP_N, MIN_PM_VOLUME, MAX_PRICE, FLOAT_DATA,
+    MIN_GAP_PCT, TOP_N, MAX_PRICE, FLOAT_DATA,
 )
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
 
 DATA_BASE_URL = "https://data.alpaca.markets"
+
+# IEX feed covers ~2.5% of real volume — PM volume filter is not meaningful
+# We rely on gap% and the movers source for quality filtering
+LIVE_MIN_PM_VOLUME = 1_000
 
 
 def _is_warrant_or_unit(ticker):
@@ -55,27 +59,91 @@ class PreMarketScanner:
         self.min_gap_pct = min_gap_pct or MIN_GAP_PCT
         self.max_float = max_float or 15_000_000
 
-    def get_movers(self, top=100):
-        """Get top % gainers from Alpaca screener endpoint (instant, no scanning)."""
+    def get_movers(self):
+        """Get top % gainers from Alpaca screener endpoint."""
         url = f"{DATA_BASE_URL}/v1beta1/screener/stocks/movers"
-        params = {}
         try:
-            resp = requests.get(url, headers=_alpaca_headers(), params=params, timeout=10)
+            resp = requests.get(url, headers=_alpaca_headers(), params={}, timeout=10)
             resp.raise_for_status()
-            data = resp.json()
-            gainers = data.get("gainers", [])
+            gainers = resp.json().get("gainers", [])
             log.info(f"Alpaca movers: {len(gainers)} gainers returned")
             for g in gainers:
                 log.debug(f"  mover: {g.get('symbol')} price=${g.get('price')} chg={g.get('percent_change')}%")
             return gainers
         except Exception as e:
-            log.warning(f"Movers endpoint failed: {e}")
+            log.warning(f"Alpaca movers failed: {e}")
+            return []
+
+    def get_finviz_premarket(self):
+        """Scrape Finviz screener for pre-market gap-up candidates."""
+        try:
+            url = "https://finviz.com/screener.ashx"
+            params = {
+                "v": "111",
+                "f": f"sh_price_u{int(MAX_PRICE)}",
+                "o": "-prechange",
+            }
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            resp.raise_for_status()
+
+            tables = pd.read_html(StringIO(resp.text))
+            df = None
+            for t in tables:
+                cols = [str(c).strip() for c in t.columns]
+                if "Ticker" in cols:
+                    df = t
+                    df.columns = cols
+                    break
+
+            if df is None:
+                log.debug("Finviz: screener table not found in response")
+                return []
+
+            movers = []
+            for _, row in df.iterrows():
+                try:
+                    ticker = str(row.get("Ticker", "")).strip()
+                    if not ticker or ticker.lower() == "nan" or len(ticker) > 5 or "." in ticker:
+                        continue
+                    if _is_warrant_or_unit(ticker):
+                        continue
+
+                    price = float(str(row.get("Price", 0)).replace(",", ""))
+                    if price <= 0 or price > MAX_PRICE:
+                        continue
+
+                    change_str = str(row.get("Change", "0%")).replace("%", "").replace("+", "").strip()
+                    change_pct = float(change_str)
+
+                    if change_pct < self.min_gap_pct:
+                        break  # sorted descending — can stop here
+
+                    movers.append({
+                        "symbol": ticker,
+                        "price": price,
+                        "percent_change": change_pct,
+                    })
+                except (ValueError, TypeError):
+                    continue
+
+            log.info(f"Finviz pre-market: {len(movers)} candidates found")
+            return movers
+
+        except Exception as e:
+            log.warning(f"Finviz scrape failed: {e}")
             return []
 
     def scan_premarket(self, movers):
-        """Fetch PM bars for movers to get volume and premarket high.
+        """Fetch PM bars for movers to get premarket high.
 
         Returns list of candidate dicts for the strategy engine.
+        Note: IEX feed volumes are ~2.5% of real volume, so PM volume
+        filter uses a very low threshold (LIVE_MIN_PM_VOLUME).
         """
         now = datetime.now(ET)
         today = now.date()
@@ -119,60 +187,69 @@ class PreMarketScanner:
                 feed=ALPACA_FEED,
             )
             bars = self.data_client.get_stock_bars(req)
+            bars_by_ticker = {}
             if not bars.df.empty:
                 df = bars.df.reset_index()
                 for ticker in df["symbol"].unique():
                     tdf = df[df["symbol"] == ticker]
-                    pm_volume = int(tdf["volume"].sum())
-                    pm_high = float(tdf["high"].max())
-                    info = ticker_map[ticker]
-                    float_shares = FLOAT_DATA.get(ticker)
-                    results.append({
-                        "ticker": ticker,
-                        "gap_pct": info["gap_pct"],
-                        "pm_volume": pm_volume,
-                        "premarket_high": pm_high,
-                        "prev_close": info["prev_close"],
-                        "float_shares": float_shares,
-                        "current_price": info["current_price"],
-                    })
+                    bars_by_ticker[ticker] = {
+                        "pm_volume": int(tdf["volume"].sum()),
+                        "pm_high": float(tdf["high"].max()),
+                    }
         except Exception as e:
             log.warning(f"Error fetching PM bars: {e}")
-            # Fall back: return movers without PM bar data
-            for ticker, info in ticker_map.items():
-                float_shares = FLOAT_DATA.get(ticker)
-                results.append({
-                    "ticker": ticker,
-                    "gap_pct": info["gap_pct"],
-                    "pm_volume": MIN_PM_VOLUME,  # assume threshold met
-                    "premarket_high": info["current_price"],
-                    "prev_close": info["prev_close"],
-                    "float_shares": float_shares,
-                    "current_price": info["current_price"],
-                })
+            bars_by_ticker = {}
 
-        # Filter by PM volume and sort by gap %
-        for r in results:
-            if r["pm_volume"] < MIN_PM_VOLUME:
-                log.debug(f"  {r['ticker']} filtered out: PM vol={r['pm_volume']:,} < {MIN_PM_VOLUME:,}")
-        results = [r for r in results if r["pm_volume"] >= MIN_PM_VOLUME]
+        for ticker, info in ticker_map.items():
+            bar_info = bars_by_ticker.get(ticker, {})
+            pm_volume = bar_info.get("pm_volume", 0)
+            pm_high = bar_info.get("pm_high", info["current_price"])
+
+            if pm_volume < LIVE_MIN_PM_VOLUME:
+                log.debug(f"  {ticker} filtered out: IEX PM vol={pm_volume:,} < {LIVE_MIN_PM_VOLUME:,}")
+                continue
+
+            float_shares = FLOAT_DATA.get(ticker)
+            results.append({
+                "ticker": ticker,
+                "gap_pct": info["gap_pct"],
+                "pm_volume": pm_volume,
+                "premarket_high": pm_high,
+                "prev_close": info["prev_close"],
+                "float_shares": float_shares,
+                "current_price": info["current_price"],
+            })
+
         results.sort(key=lambda x: x["gap_pct"], reverse=True)
         results = results[:TOP_N]
 
         log.info(f"Found {len(results)} gap-up candidates")
         for r in results:
             float_str = f"{r['float_shares']/1e6:.1f}M" if r.get("float_shares") else "N/A"
-            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, PM vol={r['pm_volume']:,}, "
+            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, IEX PM vol={r['pm_volume']:,}, "
                      f"float={float_str}, PM high=${r['premarket_high']:.2f}")
 
         return results
 
     def get_final_watchlist(self):
-        """Get top gainers via Alpaca movers endpoint, then enrich with PM bars."""
-        log.info("Starting pre-market scan (Alpaca movers)...")
-        movers = self.get_movers(top=100)
-        if not movers:
-            log.warning("No movers returned — market may be closed or subscription issue")
+        """Get pre-market gap-up candidates from Alpaca movers + Finviz screener."""
+        log.info("Starting pre-market scan (Alpaca + Finviz)...")
+
+        # Gather from both sources
+        alpaca_movers = self.get_movers()
+        finviz_movers = self.get_finviz_premarket()
+
+        # Merge, deduplicating by symbol (Alpaca takes priority for gap_pct accuracy)
+        seen = {m["symbol"] for m in alpaca_movers}
+        combined = list(alpaca_movers)
+        for m in finviz_movers:
+            if m["symbol"] not in seen:
+                combined.append(m)
+                seen.add(m["symbol"])
+
+        if not combined:
+            log.warning("No movers returned from Alpaca or Finviz")
             return []
-        candidates = self.scan_premarket(movers)
-        return candidates
+
+        log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz)")
+        return self.scan_premarket(combined)
