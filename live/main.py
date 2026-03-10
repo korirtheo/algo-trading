@@ -285,8 +285,16 @@ def run(args):
         wait_until(dt_time(9, 27), log)
         candidates = do_scan("9:27 FINAL")
 
+    # 9:30 scan — catches stocks that only show volume at open
+    now = datetime.now(ET)
+    if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
+        wait_until(dt_time(9, 30), log)
+        new_candidates = do_scan("9:30")
+        if new_candidates:
+            candidates = new_candidates
+
     if not candidates:
-        log.info("No candidates after final scan. Exiting.")
+        log.info("No candidates after all scans. Exiting.")
         return
 
     log.info(f"Watchlist locked: {len(candidates)} candidates")
@@ -307,10 +315,10 @@ def run(args):
         bridge.engine = engine
         bridge.scanner_candidates = candidates
 
-    # Phase 4: Wait for market open
+    # Phase 4: Wait for market open (stream starts at 9:30)
     now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 29), tzinfo=ET):
-        wait_until(dt_time(9, 29), log)
+    if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
+        wait_until(dt_time(9, 30), log)
 
     # Phase 5: Start bar stream
     log.info("Starting bar stream")
