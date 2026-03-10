@@ -1,3 +1,62 @@
+# Algo Trading — Gap-Up Day Trading System
+
+## AWS Deployment
+
+### SSH into the server
+```powershell
+ssh -i "C:\Users\Theo Korir\Downloads\trading-key.pem" ubuntu@98.92.73.65
+```
+
+### Check if the bot is running
+```bash
+tail -f ~/trading.log
+```
+
+### Restart the bot (outside market hours only)
+```bash
+pkill -f live.main
+cd ~/algo-trading
+source venv/bin/activate
+nohup python -m live.main >> ~/trading.log 2>&1 &
+```
+
+### View dashboard
+```
+http://98.92.73.65:8000
+```
+
+### Deploy code changes
+1. Push from local machine: `git push`
+2. AWS pulls automatically every 5 minutes via cron
+3. SSH in and restart the bot (see above)
+
+---
+
+## Local Development
+
+### Run live trading
+```bash
+python -m live.main
+```
+
+### Run backtest
+```bash
+python test_green_candle_combined.py --no-charts
+```
+
+### Run Optuna optimization
+```bash
+python optimize_combined.py --trials 2000
+```
+
+### Frontend dev server (live reload)
+```bash
+cd dashboard/frontend && npm run dev
+# Open http://localhost:5173
+```
+
+---
+
 # Combined Green Candle Breakout Strategy (H+G+A+F+P)
 
 A multi-strategy backtesting system for day-trading small-cap gap-up stocks. Five complementary strategies share a single capital pool, each targeting different gap sizes and profit profiles. The system uses 100% balance sizing with a priority cascade (H > G > A > F > P) to allocate capital to the highest-conviction setup each day.
