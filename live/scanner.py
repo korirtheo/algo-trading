@@ -95,13 +95,14 @@ class PreMarketScanner:
             df = None
             for t in tables:
                 cols = [str(c).strip() for c in t.columns]
-                if "Ticker" in cols:
+                if "Ticker" in cols and "Price" in cols and "Change" in cols:
                     df = t
                     df.columns = cols
                     break
 
             if df is None:
-                log.debug("Finviz: screener table not found in response")
+                log.warning("Finviz: screener table with Ticker/Price/Change not found — tables: "
+                            + str([[str(c).strip() for c in t.columns[:6]] for t in tables[:5]]))
                 return []
 
             movers = []
@@ -247,12 +248,14 @@ class PreMarketScanner:
             df = None
             for t in tables:
                 cols = [str(c).strip() for c in t.columns]
-                if "Ticker" in cols:
+                if "Ticker" in cols and "Price" in cols:
                     df = t
                     df.columns = cols
                     break
 
             if df is None:
+                log.warning("Finviz: screener table with Ticker/Price not found — tables: "
+                            + str([[str(c).strip() for c in t.columns[:6]] for t in tables[:5]]))
                 return []
 
             tickers = []
