@@ -11,7 +11,7 @@ import logging
 import requests
 import pandas as pd
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from alpaca.data.historical import StockHistoricalDataClient
@@ -228,29 +228,153 @@ class PreMarketScanner:
 
         return results
 
+    def get_finviz_tickers(self):
+        """Get top 20 tickers from Finviz sorted by pre-market change.
+        Ignores Change column value (unreliable after open) — returns tickers only.
+        """
+        try:
+            url = "https://finviz.com/screener.ashx"
+            params = {"v": "111", "f": f"sh_price_u{int(MAX_PRICE)}", "o": "-prechange"}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0",
+                "Accept": "text/html,application/xhtml+xml",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            resp = requests.get(url, headers=headers, params=params, timeout=15)
+            resp.raise_for_status()
+
+            tables = pd.read_html(StringIO(resp.text))
+            df = None
+            for t in tables:
+                cols = [str(c).strip() for c in t.columns]
+                if "Ticker" in cols:
+                    df = t
+                    df.columns = cols
+                    break
+
+            if df is None:
+                return []
+
+            tickers = []
+            for _, row in df.iterrows():
+                ticker = str(row.get("Ticker", "")).strip()
+                if not ticker or ticker.lower() == "nan" or len(ticker) > 5 or "." in ticker:
+                    continue
+                if _is_warrant_or_unit(ticker):
+                    continue
+                try:
+                    price = float(str(row.get("Price", 0)).replace(",", ""))
+                    if price <= 0 or price > MAX_PRICE:
+                        continue
+                except (ValueError, TypeError):
+                    continue
+                tickers.append(ticker)
+
+            log.info(f"Finviz: {len(tickers)} tickers (sorted by pre-market change)")
+            return tickers[:20]
+        except Exception as e:
+            log.warning(f"Finviz fetch failed: {e}")
+            return []
+
+    def get_gap_from_bars(self, tickers):
+        """Calculate gap% for tickers using today's 9:30 open vs yesterday's close.
+        Used for market-hours restarts where Finviz Change column is intraday %.
+        Returns list of mover dicts compatible with scan_premarket().
+        """
+        if not tickers:
+            return []
+
+        now = datetime.now(ET)
+        today = now.date()
+        yesterday = today - timedelta(days=5)  # go back far enough to cover weekends
+        market_open_dt = datetime.combine(today, datetime.min.time().replace(hour=9, minute=30)).replace(tzinfo=ET)
+
+        movers = []
+        try:
+            # Fetch yesterday's daily close for each ticker
+            daily_req = StockBarsRequest(
+                symbol_or_symbols=tickers,
+                timeframe=TimeFrame.Day,
+                start=datetime.combine(yesterday, datetime.min.time()).replace(tzinfo=ET),
+                end=datetime.combine(today, datetime.min.time()).replace(tzinfo=ET),
+                adjustment="raw",
+                feed=ALPACA_FEED,
+            )
+            daily_bars = self.data_client.get_stock_bars(daily_req)
+            prev_closes = {}
+            if not daily_bars.df.empty:
+                ddf = daily_bars.df.reset_index()
+                for ticker in ddf["symbol"].unique():
+                    tdf = ddf[ddf["symbol"] == ticker].sort_values("timestamp")
+                    prev_closes[ticker] = float(tdf.iloc[-1]["close"])
+
+            # Fetch today's first bar (9:30 open)
+            open_req = StockBarsRequest(
+                symbol_or_symbols=tickers,
+                timeframe=TimeFrame.Minute,
+                start=market_open_dt,
+                end=market_open_dt + timedelta(minutes=5),
+                adjustment="raw",
+                feed=ALPACA_FEED,
+            )
+            open_bars = self.data_client.get_stock_bars(open_req)
+            today_opens = {}
+            if not open_bars.df.empty:
+                odf = open_bars.df.reset_index()
+                for ticker in odf["symbol"].unique():
+                    tdf = odf[odf["symbol"] == ticker].sort_values("timestamp")
+                    today_opens[ticker] = float(tdf.iloc[0]["open"])
+
+            for ticker in tickers:
+                prev_close = prev_closes.get(ticker)
+                today_open = today_opens.get(ticker)
+                if not prev_close or not today_open or prev_close <= 0:
+                    continue
+                gap_pct = (today_open - prev_close) / prev_close * 100
+                if gap_pct < self.min_gap_pct or today_open > MAX_PRICE:
+                    continue
+                movers.append({"symbol": ticker, "price": today_open, "percent_change": gap_pct})
+
+            log.info(f"Bar-based gaps: {len(movers)} tickers with gap >= {self.min_gap_pct}%")
+        except Exception as e:
+            log.warning(f"Gap-from-bars calculation failed: {e}")
+
+        return movers
+
     def get_final_watchlist(self):
-        """Get pre-market gap-up candidates from Alpaca movers + Finviz screener."""
+        """Get gap-up candidates from Alpaca movers + Finviz top 20."""
         now = datetime.now(ET)
         is_premarket = now.hour < 9 or (now.hour == 9 and now.minute < 30)
 
+        alpaca_movers = self.get_movers()
+        alpaca_symbols = {m["symbol"] for m in alpaca_movers}
+
         if is_premarket:
             log.info("Starting pre-market scan (Alpaca + Finviz)...")
-            alpaca_movers = self.get_movers()
+            # Finviz Change column shows gap% correctly pre-market
             finviz_movers = self.get_finviz_premarket()
-            seen = {m["symbol"] for m in alpaca_movers}
             combined = list(alpaca_movers)
+            seen = set(alpaca_symbols)
             for m in finviz_movers:
                 if m["symbol"] not in seen:
                     combined.append(m)
                     seen.add(m["symbol"])
-            log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz)")
         else:
-            # After open: Finviz Change column shows intraday %, not gap — skip it
-            log.info("Starting market-hours scan (Alpaca movers only)...")
-            combined = self.get_movers()
+            log.info("Starting market-hours scan (Alpaca + Finviz with bar gaps)...")
+            # Finviz Change column shows intraday % — get tickers only, calculate gap from bars
+            finviz_tickers = self.get_finviz_tickers()
+            new_tickers = [t for t in finviz_tickers if t not in alpaca_symbols]
+            bar_movers = self.get_gap_from_bars(new_tickers) if new_tickers else []
+            combined = list(alpaca_movers)
+            seen = set(alpaca_symbols)
+            for m in bar_movers:
+                if m["symbol"] not in seen:
+                    combined.append(m)
+                    seen.add(m["symbol"])
 
         if not combined:
             log.warning("No movers returned")
             return []
 
+        log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz top 20)")
         return self.scan_premarket(combined)
