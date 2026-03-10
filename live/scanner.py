@@ -58,7 +58,7 @@ class PreMarketScanner:
     def get_movers(self, top=100):
         """Get top % gainers from Alpaca screener endpoint (instant, no scanning)."""
         url = f"{DATA_BASE_URL}/v1beta1/screener/stocks/movers"
-        params = {}
+        params = {"top": top}
         try:
             resp = requests.get(url, headers=_alpaca_headers(), params=params, timeout=10)
             resp.raise_for_status()
