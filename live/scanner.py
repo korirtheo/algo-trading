@@ -58,13 +58,15 @@ class PreMarketScanner:
     def get_movers(self, top=100):
         """Get top % gainers from Alpaca screener endpoint (instant, no scanning)."""
         url = f"{DATA_BASE_URL}/v1beta1/screener/stocks/movers"
-        params = {"top": top}
+        params = {}
         try:
             resp = requests.get(url, headers=_alpaca_headers(), params=params, timeout=10)
             resp.raise_for_status()
             data = resp.json()
             gainers = data.get("gainers", [])
             log.info(f"Alpaca movers: {len(gainers)} gainers returned")
+            for g in gainers:
+                log.debug(f"  mover: {g.get('symbol')} price=${g.get('price')} chg={g.get('percent_change')}%")
             return gainers
         except Exception as e:
             log.warning(f"Movers endpoint failed: {e}")
@@ -150,6 +152,9 @@ class PreMarketScanner:
                 })
 
         # Filter by PM volume and sort by gap %
+        for r in results:
+            if r["pm_volume"] < MIN_PM_VOLUME:
+                log.debug(f"  {r['ticker']} filtered out: PM vol={r['pm_volume']:,} < {MIN_PM_VOLUME:,}")
         results = [r for r in results if r["pm_volume"] >= MIN_PM_VOLUME]
         results.sort(key=lambda x: x["gap_pct"], reverse=True)
         results = results[:TOP_N]
