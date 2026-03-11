@@ -29,8 +29,8 @@ ET = ZoneInfo("America/New_York")
 
 DATA_BASE_URL = "https://data.alpaca.markets"
 
-# IEX feed covers ~2.5% of real volume — PM volume filter is not meaningful
-# We rely on gap% and the movers source for quality filtering
+# IEX feed covers ~2.5% of real volume — multiply by ~40 to estimate real volume
+IEX_VOLUME_MULTIPLIER = 40
 LIVE_MIN_PM_VOLUME = 1_000
 
 _FINVIZ_HEADERS = {
@@ -257,8 +257,10 @@ class PreMarketScanner:
                 df = bars.df.reset_index()
                 for ticker in df["symbol"].unique():
                     tdf = df[df["symbol"] == ticker]
+                    raw_vol = int(tdf["volume"].sum())
                     bars_by_ticker[ticker] = {
-                        "pm_volume": int(tdf["volume"].sum()),
+                        "pm_volume": raw_vol * IEX_VOLUME_MULTIPLIER,
+                        "pm_volume_raw_iex": raw_vol,
                         "pm_high": float(tdf["high"].max()),
                     }
         except Exception as e:
@@ -267,15 +269,16 @@ class PreMarketScanner:
 
         for ticker, info in ticker_map.items():
             bar_info = bars_by_ticker.get(ticker, {})
-            pm_volume = bar_info.get("pm_volume", 0)
+            pm_volume = bar_info.get("pm_volume", 0)  # already multiplied by IEX_VOLUME_MULTIPLIER
+            pm_volume_raw = bar_info.get("pm_volume_raw_iex", 0)
             pm_high = bar_info.get("pm_high", info["current_price"])
-            # No PM volume filter — IEX covers ~2.5% of real volume so it's unreliable
 
             float_shares = FLOAT_DATA.get(ticker)
             results.append({
                 "ticker": ticker,
                 "gap_pct": info["gap_pct"],
                 "pm_volume": pm_volume,
+                "pm_volume_raw_iex": pm_volume_raw,
                 "premarket_high": pm_high,
                 "prev_close": info["prev_close"],
                 "float_shares": float_shares,
@@ -296,7 +299,8 @@ class PreMarketScanner:
         log.info(f"Found {len(results)} gap-up candidates")
         for r in results:
             float_str = f"{r['float_shares']/1e6:.1f}M" if r.get("float_shares") else "N/A"
-            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, IEX PM vol={r['pm_volume']:,}, "
+            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, PM vol~{r['pm_volume']:,} "
+                     f"(IEX {r.get('pm_volume_raw_iex', 0):,}x{IEX_VOLUME_MULTIPLIER}), "
                      f"float={float_str}, PM high=${r['premarket_high']:.2f}")
 
         return results
