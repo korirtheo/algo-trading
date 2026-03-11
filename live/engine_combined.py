@@ -50,6 +50,36 @@ def load_trial_params(path=None):
     return params
 
 
+TRADE_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+
+
+def _trade_log_path():
+    today = datetime.now(ET).strftime("%Y-%m-%d")
+    return os.path.join(TRADE_LOG_DIR, f"{today}_trades.json")
+
+
+def _load_today_trades():
+    path = _trade_log_path()
+    if os.path.exists(path):
+        try:
+            with open(path) as f:
+                trades = json.load(f)
+            log.info("Restored %d trades from %s", len(trades), os.path.basename(path))
+            return trades
+        except Exception as e:
+            log.warning("Could not load trade log: %s", e)
+    return []
+
+
+def _append_trade(trade):
+    os.makedirs(TRADE_LOG_DIR, exist_ok=True)
+    path = _trade_log_path()
+    trades = _load_today_trades()
+    trades.append({k: str(v) if hasattr(v, 'isoformat') else v for k, v in trade.items()})
+    with open(path, "w") as f:
+        json.dump(trades, f, indent=2, default=str)
+
+
 class CombinedEngine:
     """Runs all 12 strategies using the backtest's simulate_day_combined()."""
 
@@ -62,7 +92,8 @@ class CombinedEngine:
         self.active_position = None  # ticker currently in position
         self.position_entry = {}     # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
-        self.trades_today = []
+        self.trades_today = _load_today_trades()
+        self.daily_pnl = sum(t.get("pnl", 0) for t in self.trades_today if isinstance(t.get("pnl"), (int, float)))
 
     def initialize_watchlist(self, candidates):
         """Set up from scanner candidates.
@@ -89,6 +120,7 @@ class CombinedEngine:
                 "premarket_high": cand["premarket_high"],
                 "prev_close": cand["prev_close"],
                 "pm_volume": cand["pm_volume"],
+                "float_shares": cand.get("float_shares"),  # needed for L strategy
                 "market_hour_candles": None,  # Built incrementally
             })
 
@@ -181,7 +213,7 @@ class CombinedEngine:
                         self.daily_pnl += pnl
                         entry_info = self.position_entry.get(ticker, {})
 
-                        self.trades_today.append({
+                        trade = {
                             "ticker": ticker,
                             "strategy": entry_info.get("strategy", "?"),
                             "entry_price": entry_info.get("entry_price", 0),
@@ -190,7 +222,9 @@ class CombinedEngine:
                             "reason": exit_reason,
                             "entry_time": entry_info.get("entry_time"),
                             "exit_time": ts,
-                        })
+                        }
+                        self.trades_today.append(trade)
+                        _append_trade(trade)
                         log.info("EXIT %s (%s): PnL=$%s | $%.2f -> $%.2f",
                                  ticker, exit_reason, format(pnl, "+,.2f"),
                                  entry_info.get("entry_price", 0), exit_price)

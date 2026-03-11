@@ -378,11 +378,66 @@ def run(args):
 
     log.info("Streaming... waiting for signals")
 
+    # REST polling fallback: fetch 2-min bars for tickers that the IEX stream misses
+    from alpaca.data.historical import StockHistoricalDataClient
+    from alpaca.data.requests import StockBarsRequest
+    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
+    from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
+    _hist_client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+    _last_poll_bar = {}   # ticker -> last bar timestamp seen via REST
+    _last_poll_time = datetime.now(ET)
+
+    def _poll_missing_bars():
+        """Fetch 2-min bars via REST for tickers that the WS hasn't delivered recently."""
+        nonlocal _last_poll_time
+        now_et = datetime.now(ET)
+        today = now_et.date()
+        market_open_dt = datetime.combine(today, dt_time(9, 30)).replace(tzinfo=ET)
+        # Fetch last 10 minutes worth of bars
+        start_dt = now_et - timedelta(minutes=10)
+        if start_dt < market_open_dt:
+            start_dt = market_open_dt
+        try:
+            req = StockBarsRequest(
+                symbol_or_symbols=symbols,
+                timeframe=TimeFrame(2, TimeFrameUnit.Minute),
+                start=start_dt,
+                end=now_et,
+                adjustment="raw",
+                feed=ALPACA_FEED,
+            )
+            bars_resp = _hist_client.get_stock_bars(req)
+            if bars_resp.df.empty:
+                return
+            df = bars_resp.df.reset_index()
+            for sym in df["symbol"].unique():
+                tdf = df[df["symbol"] == sym].sort_values("timestamp")
+                for _, row in tdf.iterrows():
+                    ts = row["timestamp"]
+                    last_seen = _last_poll_bar.get(sym)
+                    if last_seen is not None and ts <= last_seen:
+                        continue  # already processed
+                    bar = {
+                        "Open": float(row["open"]),
+                        "High": float(row["high"]),
+                        "Low": float(row["low"]),
+                        "Close": float(row["close"]),
+                        "Volume": int(row["volume"]),
+                        "timestamp": ts,
+                    }
+                    on_bar_with_ws(sym, bar)
+                    _last_poll_bar[sym] = ts
+                    log.debug(f"REST poll injected bar: {sym} @ {ts}")
+        except Exception as e:
+            log.debug(f"REST poll failed: {e}")
+        _last_poll_time = now_et
+
     # Phase 6: Main loop - monitor until EOD
     stop_keys = [v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0]
     target_keys = [v for k, v in engine.params.items() if k.endswith("_target_pct") or k.endswith("_target1_pct") or k.endswith("_target2_pct")]
     RECOVERY_STOP = -(max(stop_keys) if stop_keys else 12.0)
     RECOVERY_TARGET = max(target_keys) if target_keys else 23.0
+    _loop_count = 0
     try:
         while True:
             now = datetime.now(ET)
@@ -396,6 +451,11 @@ def run(args):
             # After market close
             if now.hour >= 16:
                 break
+
+            # REST polling fallback every 2 minutes
+            _loop_count += 1
+            if _loop_count % 4 == 0:  # every 4 × 30s = 2 min
+                _poll_missing_bars()
 
             # Monitor recovered positions with hard stop/target
             active = engine.active_position

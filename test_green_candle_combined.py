@@ -1765,8 +1765,9 @@ def simulate_day_combined(picks, cash, cash_account=False):
                                 else:
                                     # VWAP deviation check
                                     c_vwap_w = st["vwap"][W_CONSOL_START:W_EARLIEST_CANDLE]
-                                    if len(c_vwap_w) > 0 and np.all(c_vwap_w > 0):
-                                        vwap_devs = np.abs(c_closes_w - c_vwap_w) / c_vwap_w * 100
+                                    min_len = min(len(c_closes_w), len(c_vwap_w))
+                                    if min_len > 0 and np.all(c_vwap_w[:min_len] > 0):
+                                        vwap_devs = np.abs(c_closes_w[:min_len] - c_vwap_w[:min_len]) / c_vwap_w[:min_len] * 100
                                         max_dev = float(np.max(vwap_devs))
                                         if max_dev > W_MAX_VWAP_DEV_PCT:
                                             st["w_eligible"] = False
@@ -2191,7 +2192,8 @@ def simulate_day_combined(picks, cash, cash_account=False):
 
 if __name__ == "__main__":
     no_charts = "--no-charts" in sys.argv
-    args = [a for a in sys.argv[1:] if a != "--no-charts"]
+    explain_mode = "--explain" in sys.argv
+    args = [a for a in sys.argv[1:] if a not in ("--no-charts", "--explain")]
     data_dirs = args if args else ["stored_data_combined"]
 
     STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L"]
@@ -2333,6 +2335,43 @@ if __name__ == "__main__":
             vc_tag = " VC" if st.get("vol_capped") else ""
             print(f"  -> [{st['strategy']}] {st['ticker']:<6} {reason_short:<3}  "
                   f"${st['pnl']:>+10,.0f}  ({pct:>+6.2f}%){vc_tag}")
+
+        # --explain: show per-ticker decisions
+        if explain_mode:
+            for st in states:
+                tk = st["ticker"]
+                gap = st["gap_pct"]
+                traded = st["exit_reason"] is not None
+                if traded:
+                    continue  # already shown above
+                # Build reason why not traded
+                reasons = []
+                if st.get("is_r_candidate"):
+                    reasons.append(f"R-candidate (day2)")
+                # Check candle 1
+                cc = st.get("candle_count", 0)
+                if cc == 0:
+                    reasons.append("no candles")
+                elif st.get("first_candle_body_pct", 0) == 0 and not st.get("o_eligible") and not st.get("b_eligible") and not st.get("e_eligible") and not st.get("l_eligible"):
+                    reasons.append("candle1 red/doji")
+                # Check what was eligible
+                elig = []
+                for code in STRAT_KEYS:
+                    key = f"{code.lower()}_eligible"
+                    if st.get(key):
+                        elig.append(code)
+                if elig:
+                    reasons.append(f"eligible: {','.join(elig)}")
+                else:
+                    reasons.append("no strategy eligible")
+                # Check if signal fired but no cash
+                if st.get("signal") and st.get("entry_price") is None:
+                    reasons.append("SIGNAL but no cash")
+                elif st.get("done") and not st.get("signal"):
+                    reasons.append("timed out / no signal")
+                elif not st.get("done") and not st.get("signal"):
+                    reasons.append("no signal")
+                print(f"     [{tk:<6} gap={gap:>5.1f}%] NOT TRADED: {' | '.join(reasons)}")
 
         all_results.append({
             "date": d, "picks": picks, "states": states,
