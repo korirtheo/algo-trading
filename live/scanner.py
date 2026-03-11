@@ -124,6 +124,97 @@ class PreMarketScanner:
         self.min_gap_pct = min_gap_pct or MIN_GAP_PCT
         self.max_float = max_float or 15_000_000
 
+    def get_webull_premarket(self):
+        """Get top pre-market gainers from Webull's public API (real-time).
+        Returns movers with real SIP volume, float, and market cap data.
+        """
+        try:
+            url = "https://quotes-gw.webullfintech.com/api/wlas/ranking/topGainers"
+            params = {"regionId": 6, "rankType": "preMarket", "pageIndex": 1, "pageSize": 30}
+            headers = {"User-Agent": "Mozilla/5.0"}
+            resp = requests.get(url, params=params, headers=headers, timeout=10)
+            resp.raise_for_status()
+            data = resp.json()
+
+            movers = []
+            ticker_ids = {}  # symbol -> tickerId for batch quote
+            for item in data.get("data", []):
+                t = item.get("ticker", {})
+                v = item.get("values", {})
+                symbol = t.get("symbol", "")
+                if not symbol or len(symbol) > 5 or "." in symbol:
+                    continue
+                if _is_warrant_or_unit(symbol):
+                    continue
+
+                change_ratio = float(v.get("changeRatio", 0))
+                change_pct = change_ratio * 100
+                price = float(v.get("price", 0))
+                if price <= 0 or price > MAX_PRICE:
+                    continue
+                if change_pct < self.min_gap_pct:
+                    continue
+
+                pm_volume = int(float(t.get("volume", 0)))
+                market_cap = float(t.get("marketValue", 0))
+                prev_close = float(t.get("preClose", 0))
+                ticker_id = t.get("tickerId")
+
+                movers.append({
+                    "symbol": symbol,
+                    "price": price,
+                    "percent_change": change_pct,
+                    "webull_pm_volume": pm_volume,
+                    "webull_market_cap": market_cap,
+                    "webull_prev_close": prev_close,
+                })
+                if ticker_id:
+                    ticker_ids[symbol] = ticker_id
+
+            # Batch fetch float data from Webull quotes
+            if ticker_ids:
+                float_data = self._webull_batch_float(ticker_ids)
+                for m in movers:
+                    fdata = float_data.get(m["symbol"], {})
+                    m["webull_float"] = fdata.get("float_shares", 0)
+
+            log.info(f"Webull pre-market: {len(movers)} gainers (>= {self.min_gap_pct}%)")
+            return movers
+        except Exception as e:
+            log.warning(f"Webull pre-market fetch failed: {e}")
+            return []
+
+    def _webull_batch_float(self, ticker_ids):
+        """Batch fetch float shares from Webull quote API.
+        ticker_ids: dict of {symbol: tickerId}
+        Returns dict of {symbol: {"float_shares": int, "total_shares": int}}
+        """
+        try:
+            ids_str = ",".join(str(v) for v in ticker_ids.values())
+            url = "https://quotes-gw.webullfintech.com/api/bgw/quote/realtime"
+            params = {"ids": ids_str, "includeSecu": 1, "delay": 0, "more": 1}
+            resp = requests.get(url, params=params, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
+            resp.raise_for_status()
+
+            result = {}
+            id_to_symbol = {v: k for k, v in ticker_ids.items()}
+            for item in resp.json():
+                ticker_id = item.get("tickerId")
+                symbol = id_to_symbol.get(ticker_id, item.get("symbol", ""))
+                if not symbol:
+                    continue
+                float_shares = int(float(item.get("outstandingShares", 0)))
+                total_shares = int(float(item.get("totalShares", 0)))
+                result[symbol] = {
+                    "float_shares": float_shares or total_shares,  # fallback to total
+                    "total_shares": total_shares,
+                }
+            log.info(f"Webull float data: got {len(result)}/{len(ticker_ids)} tickers")
+            return result
+        except Exception as e:
+            log.warning(f"Webull batch float fetch failed: {e}")
+            return {}
+
     def get_movers(self):
         """Get top % gainers from Alpaca screener endpoint."""
         url = f"{DATA_BASE_URL}/v1beta1/screener/stocks/movers"
@@ -222,15 +313,27 @@ class PreMarketScanner:
                 continue
             price = m.get("price", 0)
             change_pct = m.get("percent_change", 0)
-            prev_close = price / (1 + change_pct / 100) if change_pct != -100 else 0
+            prev_close = m.get("webull_prev_close") or (price / (1 + change_pct / 100) if change_pct != -100 else 0)
             if price <= 0 or price > MAX_PRICE:
                 continue
             if change_pct < self.min_gap_pct:
                 continue
+            if change_pct > 500:
+                log.debug(f"Skipping {ticker}: gap {change_pct:.0f}% likely data error")
+                continue
+            # Keep the best data if duplicate from multiple sources
+            if ticker in ticker_map:
+                existing = ticker_map[ticker]
+                # Prefer entry with Webull volume data
+                if m.get("webull_pm_volume", 0) <= existing.get("webull_pm_volume", 0):
+                    continue
             ticker_map[ticker] = {
                 "gap_pct": change_pct,
                 "current_price": price,
                 "prev_close": prev_close,
+                "webull_pm_volume": m.get("webull_pm_volume", 0),
+                "webull_float": m.get("webull_float", 0),
+                "webull_market_cap": m.get("webull_market_cap", 0),
             }
 
         if not ticker_map:
@@ -269,11 +372,19 @@ class PreMarketScanner:
 
         for ticker, info in ticker_map.items():
             bar_info = bars_by_ticker.get(ticker, {})
-            pm_volume = bar_info.get("pm_volume", 0)  # already multiplied by IEX_VOLUME_MULTIPLIER
+            iex_vol = bar_info.get("pm_volume", 0)  # already multiplied by IEX_VOLUME_MULTIPLIER
             pm_volume_raw = bar_info.get("pm_volume_raw_iex", 0)
             pm_high = bar_info.get("pm_high", info["current_price"])
 
-            float_shares = FLOAT_DATA.get(ticker)
+            # Prefer Webull real SIP volume over IEX estimate
+            webull_vol = info.get("webull_pm_volume", 0)
+            pm_volume = webull_vol if webull_vol > 0 else iex_vol
+
+            # Prefer Webull float > static float_data.json
+            webull_float = info.get("webull_float", 0)
+            float_shares = webull_float if webull_float > 0 else FLOAT_DATA.get(ticker)
+            # Finviz fallback handled below after results are built
+
             results.append({
                 "ticker": ticker,
                 "gap_pct": info["gap_pct"],
@@ -299,8 +410,9 @@ class PreMarketScanner:
         log.info(f"Found {len(results)} gap-up candidates")
         for r in results:
             float_str = f"{r['float_shares']/1e6:.1f}M" if r.get("float_shares") else "N/A"
-            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, PM vol~{r['pm_volume']:,} "
-                     f"(IEX {r.get('pm_volume_raw_iex', 0):,}x{IEX_VOLUME_MULTIPLIER}), "
+            vol = r["pm_volume"]
+            vol_str = f"{vol/1e6:.1f}M" if vol >= 1_000_000 else f"{vol/1e3:.0f}K" if vol >= 1000 else str(vol)
+            log.info(f"  {r['ticker']}: gap={r['gap_pct']:.1f}%, PM vol={vol_str}, "
                      f"float={float_str}, PM high=${r['premarket_high']:.2f}")
 
         return results
@@ -420,39 +532,16 @@ class PreMarketScanner:
         return movers
 
     def get_final_watchlist(self):
-        """Get gap-up candidates from Alpaca movers + Finviz top 20."""
-        now = datetime.now(ET)
-        is_premarket = now.hour < 9 or (now.hour == 9 and now.minute < 30)
+        """Get gap-up candidates from Webull pre-market gainers API."""
+        webull_movers = self.get_webull_premarket()
 
-        alpaca_movers = self.get_movers()
-        alpaca_symbols = {m["symbol"] for m in alpaca_movers}
+        if not webull_movers:
+            log.warning("Webull returned 0 movers — falling back to Alpaca")
+            webull_movers = self.get_movers()
 
-        if is_premarket:
-            log.info("Starting pre-market scan (Alpaca + Finviz)...")
-            # Finviz Change column shows gap% correctly pre-market
-            finviz_movers = self.get_finviz_premarket()
-            combined = list(alpaca_movers)
-            seen = set(alpaca_symbols)
-            for m in finviz_movers:
-                if m["symbol"] not in seen:
-                    combined.append(m)
-                    seen.add(m["symbol"])
-        else:
-            log.info("Starting market-hours scan (Alpaca + Finviz with bar gaps)...")
-            # Finviz Change column shows intraday % — get tickers only, calculate gap from bars
-            finviz_tickers = self.get_finviz_tickers()
-            new_tickers = [t for t in finviz_tickers if t not in alpaca_symbols]
-            bar_movers = self.get_gap_from_bars(new_tickers) if new_tickers else []
-            combined = list(alpaca_movers)
-            seen = set(alpaca_symbols)
-            for m in bar_movers:
-                if m["symbol"] not in seen:
-                    combined.append(m)
-                    seen.add(m["symbol"])
-
-        if not combined:
-            log.warning("No movers returned")
+        if not webull_movers:
+            log.warning("No movers returned from any source")
             return []
 
-        log.info(f"Combined universe: {len(combined)} tickers (Alpaca + Finviz top 20)")
-        return self.scan_premarket(combined)
+        log.info(f"Scanning {len(webull_movers)} candidates from Webull")
+        return self.scan_premarket(webull_movers)
