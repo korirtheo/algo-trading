@@ -263,7 +263,11 @@ def run(args):
 
     def do_scan(label):
         log.info(f"Phase 1: Pre-market scan ({label})")
-        c = scanner.get_final_watchlist()
+        try:
+            c = scanner.get_final_watchlist()
+        except Exception as e:
+            log.error(f"Scanner error during {label}: {e}", exc_info=True)
+            return []
         if c:
             for x in c:
                 float_str = f"{x['float_shares']/1e6:.1f}M" if x.get('float_shares') else "N/A"
@@ -445,7 +449,19 @@ def main():
     parser.add_argument("--no-dash", action="store_true", help="Disable dashboard server")
     parser.add_argument("--port", type=int, default=8000, help="Dashboard port (default: 8000)")
     args = parser.parse_args()
-    run(args)
+    try:
+        run(args)
+    except Exception as e:
+        log = logging.getLogger("live.main")
+        log.error(f"Fatal error: {e}", exc_info=True)
+        # Keep dashboard alive even after a crash
+        if not args.no_dash:
+            log.info("Dashboard still running despite error...")
+            try:
+                while True:
+                    time.sleep(300)
+            except KeyboardInterrupt:
+                pass
 
 
 if __name__ == "__main__":
