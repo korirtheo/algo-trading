@@ -67,7 +67,8 @@ class EngineBridge:
     def get_account(self):
         """Get account info from Alpaca."""
         if not self.executor:
-            return {"cash": 0, "buying_power": 0, "equity": 0, "daily_pnl": 0}
+            return {"cash": 0, "buying_power": 0, "equity": 0, "portfolio_value": 0,
+                    "daily_pnl": 0, "status": "inactive", "pdt": False, "daytrade_count": 0}
         try:
             acct = self.executor.get_account()
             return {
@@ -263,7 +264,15 @@ class EngineBridge:
     def get_engine_summary(self):
         """Get overall engine state summary."""
         if not self.engine:
-            return {}
+            return {
+                "active_position": None,
+                "daily_pnl": 0,
+                "trades_count": 0,
+                "wins": 0,
+                "losses": 0,
+                "candidates_count": len(self.scanner_candidates),
+                "tracking_count": 0,
+            }
         return {
             "active_position": self.engine.active_position,
             "daily_pnl": self.engine.daily_pnl,
