@@ -40,6 +40,8 @@ export interface WatchlistItem {
   status: string;
   strategy: string;
   candle_count: number;
+  last_price: number | null;
+  change_pct: number | null;
 }
 
 export interface Trade {
