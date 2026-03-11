@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from dashboard.backend.services.ws_manager import ws_manager
 from dashboard.backend.services.engine_bridge import EngineBridge
-from dashboard.backend.routers import account, positions, watchlist, trades, charts, strategies
+from dashboard.backend.routers import account, positions, watchlist, trades, charts, strategies, diagnostics
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +49,7 @@ app.include_router(watchlist.router, prefix="/api")
 app.include_router(trades.router, prefix="/api")
 app.include_router(charts.router, prefix="/api")
 app.include_router(strategies.router, prefix="/api")
+app.include_router(diagnostics.router, prefix="/api")
 
 
 @app.websocket("/ws/live")

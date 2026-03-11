@@ -196,6 +196,12 @@ body {
   gap: 14px;
 }
 
+.row-diagnostics {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
 /* ─── Card System ─── */
 .card {
   background: var(--bg-card);

@@ -264,6 +264,55 @@ class CombinedEngine:
             self.executor.sell(self.active_position, reason="EOD_CLOSE")
             self.active_position = None
         self.executor.close_all_positions(reason="EOD_CLOSE")
+        self._log_eod_diagnostics()
+
+    def _log_eod_diagnostics(self):
+        """Log final simulation state for every ticker to diagnose why signals didn't fire."""
+        if not self.picks:
+            return
+        picks_with_data = []
+        for pick in self.picks:
+            ticker = pick["ticker"]
+            bars = self.bar_data.get(ticker, [])
+            if not bars:
+                log.info("EOD-DIAG %s: 0 bars received", ticker)
+                continue
+            df = pd.DataFrame(bars)
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+            df = df.set_index("timestamp").sort_index()
+            pick_copy = dict(pick)
+            pick_copy["market_hour_candles"] = df
+            if pick_copy["market_open"] is None:
+                pick_copy["market_open"] = float(df.iloc[0]["Open"])
+            picks_with_data.append(pick_copy)
+
+        if not picks_with_data:
+            return
+
+        cash = self.executor.get_buying_power()
+        states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash)
+        log.info("=== EOD DIAGNOSTICS (%d tickers, %d bars avg) ===",
+                 len(picks_with_data),
+                 sum(len(self.bar_data.get(p["ticker"], [])) for p in picks_with_data) // max(len(picks_with_data), 1))
+        for st in states:
+            tk = st["ticker"]
+            candles = st.get("candle_count", 0)
+            gap = st.get("gap_pct", 0)
+            entry = st.get("entry_price")
+            strategy = st.get("strategy", "none")
+            if entry:
+                log.info("  EOD-DIAG %s: TRADED strat=%s candles=%d gap=%.1f%%",
+                         tk, strategy, candles, gap)
+            else:
+                # Log which strategies were eligible
+                eligible = []
+                for s in "HGAFDVPMRWOBKCEIJNL":
+                    if st.get(f"{s.lower()}_eligible", False):
+                        eligible.append(s)
+                log.info("  EOD-DIAG %s: NO SIGNAL | candles=%d gap=%.1f%% eligible=%s pm_high=%.3f open=%.3f",
+                         tk, candles, gap, eligible or "none",
+                         pick.get("premarket_high", 0) if (pick := next((p for p in self.picks if p["ticker"] == tk), {})) else 0,
+                         st.get("market_open", 0))
 
     def get_summary(self):
         return {

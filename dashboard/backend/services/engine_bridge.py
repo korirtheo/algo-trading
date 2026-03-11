@@ -146,6 +146,21 @@ class EngineBridge:
                     if last_price and prev_close:
                         change_pct = (last_price / prev_close - 1) * 100
 
+            # All eligible strategies for this ticker
+            eligible_strategies = []
+            done = engine_state.get("done", False)
+            for code in "HGAFDVPMRWOBKCEIJNL":
+                key = code.lower()
+                if engine_state.get(f"{key}_eligible", False):
+                    fired = engine_state.get("strategy") == code and engine_state.get("entry_price") is not None
+                    if fired:
+                        s_status = "fired"
+                    elif done:
+                        s_status = "done"
+                    else:
+                        s_status = "active"
+                    eligible_strategies.append({"code": code, "status": s_status})
+
             watchlist.append({
                 "ticker": ticker,
                 "gap_pct": cand["gap_pct"],
@@ -155,6 +170,7 @@ class EngineBridge:
                 "float_shares": cand.get("float_shares"),
                 "status": status,
                 "strategy": engine_state.get("strategy", ""),
+                "eligible_strategies": eligible_strategies,
                 "candle_count": engine_state.get("candle_count", 0),
                 "last_price": last_price,
                 "change_pct": change_pct,
@@ -260,6 +276,59 @@ class EngineBridge:
                         })
 
         return {"bars": bars, "markers": markers, "symbol": symbol}
+
+    def get_diagnostics(self):
+        """Per-ticker diagnostics: all 20 strategy statuses + key metrics."""
+        result = []
+        for cand in self.scanner_candidates:
+            ticker = cand["ticker"]
+            st = {}
+            if self.engine and ticker in self.engine.last_states:
+                st = self.engine.last_states[ticker]
+
+            bars = self.engine.bar_data.get(ticker, []) if self.engine else []
+            candle_count = st.get("candle_count", len(bars))
+            ticker_done = st.get("done", False)
+
+            # All 20 strategies with their status
+            strategies = []
+            for code in "HGAFDVPMRWOBKCEIJNL":
+                key = code.lower()
+                eligible = st.get(f"{key}_eligible", False)
+                fired = st.get("strategy") == code and st.get("entry_price") is not None
+                if fired:
+                    status = "fired"
+                elif eligible and ticker_done:
+                    status = "timed_out"
+                elif eligible:
+                    status = "watching"
+                else:
+                    status = "not_eligible"
+                strategies.append({"code": code, "status": status})
+
+            premarket_high = cand.get("premarket_high", 0)
+            market_open = st.get("market_open") or (bars[0]["Open"] if bars else 0)
+            pm_high_ratio = ((premarket_high / market_open - 1) * 100) if market_open else 0
+
+            last_price = bars[-1]["Close"] if bars else None
+            prev_close = cand.get("prev_close", 0)
+            change_pct = ((last_price / prev_close - 1) * 100) if (last_price and prev_close) else None
+
+            result.append({
+                "ticker": ticker,
+                "gap_pct": cand["gap_pct"],
+                "candle_count": candle_count,
+                "premarket_high": premarket_high,
+                "market_open": round(market_open, 3),
+                "pm_high_pct_above_open": round(pm_high_ratio, 1),
+                "last_price": last_price,
+                "change_pct": round(change_pct, 1) if change_pct is not None else None,
+                "strategies": strategies,
+                "traded": st.get("entry_price") is not None,
+                "active_strategy": st.get("strategy", ""),
+                "done": ticker_done,
+            })
+        return result
 
     def get_engine_summary(self):
         """Get overall engine state summary."""

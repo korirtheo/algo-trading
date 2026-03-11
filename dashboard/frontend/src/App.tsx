@@ -5,6 +5,7 @@ import { Chart } from './components/Chart';
 import { Positions } from './components/Positions';
 import { TradeLog } from './components/TradeLog';
 import { StrategyPanel } from './components/StrategyPanel';
+import { Diagnostics } from './components/Diagnostics';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
@@ -46,6 +47,10 @@ function App() {
           <Positions />
           <TradeLog />
           <StrategyPanel />
+        </div>
+
+        <div className="row-diagnostics">
+          <Diagnostics />
         </div>
       </main>
     </div>

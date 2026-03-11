@@ -30,6 +30,11 @@ export interface Position {
   gap_pct: number;
 }
 
+export interface StrategyStatus {
+  code: string;
+  status: 'active' | 'done' | 'fired';
+}
+
 export interface WatchlistItem {
   ticker: string;
   gap_pct: number;
@@ -39,9 +44,30 @@ export interface WatchlistItem {
   float_shares: number | null;
   status: string;
   strategy: string;
+  eligible_strategies: StrategyStatus[];
   candle_count: number;
   last_price: number | null;
   change_pct: number | null;
+}
+
+export interface DiagnosticsStrategy {
+  code: string;
+  status: 'fired' | 'timed_out' | 'watching' | 'not_eligible';
+}
+
+export interface DiagnosticsItem {
+  ticker: string;
+  gap_pct: number;
+  candle_count: number;
+  premarket_high: number;
+  market_open: number;
+  pm_high_pct_above_open: number;
+  last_price: number | null;
+  change_pct: number | null;
+  strategies: DiagnosticsStrategy[];
+  traded: boolean;
+  active_strategy: string;
+  done: boolean;
 }
 
 export interface Trade {
@@ -120,4 +146,5 @@ export const api = {
   strategyConfig: () => fetchJSON<StrategyConfig[]>('/api/strategies/config'),
   chart: (symbol: string) => fetchJSON<ChartData>(`/api/charts/${symbol}`),
   summary: () => fetchJSON<Summary>('/api/summary'),
+  diagnostics: () => fetchJSON<DiagnosticsItem[]>('/api/diagnostics'),
 };

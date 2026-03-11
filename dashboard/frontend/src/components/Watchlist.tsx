@@ -58,19 +58,29 @@ export function Watchlist({ onSelectSymbol, selectedSymbol }: Props) {
                     </span>
                   </td>
                   <td style={{ textAlign: 'center' }}>
-                    {item.strategy && (
-                      <span
-                        className="strat-tag"
-                        style={{
-                          width: 22,
-                          height: 22,
-                          fontSize: 10,
-                          background: `linear-gradient(135deg, ${strategyColor(item.strategy)}, ${strategyColor(item.strategy)}cc)`,
-                        }}
-                      >
-                        {item.strategy}
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap', justifyContent: 'center' }}>
+                      {(item.eligible_strategies || []).map((s) => (
+                        <span
+                          key={s.code}
+                          className="strat-tag"
+                          title={s.status}
+                          style={{
+                            width: 20,
+                            height: 20,
+                            fontSize: 9,
+                            opacity: s.status === 'done' ? 0.3 : 1,
+                            background: s.status === 'fired'
+                              ? `linear-gradient(135deg, ${strategyColor(s.code)}, ${strategyColor(s.code)}cc)`
+                              : s.status === 'done'
+                              ? '#555'
+                              : `linear-gradient(135deg, ${strategyColor(s.code)}88, ${strategyColor(s.code)}55)`,
+                            outline: s.status === 'fired' ? '1.5px solid #fff' : 'none',
+                          }}
+                        >
+                          {s.code}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                 </tr>
               );
