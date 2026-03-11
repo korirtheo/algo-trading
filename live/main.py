@@ -273,6 +273,13 @@ def run(args):
                 float_str = f"{x['float_shares']/1e6:.1f}M" if x.get('float_shares') else "N/A"
                 log.info(f"  {x['ticker']}: gap={x['gap_pct']:.1f}%, "
                          f"PM vol={x['pm_volume']:,}, float={float_str}")
+            # Update dashboard with latest scan results immediately
+            if not args.no_dash:
+                try:
+                    from dashboard.backend.app import bridge
+                    bridge.scanner_candidates = c
+                except Exception:
+                    pass
         else:
             log.info("  No candidates found")
         return c

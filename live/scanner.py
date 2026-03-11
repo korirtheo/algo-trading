@@ -33,6 +33,71 @@ DATA_BASE_URL = "https://data.alpaca.markets"
 # We rely on gap% and the movers source for quality filtering
 LIVE_MIN_PM_VOLUME = 1_000
 
+_FINVIZ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def _fetch_finviz_floats(tickers):
+    """Fetch float shares from Finviz overview (v=152) for a list of tickers.
+    Returns dict of {ticker: float_shares} for tickers where data is available.
+    """
+    if not tickers:
+        return {}
+    result = {}
+    # Finviz accepts up to ~40 tickers in a comma-separated filter
+    ticker_str = ",".join(tickers[:40])
+    try:
+        url = "https://finviz.com/screener.ashx"
+        params = {
+            "v": "152",  # Overview with float column
+            "t": ticker_str,
+        }
+        resp = requests.get(url, headers=_FINVIZ_HEADERS, params=params, timeout=15)
+        resp.raise_for_status()
+
+        tables = pd.read_html(StringIO(resp.text))
+        for t in tables:
+            cols = [str(c).strip() for c in t.columns]
+            if "Ticker" in cols and ("Float" in cols or "Outstanding" in cols):
+                t.columns = cols
+                for _, row in t.iterrows():
+                    ticker = str(row.get("Ticker", "")).strip()
+                    if not ticker or ticker.lower() == "nan" or len(ticker) > 5:
+                        continue
+                    # Try Float column first, then Outstanding
+                    for col_name in ["Float", "Outstanding"]:
+                        if col_name not in cols:
+                            continue
+                        raw = str(row.get(col_name, "")).strip()
+                        if not raw or raw.lower() in ("nan", "-", ""):
+                            continue
+                        try:
+                            multiplier = 1
+                            raw_clean = raw.replace(",", "")
+                            if raw_clean.endswith("B"):
+                                multiplier = 1_000_000_000
+                                raw_clean = raw_clean[:-1]
+                            elif raw_clean.endswith("M"):
+                                multiplier = 1_000_000
+                                raw_clean = raw_clean[:-1]
+                            elif raw_clean.endswith("K"):
+                                multiplier = 1_000
+                                raw_clean = raw_clean[:-1]
+                            val = float(raw_clean) * multiplier
+                            if val > 0:
+                                result[ticker] = int(val)
+                                break  # Got float, don't need outstanding
+                        except (ValueError, TypeError):
+                            continue
+                break  # Found the data table
+        log.info(f"Finviz float data: got {len(result)}/{len(tickers)} tickers")
+    except Exception as e:
+        log.warning(f"Finviz float fetch failed: {e}")
+    return result
+
 
 def _is_warrant_or_unit(ticker):
     if ".WS" in ticker or ".RT" in ticker:
@@ -83,11 +148,7 @@ class PreMarketScanner:
                 "f": f"sh_price_u{int(MAX_PRICE)}",
                 "o": "-change",
             }
-            headers = {
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-            }
+            headers = _FINVIZ_HEADERS
             resp = requests.get(url, headers=headers, params=params, timeout=15)
             resp.raise_for_status()
 
@@ -224,6 +285,14 @@ class PreMarketScanner:
         results.sort(key=lambda x: x["gap_pct"], reverse=True)
         results = results[:TOP_N]
 
+        # Fetch float data from Finviz for tickers missing it
+        missing_float = [r["ticker"] for r in results if not r.get("float_shares")]
+        if missing_float:
+            finviz_floats = _fetch_finviz_floats(missing_float)
+            for r in results:
+                if not r.get("float_shares") and r["ticker"] in finviz_floats:
+                    r["float_shares"] = finviz_floats[r["ticker"]]
+
         log.info(f"Found {len(results)} gap-up candidates")
         for r in results:
             float_str = f"{r['float_shares']/1e6:.1f}M" if r.get("float_shares") else "N/A"
@@ -239,11 +308,7 @@ class PreMarketScanner:
         try:
             url = "https://finviz.com/screener.ashx"
             params = {"v": "111", "f": f"sh_price_u{int(MAX_PRICE)}", "o": "-prechange"}
-            headers = {
-                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120.0.0.0",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.9",
-            }
+            headers = _FINVIZ_HEADERS
             resp = requests.get(url, headers=headers, params=params, timeout=15)
             resp.raise_for_status()
 
