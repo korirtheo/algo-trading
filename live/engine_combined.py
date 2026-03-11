@@ -168,7 +168,14 @@ class CombinedEngine:
 
         # Run the backtest simulation on accumulated bars
         cash = self.executor.get_buying_power()
+        log.debug("on_bar %s | cash=$%.0f | %d picks with data", symbol, cash, len(picks_with_data))
         states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash)
+
+        # Log any state that has an entry (for diagnostics)
+        for st in states:
+            if st.get("entry_price") is not None:
+                log.debug("  sim-entry: %s strat=%s entry=$%.3f cost=$%.0f",
+                          st["ticker"], st.get("strategy"), st.get("entry_price"), st.get("position_cost", 0))
 
         # Detect state changes
         for st in states:
@@ -181,12 +188,13 @@ class CombinedEngine:
                     entry_price = st["entry_price"]
                     strategy = st.get("strategy", "?")
                     trade_size = st.get("position_cost", cash)
+                    cum_vol = self._cum_vol(ticker)
 
-                    log.info("SIGNAL %s (strategy %s): price=$%.2f, gap=%.1f%%",
-                             ticker, strategy, entry_price, st.get("gap_pct", 0))
+                    log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_vol=%d",
+                             ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_vol)
 
                     order = self.executor.buy(ticker, trade_size, entry_price,
-                                             cumulative_volume=self._cum_vol(ticker))
+                                             cumulative_volume=cum_vol)
                     if order:
                         self.active_position = ticker
                         self.position_entry[ticker] = {
@@ -196,9 +204,13 @@ class CombinedEngine:
                             "strategy": strategy,
                             "entry_time": ts,
                         }
-                        log.info("ENTRY %s (%s): %.2f shares @ $%.2f ($%s)",
+                        log.info("ENTRY %s (%s): %.2f shares @ $%.3f ($%s)",
                                  ticker, strategy, st.get("shares", 0), entry_price,
                                  format(trade_size, ",.0f"))
+                    else:
+                        log.warning("BUY REJECTED %s: order returned None (vol_cap or executor error)", ticker)
+                elif self.active_position is not None:
+                    log.debug("SIGNAL %s skipped — already in position %s", ticker, self.active_position)
 
             # Exit detected
             if st.get("exit_price") is not None and (prev is None or prev.get("exit_price") is None):
