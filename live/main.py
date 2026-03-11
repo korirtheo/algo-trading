@@ -5,12 +5,14 @@ Entry point for live paper trading on Alpaca using all enabled strategies.
 Includes embedded dashboard server on port 8000.
 
 Schedule:
-  8:00 AM ET  - Start pre-market scan
-  9:25 AM ET  - Finalize watchlist
-  9:29 AM ET  - Subscribe to bar stream
-  9:30 AM ET  - Strategy engine starts processing
+  7:00 AM ET  - First pre-market scan
+  7:30 AM ET  - Second pre-market scan
+  9:00 AM ET  - Third scan (more PM volume data)
+  9:25 AM ET  - Rescan
+  9:27 AM ET  - Final scan, lock watchlist
+  9:30 AM ET  - Market open scan + strategy engine starts
   3:45 PM ET  - EOD close all positions
-  4:00 PM ET  - Daily summary + shutdown
+  4:00 PM ET  - Daily summary, dashboard stays alive
 
 Usage:
   python -m live.main              # run full day + dashboard
@@ -257,10 +259,6 @@ def run(args):
     from datetime import time as dt_time
 
     # Phase 1: Pre-market scan loop (9:00 → 9:25 → 9:27 → lock)
-    now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 0), tzinfo=ET):
-        wait_until(dt_time(9, 0), log)
-
     scanner = PreMarketScanner()
 
     def do_scan(label):
@@ -275,36 +273,37 @@ def run(args):
             log.info("  No candidates found")
         return c
 
+    # Scan schedule: 7:00, 7:30, 9:00, 9:25, 9:27, 9:30
+    scan_times = [
+        (dt_time(7, 0),  "7:00"),
+        (dt_time(7, 30), "7:30"),
+        (dt_time(9, 0),  "9:00"),
+        (dt_time(9, 25), "9:25"),
+        (dt_time(9, 27), "9:27 FINAL"),
+        (dt_time(9, 30), "9:30"),
+    ]
+
     now = datetime.now(ET)
     if now >= datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
         # Restarted during market hours — scan immediately
         candidates = do_scan("RESTART")
     else:
-        candidates = do_scan("9:00")
+        # Wait for the first scan time we haven't passed yet
+        candidates = []
+        for i, (scan_t, label) in enumerate(scan_times):
+            now = datetime.now(ET)
+            target = datetime.combine(now.date(), scan_t, tzinfo=ET)
+            if now < target:
+                wait_until(scan_t, log)
+            # Skip scan times that are already past
+            if datetime.now(ET) >= target:
+                new_candidates = do_scan(label)
+                if new_candidates:
+                    candidates = new_candidates
 
-        if args.scan_only:
-            log.info("--scan-only mode. Exiting.")
-            return
-
-        # Rescan at 9:25
-        now = datetime.now(ET)
-        if now < datetime.combine(now.date(), dt_time(9, 25), tzinfo=ET):
-            wait_until(dt_time(9, 25), log)
-            candidates = do_scan("9:25")
-
-        # Final scan at 9:27
-        now = datetime.now(ET)
-        if now < datetime.combine(now.date(), dt_time(9, 27), tzinfo=ET):
-            wait_until(dt_time(9, 27), log)
-            candidates = do_scan("9:27 FINAL")
-
-        # 9:30 scan — catches stocks that only show volume at open
-        now = datetime.now(ET)
-        if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
-            wait_until(dt_time(9, 30), log)
-            new_candidates = do_scan("9:30")
-            if new_candidates:
-                candidates = new_candidates
+            if args.scan_only and i == 0:
+                log.info("--scan-only mode. Exiting.")
+                return
 
     if args.scan_only:
         log.info("--scan-only mode. Exiting.")
