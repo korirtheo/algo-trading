@@ -5,8 +5,8 @@ import os
 import json
 
 # --- Alpaca API ---
-ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PKZGRFUVCPRAAZT34RPCCED47X")
-ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "ALfFBJStYK5KGGYfN5AE34Lvz46DLxQJrWVYAnNCeFKi")
+ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PK34OGXUBAOCLG7E6KYTI6QMZ3")
+ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
 ALPACA_FEED = "iex"  # "sip" for full market data, "iex" for free tier
 
