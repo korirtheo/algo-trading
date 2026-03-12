@@ -6,3 +6,5 @@ pandas>=2.0.0
 optuna>=3.0.0
 matplotlib>=3.7.0
 lxml>=4.9.0
+pytz>=2023.3
+websockets>=11.0
