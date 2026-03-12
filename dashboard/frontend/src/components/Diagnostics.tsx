@@ -26,7 +26,7 @@ export function Diagnostics() {
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: 'var(--green)', marginRight: 4 }} />Fired</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#4a7cbe', marginRight: 4 }} />Watching</span>
         <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#555', opacity: 0.6, marginRight: 4 }} />Timed Out</span>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#333', marginRight: 4 }} />Not Eligible</span>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, borderRadius: 2, background: '#333', marginRight: 4 }} />None Eligible</span>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
@@ -41,7 +41,7 @@ export function Diagnostics() {
               <th style={{ textAlign: 'right' }}>Open</th>
               <th style={{ textAlign: 'right' }}>PM High</th>
               <th style={{ textAlign: 'right' }}>PM High vs Open</th>
-              <th style={{ textAlign: 'left', minWidth: 320 }}>Strategies (all 20)</th>
+              <th style={{ textAlign: 'left', minWidth: 120 }}>Strategies</th>
             </tr>
           </thead>
           <tbody>
@@ -68,37 +68,38 @@ export function Diagnostics() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                    {item.strategies.map((s) => {
-                      const color = s.status === 'not_eligible' ? '#2a2a2a'
-                        : s.status === 'timed_out' ? '#444'
-                        : s.status === 'fired' ? strategyColor(s.code)
-                        : strategyColor(s.code) + '88';
-                      const textColor = s.status === 'not_eligible' ? '#444'
-                        : s.status === 'timed_out' ? '#777'
-                        : '#fff';
-                      return (
-                        <span
-                          key={s.code}
-                          title={`${s.code}: ${STATUS_LABEL[s.status]}`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            width: 22,
-                            height: 22,
-                            borderRadius: 4,
-                            fontSize: 10,
-                            fontWeight: 700,
-                            background: color,
-                            color: textColor,
-                            outline: s.status === 'fired' ? '1.5px solid #fff' : 'none',
-                            textDecoration: s.status === 'timed_out' ? 'line-through' : 'none',
-                          }}
-                        >
-                          {s.code}
-                        </span>
-                      );
-                    })}
+                    {item.strategies.filter((s) => s.status !== 'not_eligible').length === 0 ? (
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>none</span>
+                    ) : (
+                      item.strategies.filter((s) => s.status !== 'not_eligible').map((s) => {
+                        const color = s.status === 'timed_out' ? '#444'
+                          : s.status === 'fired' ? strategyColor(s.code)
+                          : strategyColor(s.code) + '88';
+                        const textColor = s.status === 'timed_out' ? '#777' : '#fff';
+                        return (
+                          <span
+                            key={s.code}
+                            title={`${s.code}: ${STATUS_LABEL[s.status]}`}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 22,
+                              height: 22,
+                              borderRadius: 4,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              background: color,
+                              color: textColor,
+                              outline: s.status === 'fired' ? '1.5px solid #fff' : 'none',
+                              textDecoration: s.status === 'timed_out' ? 'line-through' : 'none',
+                            }}
+                          >
+                            {s.code}
+                          </span>
+                        );
+                      })
+                    )}
                   </div>
                 </td>
               </tr>

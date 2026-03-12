@@ -21,28 +21,39 @@ ssh -i "C:\Users\Theo Korir\Documents\Python\algo-trading\trading-key.pem" ubunt
 
 ### Check logs
 ```bash
-cd ~/algo-trading
-tail -f logs/trading.log &
+docker compose logs -f --tail 100
 ```
-> Use `&` so Ctrl+C doesn't kill the bot.
 
 ### View dashboard
 ```
-http://98.92.73.65:8000
+http://98.92.73.65
 ```
 Dashboard stays alive 24/7 (even after market close).
 
-### Restart the bot manually (if needed)
+### Restart the bot
 ```bash
-cd ~/algo-trading
-pkill -f live.main; sleep 2
-nohup venv/bin/python -m live.main >> logs/trading.log 2>&1 &
+sudo docker compose restart
+```
+
+### Rebuild after code changes
+```bash
+sudo docker compose up -d --build
+```
+
+### Stop the bot
+```bash
+sudo docker compose down
+```
+
+### Shell into the container
+```bash
+docker compose exec algotrader bash
 ```
 
 ### Cron jobs (automatic — no manual intervention needed)
 The bot runs itself via two cron jobs:
-- **`@reboot`**: Starts the bot when the server boots
-- **`*/5 * * * *`**: Every 5 minutes — auto-pulls new code from GitHub, restarts if new commit detected, ensures bot is always running
+- **`@reboot`**: Starts the Docker container when the server boots
+- **`*/5 * * * *`**: Every 5 minutes — auto-pulls new code from GitHub, rebuilds and restarts Docker if new commit detected
 
 To deploy new code: just `git push` from your local machine. The server picks it up within 5 minutes.
 
