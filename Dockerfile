@@ -18,10 +18,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY config/ ./config/
 COPY live/ ./live/
 COPY dashboard/ ./dashboard/
-COPY test_green_candle_combined.py ./
-COPY optimize_combined.py ./
-COPY test_full.py ./
-COPY optimize.py ./
+COPY *.py ./
 
 # Copy built frontend (overwrite source with built assets)
 COPY --from=frontend-build /app/dashboard/frontend/dist /app/dashboard/frontend/dist

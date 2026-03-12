@@ -1,0 +1,59 @@
+# Data directories (large, not needed for live trading)
+stored_data*/
+regime_data/
+charts/
+
+# Optuna databases
+*.db
+
+# Pickled caches
+*.pkl
+
+# Optimization scripts (not needed in container)
+optimize*.py
+sweep_*.py
+stress_test*.py
+compare_*.py
+verify_*.py
+analyze_*.py
+trace_*.py
+pattern_*.py
+volume_analysis.py
+download_*.py
+blind_test*.py
+
+# Test/backtest scripts
+test_*.py
+
+# Re-include files needed by the live engine import chain
+!test_green_candle_combined.py
+!test_full.py
+!stress_test.py
+!optimize.py
+!optimize_combined.py
+
+# Node modules (frontend is built in separate stage)
+dashboard/frontend/node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Python caches
+__pycache__/
+*.pyc
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# Logs
+logs/
+*.log
+
+# Env files
+.env
+.envrc
