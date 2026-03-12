@@ -156,6 +156,7 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
+            df = df[~df.index.duplicated(keep="last")]
 
             pick_copy = dict(pick)
             pick_copy["market_hour_candles"] = df
