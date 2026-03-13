@@ -122,18 +122,25 @@ class EngineBridge:
         watchlist = []
         for cand in self.scanner_candidates:
             ticker = cand["ticker"]
-            engine_state = {}
-            if self.engine and ticker in self.engine.last_states:
-                engine_state = self.engine.last_states[ticker]
 
-            # Determine status
+            # Get ALL sub-states for this ticker
+            sub_states = []
+            if self.engine and hasattr(self.engine, 'all_states') and ticker in self.engine.all_states:
+                sub_states = self.engine.all_states[ticker]
+            elif self.engine and ticker in self.engine.last_states:
+                sub_states = [self.engine.last_states[ticker]]
+
+            # Determine status by merging all sub-states
             status = "watching"
-            if engine_state.get("done"):
-                status = "done"
-            elif engine_state.get("entry_price") is not None:
+            any_in_position = any(st.get("entry_price") is not None for st in sub_states)
+            any_signal = any(st.get("signal") for st in sub_states)
+            all_done = all(st.get("done", False) for st in sub_states) if sub_states else False
+            if any_in_position:
                 status = "in_position"
-            elif engine_state.get("signal"):
+            elif any_signal:
                 status = "signal"
+            elif all_done:
+                status = "done"
 
             # Last price from engine bar data
             last_price = None
@@ -146,20 +153,25 @@ class EngineBridge:
                     if last_price and prev_close:
                         change_pct = (last_price / prev_close - 1) * 100
 
-            # All eligible strategies for this ticker
+            # Merge eligible strategies across all sub-states
             eligible_strategies = []
-            done = engine_state.get("done", False)
             for code in "HGAFDVPMRWOBKCEIJNL":
                 key = code.lower()
-                if engine_state.get(f"{key}_eligible", False):
-                    fired = engine_state.get("strategy") == code and engine_state.get("entry_price") is not None
+                best_status = None
+                for st in sub_states:
+                    eligible = st.get(f"{key}_eligible", False)
+                    if not eligible:
+                        continue
+                    fired = st.get("strategy") == code and st.get("entry_price") is not None
+                    is_done = st.get("done", False)
                     if fired:
-                        s_status = "fired"
-                    elif done:
-                        s_status = "done"
-                    else:
-                        s_status = "active"
-                    eligible_strategies.append({"code": code, "status": s_status})
+                        best_status = "fired"
+                    elif not is_done and best_status != "fired":
+                        best_status = "active"
+                    elif is_done and best_status not in ("fired", "active"):
+                        best_status = "done"
+                if best_status:
+                    eligible_strategies.append({"code": code, "status": best_status})
 
             watchlist.append({
                 "ticker": ticker,
@@ -169,9 +181,9 @@ class EngineBridge:
                 "prev_close": cand.get("prev_close", 0),
                 "float_shares": cand.get("float_shares"),
                 "status": status,
-                "strategy": engine_state.get("strategy", ""),
+                "strategy": next((st.get("strategy", "") for st in sub_states if st.get("strategy")), ""),
                 "eligible_strategies": eligible_strategies,
-                "candle_count": engine_state.get("candle_count", 0),
+                "candle_count": max((st.get("candle_count", 0) for st in sub_states), default=0),
                 "last_price": last_price,
                 "change_pct": change_pct,
             })
@@ -278,38 +290,52 @@ class EngineBridge:
         return {"bars": bars, "markers": markers, "symbol": symbol}
 
     def get_diagnostics(self):
-        """Per-ticker diagnostics: all 20 strategy statuses + key metrics."""
+        """Per-ticker diagnostics: merge ALL sub-states (main, l_only, o_only, b_only, e_only)."""
         result = []
         for cand in self.scanner_candidates:
             ticker = cand["ticker"]
-            st = {}
-            if self.engine and ticker in self.engine.last_states:
-                st = self.engine.last_states[ticker]
+
+            # Get ALL sub-states for this ticker (not just the last one)
+            sub_states = []
+            if self.engine and hasattr(self.engine, 'all_states') and ticker in self.engine.all_states:
+                sub_states = self.engine.all_states[ticker]
+            elif self.engine and ticker in self.engine.last_states:
+                sub_states = [self.engine.last_states[ticker]]
 
             bars = self.engine.bar_data.get(ticker, []) if self.engine else []
-            candle_count = st.get("candle_count", len(bars))
-            ticker_done = st.get("done", False)
 
-            # All 20 strategies with their status
+            # Merge eligibility/status across all sub-states
+            max_candles = 0
+            market_open = 0
+            any_traded = False
+            active_strategy = ""
             strategies = []
+
             for code in "HGAFDVPMRWOBKCEIJNL":
                 key = code.lower()
-                eligible = st.get(f"{key}_eligible", False)
-                fired = st.get("strategy") == code and st.get("entry_price") is not None
-                if fired:
-                    status = "fired"
-                elif eligible and ticker_done:
-                    status = "timed_out"
-                elif eligible:
-                    status = "watching"
-                else:
-                    status = "not_eligible"
-                strategies.append({"code": code, "status": status})
+                best_status = "not_eligible"
+                for st in sub_states:
+                    max_candles = max(max_candles, st.get("candle_count", 0))
+                    if not market_open:
+                        market_open = st.get("market_open", 0)
+                    fired = st.get("strategy") == code and st.get("entry_price") is not None
+                    eligible = st.get(f"{key}_eligible", False)
+                    is_done = st.get("done", False)
+                    if fired:
+                        best_status = "fired"
+                        any_traded = True
+                        active_strategy = code
+                    elif eligible and best_status != "fired":
+                        best_status = "timed_out" if is_done else "watching"
+                strategies.append({"code": code, "status": best_status})
+
+            candle_count = max_candles or len(bars)
+            if not market_open and bars:
+                market_open = bars[0]["Open"]
+            ticker_done = all(st.get("done", False) for st in sub_states) if sub_states else False
 
             premarket_high = cand.get("premarket_high", 0)
-            market_open = st.get("market_open") or (bars[0]["Open"] if bars else 0)
             pm_high_ratio = ((premarket_high / market_open - 1) * 100) if market_open else 0
-
             last_price = bars[-1]["Close"] if bars else None
             prev_close = cand.get("prev_close", 0)
             change_pct = ((last_price / prev_close - 1) * 100) if (last_price and prev_close) else None
@@ -319,13 +345,13 @@ class EngineBridge:
                 "gap_pct": cand["gap_pct"],
                 "candle_count": candle_count,
                 "premarket_high": premarket_high,
-                "market_open": round(market_open, 3),
+                "market_open": round(market_open, 3) if market_open else 0,
                 "pm_high_pct_above_open": round(pm_high_ratio, 1),
                 "last_price": last_price,
                 "change_pct": round(change_pct, 1) if change_pct is not None else None,
                 "strategies": strategies,
-                "traded": st.get("entry_price") is not None,
-                "active_strategy": st.get("strategy", ""),
+                "traded": any_traded,
+                "active_strategy": active_strategy,
                 "done": ticker_done,
             })
         return result

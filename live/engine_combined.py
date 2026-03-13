@@ -88,7 +88,8 @@ class CombinedEngine:
         self.params = load_trial_params(params_path)
         self.bar_data = {}      # ticker -> list of (timestamp, OHLCV dict)
         self.picks = []         # list of pick dicts (scanner output)
-        self.last_states = {}   # ticker -> last known state from simulate
+        self.last_states = {}   # ticker -> last known state from simulate (for entry/exit detection)
+        self.all_states = {}    # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
         self.active_position = None  # ticker currently in position
         self.position_entry = {}     # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
@@ -104,6 +105,7 @@ class CombinedEngine:
         """
         self.bar_data.clear()
         self.last_states.clear()
+        self.all_states.clear()
         self.active_position = None
         self.position_entry.clear()
         self.daily_pnl = 0.0
@@ -177,6 +179,12 @@ class CombinedEngine:
             if st.get("entry_price") is not None:
                 log.debug("  sim-entry: %s strat=%s entry=$%.3f cost=$%.0f",
                           st["ticker"], st.get("strategy"), st.get("entry_price"), st.get("position_cost", 0))
+
+        # Store all sub-states per ticker for diagnostics
+        per_ticker = {}
+        for st in states:
+            per_ticker.setdefault(st["ticker"], []).append(dict(st))
+        self.all_states = per_ticker
 
         # Detect state changes
         for st in states:
