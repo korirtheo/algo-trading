@@ -447,9 +447,12 @@ def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_conf
     return None
 
 
-def simulate_day_combined(picks, cash, cash_account=False):
+def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
     """Simulate combined strategy for one day with single cash pool.
     cash: float, available cash.
+    is_live: when True, skip the final EOD-cleanup loop so open positions
+        remain visible to the caller (the live engine diffs states across
+        bars and needs entry_price to stay set on a live position).
     Returns: (states, cash, unsettled, selection_log)
     """
     cash_box = [float(cash)]
@@ -2155,7 +2158,9 @@ def simulate_day_combined(picks, cash, cash_account=False):
                 "skipped": list(skipped_this_ts),
             })
 
-    # EOD: close remaining
+    # EOD: close remaining (skipped in live mode — engine manages real EOD)
+    if is_live:
+        return states, cash_box[0], unsettled_box[0], selection_log
     for st in states:
         if st["entry_price"] is not None and st["shares"] > 0:
             last_ts = st["mh"].index[-1]

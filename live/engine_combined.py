@@ -172,7 +172,7 @@ class CombinedEngine:
         # Run the backtest simulation on accumulated bars
         cash = self.executor.get_buying_power()
         log.debug("on_bar %s | cash=$%.0f | %d picks with data", symbol, cash, len(picks_with_data))
-        states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash)
+        states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash, is_live=True)
 
         # Log any state that has an entry (for diagnostics)
         for st in states:
@@ -299,7 +299,7 @@ class CombinedEngine:
             return
 
         cash = self.executor.get_buying_power()
-        states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash)
+        states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash, is_live=True)
         log.info("=== EOD DIAGNOSTICS (%d tickers, %d bars avg) ===",
                  len(picks_with_data),
                  sum(len(self.bar_data.get(p["ticker"], [])) for p in picks_with_data) // max(len(picks_with_data), 1))
