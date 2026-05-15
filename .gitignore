@@ -244,6 +244,10 @@ logs/
 # Environment / secrets
 .env
 .env.*
+*.pem
+
+# Large binary wheels (e.g. local PyTorch CUDA builds)
+*.whl
 
 # Node modules (frontend)
 node_modules/
