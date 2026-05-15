@@ -210,6 +210,43 @@ def wait_until(target_time, log):
     time.sleep(max(0, wait_secs))
 
 
+def _next_trading_day_prep_time(executor, log):
+    """Return ET datetime to wake at for the next trading day's pre-market.
+    Uses Alpaca's get_clock() so weekends and exchange holidays are handled
+    automatically. We wake 2.5 hours before next_open, which lands near 7:00 ET
+    on regular days (9:30 - 2:30) and gives the scan loop time to do its
+    7:00 / 7:30 / 8:30 / 9:00 / 9:25 / 9:27 / 9:30 sweep.
+    """
+    from datetime import time as dt_time
+    try:
+        clock = executor.client.get_clock()
+        next_open = clock.next_open
+        if next_open.tzinfo is None:
+            next_open = next_open.replace(tzinfo=ET)
+        next_open_et = next_open.astimezone(ET)
+        wake_at = next_open_et - timedelta(hours=2, minutes=30)
+        log.info(f"Next session opens at {next_open_et}; waking at {wake_at}")
+        return wake_at
+    except Exception as e:
+        log.warning(f"Alpaca clock fetch failed ({e}); falling back to next weekday 7:00 ET")
+        now = datetime.now(ET)
+        nxt = now.date() + timedelta(days=1)
+        while nxt.weekday() >= 5:  # 5=Sat, 6=Sun
+            nxt = nxt + timedelta(days=1)
+        return datetime.combine(nxt, dt_time(7, 0), tzinfo=ET)
+
+
+def _sleep_until(target_dt, log):
+    """Sleep in 5-minute chunks until target_dt (ET-aware). Allows KeyboardInterrupt."""
+    while True:
+        now = datetime.now(ET)
+        remaining = (target_dt - now).total_seconds()
+        if remaining <= 0:
+            return
+        chunk = min(remaining, 300.0)
+        time.sleep(chunk)
+
+
 def start_dashboard(engine, executor, candidates, port=8000):
     """Start the FastAPI dashboard server in a background thread."""
     import uvicorn
@@ -239,23 +276,11 @@ def start_dashboard(engine, executor, candidates, port=8000):
     return thread
 
 
-def run(args):
-    log = setup_logging()
-    log.info("=" * 60)
-    log.info("Combined Strategy Live Paper Trading (Trial 432)")
-    log.info("=" * 60)
-
-    # Check account
-    executor = OrderExecutor()
-    acct = executor.get_account()
-    log.info(f"Account: cash=${float(acct.cash):,.2f}, "
-             f"buying_power=${float(acct.buying_power):,.2f}")
-
-    # Start dashboard immediately so it's accessible before scan
-    if not args.no_dash:
-        start_dashboard(None, executor, [], port=args.port)
-        log.info(f"Dashboard running at http://localhost:{args.port}")
-
+def _run_one_day(executor, args, log):
+    """Run a single trading session: scan -> engine -> stream -> EOD.
+    Returns a summary dict (or None when no trading happened, e.g. empty
+    watchlist or --scan-only).
+    """
     from datetime import time as dt_time
 
     # Phase 1: Pre-market scan loop (9:00 → 9:25 → 9:27 → lock)
@@ -288,6 +313,7 @@ def run(args):
     scan_times = [
         (dt_time(7, 0),  "7:00"),
         (dt_time(7, 30), "7:30"),
+        (dt_time(8, 30), "8:30"),
         (dt_time(9, 0),  "9:00"),
         (dt_time(9, 25), "9:25"),
         (dt_time(9, 27), "9:27 FINAL"),
@@ -314,24 +340,19 @@ def run(args):
 
             if args.scan_only and i == 0:
                 log.info("--scan-only mode. Exiting.")
-                return
+                return None
 
     if args.scan_only:
         log.info("--scan-only mode. Exiting.")
-        return
+        return None
 
     if not candidates:
-        log.info("No candidates after all scans.")
-        if not args.no_dash:
-            log.info("Dashboard still running at http://localhost:%d", args.port)
-            try:
-                while True:
-                    time.sleep(300)
-            except KeyboardInterrupt:
-                log.info("Shutting down.")
-        return
+        log.info("No candidates after all scans for %s — will retry next trading day.",
+                 datetime.now(ET).strftime("%Y-%m-%d"))
+        return None
 
-    log.info(f"Watchlist locked: {len(candidates)} candidates")
+    trading_day = datetime.now(ET).date()
+    log.info(f"Watchlist locked for {trading_day}: {len(candidates)} candidates")
 
     # Phase 2: Initialize combined engine
     engine = CombinedEngine(executor)
@@ -348,6 +369,7 @@ def run(args):
         from dashboard.backend.app import bridge
         bridge.engine = engine
         bridge.scanner_candidates = candidates
+        bridge.scan_date = trading_day
 
     # Phase 4: Wait for market open (stream starts at 9:30)
     now = datetime.now(ET)
@@ -442,6 +464,13 @@ def run(args):
         while True:
             now = datetime.now(ET)
 
+            # Sanity: trading day rolled over while we were still in the loop —
+            # something is very wrong; abort so the outer rollover can re-init.
+            if now.date() != trading_day:
+                log.error("DATE MISMATCH: trading_day=%s but now=%s — exiting loop",
+                          trading_day, now.date())
+                break
+
             # EOD close at 3:45 PM
             if now.hour == 15 and now.minute >= 45:
                 log.info("EOD: Closing all positions")
@@ -489,7 +518,7 @@ def run(args):
 
     summary = engine.get_summary()
     log.info("=" * 60)
-    log.info("DAILY SUMMARY")
+    log.info(f"DAILY SUMMARY ({trading_day})")
     log.info(f"  Trades: {summary['trades']}")
     log.info(f"  Wins:   {summary['wins']}")
     log.info(f"  Losses: {summary['losses']}")
@@ -498,15 +527,56 @@ def run(args):
         log.info(f"    {t['ticker']} ({t.get('strategy','?')}): ${t['pnl']:+,.2f} "
                  f"({t['reason']}) ${t['entry_price']:.2f} -> ${t['exit_price']:.2f}")
     log.info("=" * 60)
+    return summary
 
-    # Keep process alive so dashboard stays accessible after hours
+
+def run(args):
+    """Main loop: start dashboard once, then run one trading session per
+    weekday until interrupted. Sleeps between sessions until ~2.5h before
+    next Alpaca open (i.e. ~7:00 ET on regular days).
+    """
+    log = setup_logging()
+    log.info("=" * 60)
+    log.info("Combined Strategy Live Paper Trading (Trial 432)")
+    log.info("=" * 60)
+
+    # Check account
+    executor = OrderExecutor()
+    acct = executor.get_account()
+    log.info(f"Account: cash=${float(acct.cash):,.2f}, "
+             f"buying_power=${float(acct.buying_power):,.2f}")
+
+    # Start dashboard once — it persists across trading days
     if not args.no_dash:
-        log.info("Market closed. Dashboard still running at http://localhost:%d", args.port)
+        start_dashboard(None, executor, [], port=args.port)
+        log.info(f"Dashboard running at http://localhost:{args.port}")
+
+    while True:
         try:
-            while True:
-                time.sleep(300)
+            _run_one_day(executor, args, log)
         except KeyboardInterrupt:
-            log.info("Shutting down.")
+            log.info("Interrupted by user — shutting down.")
+            return
+        except Exception as e:
+            log.error(f"Trading session crashed: {e}", exc_info=True)
+
+        if args.scan_only:
+            return
+
+        # Wait until ~2.5h before next Alpaca open (Mon–Fri, skips holidays)
+        wake_at = _next_trading_day_prep_time(executor, log)
+        log.info("=" * 60)
+        log.info(f"Session done. Sleeping until {wake_at} ET.")
+        log.info("=" * 60)
+        try:
+            _sleep_until(wake_at, log)
+        except KeyboardInterrupt:
+            log.info("Interrupted during overnight wait — shutting down.")
+            return
+
+        log.info("=" * 60)
+        log.info(f"New trading day: {datetime.now(ET).strftime('%Y-%m-%d')}")
+        log.info("=" * 60)
 
 
 def main():
