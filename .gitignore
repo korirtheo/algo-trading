@@ -231,6 +231,8 @@ float_data.json
 # Optuna study databases & output
 *.db
 optuna_output.txt
+# Result files (DBs already covered above; JSON best-params under results/ stay tracked)
+results/logs/
 
 # Live trading logs
 logs/

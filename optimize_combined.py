@@ -755,7 +755,7 @@ def objective(trial, daily_picks, all_dates):
 # ---------------------------------------------------------------------------
 # Dump best params to JSON (for live backtest runs)
 # ---------------------------------------------------------------------------
-BEST_PARAMS_FILE = "optuna_best_params_v8.json"
+BEST_PARAMS_FILE = "results/params/optuna_best_params_v8.json"
 
 def dump_best_params(trial, elapsed_min=None):
     """Save best trial's full params + summary to JSON file."""
@@ -835,14 +835,36 @@ def make_callback(start_time):
 # Main
 # ---------------------------------------------------------------------------
 def main():
+    global BEST_PARAMS_FILE
     parser = argparse.ArgumentParser()
     parser.add_argument("--trials", type=int, default=2000)
     parser.add_argument("--dump-best", action="store_true",
                         help="Extract best params from existing DB and exit (no new trials)")
+    parser.add_argument("--slippage", type=float, default=None,
+                        help="Override tgc.SLIPPAGE_PCT (e.g. 1.0 = 1%% per leg)")
+    parser.add_argument("--vol-cap", type=float, default=None,
+                        help="Override tgc.VOL_CAP_PCT (e.g. 1.0 = 1%% of cumulative dollar vol)")
+    parser.add_argument("--db", default="optuna_combined_v8.db",
+                        help="SQLite path for the study (default: optuna_combined_v8.db)")
+    parser.add_argument("--study", default="combined_v8_20strats_2024_2026",
+                        help="Optuna study name (default: combined_v8_20strats_2024_2026)")
+    parser.add_argument("--params-out", default=None,
+                        help="Best-trial JSON output path (default: optuna_best_params_v8.json)")
     args = parser.parse_args()
     n_trials = args.trials
 
-    db_path = "optuna_combined_v8.db"
+    db_path = args.db
+    study_name = args.study
+    if args.params_out:
+        BEST_PARAMS_FILE = args.params_out
+
+    # Apply slippage / vol-cap overrides to the simulator BEFORE any trial runs.
+    # These rebind the module globals tgc imported from test_full; simulate_day_combined
+    # looks them up by name on each call, so the override takes effect.
+    if args.slippage is not None:
+        tgc.SLIPPAGE_PCT = float(args.slippage)
+    if args.vol_cap is not None:
+        tgc.VOL_CAP_PCT = float(args.vol_cap)
 
     # --dump-best: extract best params from existing DB without running trials
     if args.dump_best:
@@ -851,7 +873,7 @@ def main():
             sys.exit(1)
         study = optuna.create_study(
             direction="maximize",
-            study_name="combined_v8_20strats_2024_2026",
+            study_name=study_name,
             storage=f"sqlite:///{db_path}",
             load_if_exists=True,
         )
@@ -872,12 +894,17 @@ def main():
 
     print("=" * 70)
     print("Combined Optuna Optimizer v8: 20 Strategies + Single Pool")
-    print(f"  Candidates: {', '.join(STRAT_KEYS)}")
+    print(f"  Candidates:  {', '.join(STRAT_KEYS)}")
     print(f"  Optuna decides: which strategies to enable (1-20) + priority")
     print(f"  Single pool: ${STARTING_CASH:,}")
-    print(f"  Trials: {n_trials}")
-    print(f"  Objective: total_pnl * min(pf, 3.0)")
-    print(f"  Data: {DATA_DIRS}")
+    print(f"  Trials:      {n_trials}")
+    print(f"  Objective:   total_pnl * min(pf, 3.0)")
+    print(f"  Data:        {DATA_DIRS}")
+    print(f"  Slippage:    {tgc.SLIPPAGE_PCT}% per leg")
+    print(f"  Vol cap:     {tgc.VOL_CAP_PCT}% of cumulative dollar vol")
+    print(f"  DB:          {db_path}")
+    print(f"  Study:       {study_name}")
+    print(f"  Best JSON:   {BEST_PARAMS_FILE}")
     print("=" * 70)
 
     print("\nLoading data...")
@@ -886,7 +913,7 @@ def main():
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
     study = optuna.create_study(
         direction="maximize",
-        study_name="combined_v8_20strats_2024_2026",
+        study_name=study_name,
         storage=optuna.storages.RDBStorage(
             url=f"sqlite:///{db_path}",
             engine_kwargs={"connect_args": {"timeout": 30}},
@@ -975,9 +1002,9 @@ def main():
 
     # Final dump of best params to JSON
     dump_best_params(best, total_time / 60)
-    print(f"\n  DB saved to: {db_path}")
+    print(f"\n  DB saved to:     {db_path}")
     print(f"  Params saved to: {BEST_PARAMS_FILE}")
-    print(f"  Study name: combined_v8_20strats_2024_2026")
+    print(f"  Study name:      {study_name}")
 
 
 if __name__ == "__main__":

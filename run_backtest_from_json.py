@@ -12,7 +12,7 @@ import io
 import json
 
 # Parse args
-json_path = "optuna_best_params_v8.json"
+json_path = "results/params/optuna_best_params_v8.json"
 no_charts = "--no-charts" in sys.argv
 remaining = [a for a in sys.argv[1:] if a not in ("--no-charts",)]
 

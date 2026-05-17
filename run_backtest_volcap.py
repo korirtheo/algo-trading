@@ -12,7 +12,7 @@ import json
 vol_cap = float(sys.argv[1]) if len(sys.argv) > 1 else 6.0
 with_charts = "--charts" in sys.argv
 
-json_path = "optuna_best_params_v8.json"
+json_path = "results/params/optuna_best_params_v8.json"
 with open(json_path) as f:
     data = json.load(f)
 params = data["params"]
