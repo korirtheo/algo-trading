@@ -31,18 +31,21 @@ import test_green_candle_combined as tgc
 from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
 DATA_DIRS = [
-    # 2025 ONLY (~246 trading days). Picked over 2024 because:
-    #  - stored_data_jan_feb_2024 has broken (sparse pre-market) intraday data,
-    #    so the 2024 training window had ~41 dead days.
-    #  - 2025 covers Jan -> Dec continuously with full pre-market coverage.
-    # Leaves 2024 (~206 usable days, currently being re-downloaded) and
-    # Jan-Feb 2026 + Mar-May 2026 OOS as held-out validation sets.
-    "stored_data_jan_mar_2025",   # 2025-01 -> 2025-03       (59 days)
-    "stored_data_apr_jun_2025",   # 2025-04 -> 2025-06       (61 days)
-    "stored_data_jul_2025",       # 2025-07                  (21 days)
-    "stored_data_oos",            # 2025-08 -> 2025-12       (105 days)
+    # 2022 + Mar-Dec 2024 + 2025 (~703 trading days). Richest training set
+    # with three regimes: 2022 bear, 2024 momentum, 2025 mixed.
+    # Skipped: stored_data_jan_feb_2024 (broken sparse PM), 2023 (broken PM
+    # filter, 0.93 picks/day). Leaves Jan-Feb 2026 + Mar-May 2026 as OOS.
+    "stored_data_2022",           # 2022-01-03 -> 2022-12-30  (251 days)
+    "stored_data_jan_mar_2024",   # 2024-03                    (18 days)
+    "stored_data_apr_jun_2024",   # 2024-04 -> 2024-06         (62 days)
+    "stored_data_jul_sep_2024",   # 2024-07 -> 2024-09         (63 days)
+    "stored_data_oct_dec_2024",   # 2024-10 -> 2024-12         (63 days)
+    "stored_data_jan_mar_2025",   # 2025-01 -> 2025-03         (59 days)
+    "stored_data_apr_jun_2025",   # 2025-04 -> 2025-06         (61 days)
+    "stored_data_jul_2025",       # 2025-07                    (21 days)
+    "stored_data_oos",            # 2025-08 -> 2025-12        (105 days)
 ]
-DATE_RANGE = ("2025-01-01", "2025-12-31")
+DATE_RANGE = ("2022-01-01", "2025-12-31")
 
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
