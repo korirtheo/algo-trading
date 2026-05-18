@@ -31,22 +31,16 @@ import test_green_candle_combined as tgc
 from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
 DATA_DIRS = [
-    # Full continuous coverage Jan 2024 -> Feb 2026 (~531 trading days).
-    # stored_data_combined was a partial merge that omitted Mar-Dec 2024;
-    # listing the component dirs directly lets load_all_picks merge them
-    # in memory (it dedupes by date, so overlaps are safe).
+    # 2024 ONLY (~247 trading days). Trains faster than the full 531-day
+    # window AND leaves 2025-Jan + 2026-Feb (~287 days) plus Mar-May 2026
+    # (~43 days) as held-out validation/OOS for honest preservation tests.
     "stored_data_jan_feb_2024",   # 2024-01-02 -> 2024-02-29 (41 days)
     "stored_data_jan_mar_2024",   # 2024-03                  (18 days)
     "stored_data_apr_jun_2024",   # 2024-04 -> 2024-06       (62 days)
     "stored_data_jul_sep_2024",   # 2024-07 -> 2024-09       (63 days)
     "stored_data_oct_dec_2024",   # 2024-10 -> 2024-12       (63 days)
-    "stored_data_jan_mar_2025",   # 2025-01 -> 2025-03       (59 days)
-    "stored_data_apr_jun_2025",   # 2025-04 -> 2025-06       (61 days)
-    "stored_data_jul_2025",       # 2025-07                  (21 days)
-    "stored_data_oos",            # 2025-08 -> 2025-12       (105 days)
-    "stored_data",                # 2026-01 -> 2026-02       (38 days)
 ]
-DATE_RANGE = ("2024-01-01", "2026-02-28")
+DATE_RANGE = ("2024-01-01", "2024-12-31")
 
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
