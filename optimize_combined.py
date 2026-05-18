@@ -745,11 +745,30 @@ def objective(trial, daily_picks, all_dates):
 
     total_pnl = result["total_pnl"]
 
+    # Sanitize numeric values for SQLite/JSON storage.
+    # Under dynamic slippage, bad-params trials can produce NaN/Inf equities
+    # (e.g. negative bankroll after compounded extreme slippage). Optuna's
+    # rdb storage rejects those, killing the whole study. Clamp to a finite
+    # large-magnitude sentinel instead.
+    def _safe(x, default=-9.9e12):
+        import math
+        try:
+            x = float(x)
+        except (TypeError, ValueError):
+            return default
+        if math.isnan(x) or math.isinf(x):
+            return default
+        # SQLite's max is ~1e308 but JSON serialization is happier with smaller
+        return max(-9.9e12, min(9.9e12, x))
+
+    pf_safe = _safe(pf, 0)
+    total_pnl_safe = _safe(total_pnl, -1e12)
+
     trial.set_user_attr("n", n)
-    trial.set_user_attr("pf", round(pf, 3))
-    trial.set_user_attr("wr", round(result["wr"], 1))
-    trial.set_user_attr("total_pnl", round(total_pnl, 2))
-    trial.set_user_attr("equity", round(result["equity"], 2))
+    trial.set_user_attr("pf", round(pf_safe, 3))
+    trial.set_user_attr("wr", round(_safe(result["wr"], 0), 1))
+    trial.set_user_attr("total_pnl", round(total_pnl_safe, 2))
+    trial.set_user_attr("equity", round(_safe(result["equity"], -1e12), 2))
 
     enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
     prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
@@ -760,11 +779,12 @@ def objective(trial, daily_picks, all_dates):
 
     for s, v in result["strats"].items():
         trial.set_user_attr(f"{s}_n", v["n"])
-        trial.set_user_attr(f"{s}_pnl", round(v["pnl"], 2))
+        trial.set_user_attr(f"{s}_pnl", round(_safe(v["pnl"], 0), 2))
         wr_s = v["wins"] / v["n"] * 100 if v["n"] > 0 else 0
-        trial.set_user_attr(f"{s}_wr", round(wr_s, 1))
+        trial.set_user_attr(f"{s}_wr", round(_safe(wr_s, 0), 1))
 
-    return total_pnl * min(pf, 3.0)
+    score = total_pnl_safe * min(pf_safe, 3.0)
+    return _safe(score, -9999)
 
 
 # ---------------------------------------------------------------------------
