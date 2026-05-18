@@ -662,8 +662,83 @@ def suggest_all_params(trial):
 # ---------------------------------------------------------------------------
 # Run full combined backtest with current tgc globals
 # ---------------------------------------------------------------------------
-def run_combined_backtest(daily_picks, all_dates):
-    """Run the full backtest with single cash pool and return per-strategy stats."""
+def _build_param_snapshot():
+    """Snapshot all current tgc strategy globals into a dict the simulator
+    can use thread-safely. Called after set_strategy_params() has applied
+    a trial's params to tgc; the snapshot is then passed explicitly to
+    simulate_day_combined so it's immune to other threads stomping on
+    tgc globals during this trial's backtest."""
+    g = tgc.__dict__
+    names = (
+        'A_STOP_PCT', 'A_TARGET_PCT', 'A_TIME_LIMIT_MINUTES', 'A_TRAIL_ACTIVATE_PCT', 'A_TRAIL_PCT',
+        'B_MAX_DIP_PCT', 'B_MAX_ENTRY_CANDLE', 'B_MIN_GAP_PCT', 'B_MIN_RECLAIM_VOL_MULT',
+        'B_PARTIAL_SELL_PCT', 'B_STOP_PCT', 'B_TARGET1_PCT', 'B_TARGET2_PCT', 'B_TIME_LIMIT_MINUTES',
+        'B_TRAIL_ACTIVATE_PCT', 'B_TRAIL_PCT',
+        'C_BREAKOUT_VOL_MULT', 'C_MAX_BASE_CANDLES', 'C_MAX_BASE_RANGE_PCT', 'C_MAX_ENTRY_CANDLE',
+        'C_MIN_BASE_CANDLES', 'C_MIN_GAP_PCT', 'C_MIN_SPIKE_PCT', 'C_PARTIAL_SELL_PCT', 'C_STOP_PCT',
+        'C_TARGET1_PCT', 'C_TARGET2_PCT', 'C_TIME_LIMIT_MINUTES', 'C_TRAIL_ACTIVATE_PCT', 'C_TRAIL_PCT',
+        'D_DIP_PCT', 'D_ENTRY_MODE', 'D_MAX_ENTRY_CANDLE', 'D_MIN_GAP_PCT', 'D_MIN_SPIKE_PCT',
+        'D_PARTIAL_SELL_PCT', 'D_SPIKE_WINDOW', 'D_STOP_PCT', 'D_TARGET1_PCT', 'D_TARGET2_PCT',
+        'D_TIME_LIMIT_MINUTES', 'D_TRAIL_ACTIVATE_PCT', 'D_TRAIL_PCT',
+        'EOD_EXIT_MINUTES',
+        'E_MAX_ENTRY_CANDLE', 'E_MIN_GAP_PCT', 'E_MIN_PM_VOL_MULT', 'E_PARTIAL_SELL_PCT',
+        'E_STOP_PCT', 'E_TARGET1_PCT', 'E_TARGET2_PCT', 'E_TIME_LIMIT_MINUTES',
+        'E_TRAIL_ACTIVATE_PCT', 'E_TRAIL_PCT',
+        'F_STOP_PCT', 'F_TARGET_PCT', 'F_TIME_LIMIT_MINUTES', 'F_TRAIL_ACTIVATE_PCT', 'F_TRAIL_PCT',
+        'G_STOP_PCT', 'G_TARGET_PCT', 'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
+        'H_STOP_PCT', 'H_TARGET_PCT', 'H_TIME_LIMIT_MINUTES', 'H_TRAIL_ACTIVATE_PCT', 'H_TRAIL_PCT',
+        'I_BREAKOUT_VOL_MULT', 'I_MAX_ENTRY_CANDLE', 'I_MIN_GAP_PCT', 'I_PARTIAL_SELL_PCT',
+        'I_STOP_PCT', 'I_TARGET1_PCT', 'I_TARGET2_PCT', 'I_TIME_LIMIT_MINUTES',
+        'I_TRAIL_ACTIVATE_PCT', 'I_TRAIL_PCT',
+        'J_MAX_ENTRY_CANDLE', 'J_MIN_GAP_PCT', 'J_PARTIAL_SELL_PCT', 'J_STOP_PCT',
+        'J_TARGET1_PCT', 'J_TARGET2_PCT', 'J_TIME_LIMIT_MINUTES', 'J_TRAIL_ACTIVATE_PCT',
+        'J_TRAIL_PCT', 'J_VWAP_PROXIMITY_PCT',
+        'K_BOUNCE_VOL_MULT', 'K_MAX_ENTRY_CANDLE', 'K_MIN_GAP_PCT', 'K_MIN_RUN_PCT',
+        'K_PARTIAL_SELL_PCT', 'K_PULLBACK_PCT', 'K_PULLBACK_VOL_RATIO', 'K_RUN_WINDOW',
+        'K_STOP_PCT', 'K_TARGET1_PCT', 'K_TARGET2_PCT', 'K_TIME_LIMIT_MINUTES',
+        'K_TRAIL_ACTIVATE_PCT', 'K_TRAIL_PCT',
+        'L_EARLIEST_CANDLE', 'L_HOD_BREAK_REQUIRED', 'L_LATEST_CANDLE', 'L_MAX_FLOAT',
+        'L_MIN_GAP_PCT', 'L_MIN_PRICE_ACCEL_PCT', 'L_PARTIAL_SELL_PCT', 'L_REQUIRE_ABOVE_VWAP',
+        'L_STOP_PCT', 'L_TIME_LIMIT_MINUTES', 'L_TRAIL_ACTIVATE_PCT', 'L_TRAIL_PCT',
+        'L_VOL_SURGE_MULT',
+        'M_CONSOLIDATION_LEN', 'M_MAX_ENTRY_CANDLE', 'M_MAX_RANGE_PCT', 'M_MIN_GAP_PCT',
+        'M_MORNING_CANDLES', 'M_MORNING_SPIKE_PCT', 'M_PARTIAL_SELL_PCT', 'M_RANGE_START_CANDLE',
+        'M_STOP_PCT', 'M_TARGET1_PCT', 'M_TIME_LIMIT_MINUTES', 'M_TRAIL_ACTIVATE_PCT',
+        'M_TRAIL_PCT', 'M_VOL_RATIO',
+        'N_MAX_ENTRY_CANDLE', 'N_MIN_GAP_PCT', 'N_MIN_HOD_AGE', 'N_PARTIAL_SELL_PCT',
+        'N_PULLBACK_FROM_HOD_PCT', 'N_STOP_PCT', 'N_TARGET1_PCT', 'N_TARGET2_PCT',
+        'N_TIME_LIMIT_MINUTES', 'N_TRAIL_ACTIVATE_PCT', 'N_TRAIL_PCT',
+        'O_BREAKOUT_VOL_MULT', 'O_MAX_ENTRY_CANDLE', 'O_MIN_GAP_PCT', 'O_PARTIAL_SELL_PCT',
+        'O_RANGE_CANDLES', 'O_STOP_PCT', 'O_TARGET1_PCT', 'O_TARGET2_PCT',
+        'O_TIME_LIMIT_MINUTES', 'O_TRAIL_ACTIVATE_PCT', 'O_TRAIL_PCT',
+        'P_CONFIRM_ABOVE', 'P_CONFIRM_WINDOW', 'P_MAX_ENTRY_CANDLE', 'P_MIN_GAP_PCT',
+        'P_PARTIAL_SELL_PCT', 'P_PULLBACK_PCT', 'P_PULLBACK_TIMEOUT', 'P_STOP_PCT',
+        'P_TARGET1_PCT', 'P_TARGET2_PCT', 'P_TIME_LIMIT_MINUTES', 'P_TRAIL_ACTIVATE_PCT',
+        'P_TRAIL_PCT',
+        'R_BOUNCE_REF', 'R_D2_PULLBACK_PCT', 'R_MAX_ENTRY_CANDLE', 'R_PULLBACK_WINDOW',
+        'R_STOP_PCT', 'R_TARGET1_PCT', 'R_TIME_LIMIT_MINUTES', 'R_TRAIL_ACTIVATE_PCT',
+        'R_TRAIL_PCT',
+        'S_BREAKOUT_VOL_MULT', 'S_HOD_TOLERANCE_PCT', 'S_MAX_ENTRY_CANDLE', 'S_MIN_GAP_PCT',
+        'S_MIN_HOD_TESTS', 'S_PARTIAL_SELL_PCT', 'S_REJECTION_PCT', 'S_STOP_PCT',
+        'S_TARGET1_PCT', 'S_TARGET2_PCT', 'S_TIME_LIMIT_MINUTES', 'S_TRAIL_ACTIVATE_PCT',
+        'S_TRAIL_PCT',
+        'VOL_CAP_PCT',
+        'V_MAX_ENTRY_CANDLE', 'V_MIN_BELOW_CANDLES', 'V_MIN_BELOW_PCT', 'V_MIN_GAP_PCT',
+        'V_PARTIAL_SELL_PCT', 'V_STOP_PCT', 'V_TARGET1_PCT', 'V_TARGET2_PCT',
+        'V_TIME_LIMIT_MINUTES', 'V_TRAIL_ACTIVATE_PCT', 'V_TRAIL_PCT', 'V_VOL_SPIKE_RATIO',
+        'W_CONSOL_START', 'W_EARLIEST_CANDLE', 'W_LATEST_CANDLE', 'W_MAX_HOD_BREAKS',
+        'W_MAX_RANGE_PCT', 'W_MAX_VWAP_DEV_PCT', 'W_MIN_GAP_PCT', 'W_MIN_MORNING_RUN',
+        'W_REQUIRE_ABOVE_VWAP', 'W_STOP_PCT', 'W_TARGET_PCT', 'W_TRAIL_ACTIVATE_PCT',
+        'W_TRAIL_PCT', 'W_VOL_SURGE_MULT', 'W_VOL_VS_MORNING_MULT',
+    )
+    return {n: g[n] for n in names}
+
+
+def run_combined_backtest(daily_picks, all_dates, params_snapshot=None):
+    """Run the full backtest with single cash pool and return per-strategy stats.
+
+    When params_snapshot is provided, each simulate_day_combined call uses it
+    explicitly — fully parallel-safe regardless of n_jobs."""
     cash = float(STARTING_CASH)
     unsettled = 0.0
     all_trades = []
@@ -676,7 +751,7 @@ def run_combined_backtest(daily_picks, all_dates):
         cash_account = cash < MARGIN_THRESHOLD
 
         states, cash, unsettled, _ = tgc.simulate_day_combined(
-            picks, cash, cash_account
+            picks, cash, cash_account, params=params_snapshot
         )
 
         for st in states:
@@ -722,12 +797,24 @@ def run_combined_backtest(daily_picks, all_dates):
 # ---------------------------------------------------------------------------
 # Optuna objective
 # ---------------------------------------------------------------------------
-def objective(trial, daily_picks, all_dates):
-    """Objective function: suggest params -> run full backtest -> score."""
-    params = suggest_all_params(trial)
-    set_strategy_params(params)
+_param_lock = __import__("threading").RLock()
 
-    result = run_combined_backtest(daily_picks, all_dates)
+
+def objective(trial, daily_picks, all_dates):
+    """Objective function: suggest params -> run full backtest -> score.
+
+    The set_strategy_params() + snapshot construction runs under a lock so
+    that with n_jobs > 1, threads don't corrupt each other's tgc globals
+    during the brief mutation window. Once the snapshot dict is built, it's
+    passed explicitly to the simulator — no shared state during the long
+    backtest phase. Optuna's parallelism is thus correct AND fully utilized.
+    """
+    params = suggest_all_params(trial)
+    with _param_lock:
+        set_strategy_params(params)
+        snapshot = _build_param_snapshot()
+
+    result = run_combined_backtest(daily_picks, all_dates, params_snapshot=snapshot)
 
     n = result["n"]
     if n < 30:
