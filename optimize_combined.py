@@ -31,11 +31,16 @@ import test_green_candle_combined as tgc
 from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
 DATA_DIRS = [
-    # 2022 + Mar-Dec 2024 + 2025 (~703 trading days). Richest training set
-    # with three regimes: 2022 bear, 2024 momentum, 2025 mixed.
-    # Skipped: stored_data_jan_feb_2024 (broken sparse PM), 2023 (broken PM
-    # filter, 0.93 picks/day). Leaves Jan-Feb 2026 + Mar-May 2026 as OOS.
-    "stored_data_2022",           # 2022-01-03 -> 2022-12-30  (251 days)
+    # Mar-Dec 2024 + 2025 (~452 training days). Two regimes: 2024 momentum/AI
+    # runners + 2025 mixed/small-cap squeeze. Fastest path to convergence
+    # without sacrificing meaningful regime diversity.
+    # Held out for OOS / blind tests (NOT in training):
+    #   stored_data_2022                  -> blind OOS (251 days, 2022 bear)
+    #   stored_data                       -> Jan-Feb 2026 (38 days)
+    #   stored_data_mar_may_2026          -> Mar-May 2026 (43 days)
+    # Skipped (broken data):
+    #   stored_data_jan_feb_2024          -> sparse PM, every pick filtered out
+    #   stored_data_combined/stored_data_2023 -> 0.93 picks/day
     "stored_data_jan_mar_2024",   # 2024-03                    (18 days)
     "stored_data_apr_jun_2024",   # 2024-04 -> 2024-06         (62 days)
     "stored_data_jul_sep_2024",   # 2024-07 -> 2024-09         (63 days)
@@ -45,7 +50,7 @@ DATA_DIRS = [
     "stored_data_jul_2025",       # 2025-07                    (21 days)
     "stored_data_oos",            # 2025-08 -> 2025-12        (105 days)
 ]
-DATE_RANGE = ("2022-01-01", "2025-12-31")
+DATE_RANGE = ("2024-01-01", "2025-12-31")
 
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
