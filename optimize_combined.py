@@ -856,9 +856,13 @@ def main():
     parser.add_argument("--dump-best", action="store_true",
                         help="Extract best params from existing DB and exit (no new trials)")
     parser.add_argument("--slippage", type=float, default=None,
-                        help="Override tgc.SLIPPAGE_PCT (e.g. 1.0 = 1%% per leg)")
+                        help="Override tgc.SLIPPAGE_PCT (e.g. 1.0 = 1%% per leg, legacy constant)")
     parser.add_argument("--vol-cap", type=float, default=None,
                         help="Override tgc.VOL_CAP_PCT (e.g. 1.0 = 1%% of cumulative dollar vol)")
+    parser.add_argument("--dynamic-slip", action="store_true",
+                        help="Enable liquidity-aware slippage (base + sqrt-participation impact)")
+    parser.add_argument("--slip-impact-k", type=float, default=None,
+                        help="Override SLIP_IMPACT_K (default 3.0)")
     parser.add_argument("--db", default="optuna_combined_v8.db",
                         help="SQLite path for the study (default: optuna_combined_v8.db)")
     parser.add_argument("--study", default="combined_v8_20strats_2024_2026",
@@ -880,6 +884,10 @@ def main():
         tgc.SLIPPAGE_PCT = float(args.slippage)
     if args.vol_cap is not None:
         tgc.VOL_CAP_PCT = float(args.vol_cap)
+    if args.dynamic_slip:
+        tgc.USE_DYNAMIC_SLIPPAGE = True
+    if args.slip_impact_k is not None:
+        tgc.SLIP_IMPACT_K = float(args.slip_impact_k)
 
     # --dump-best: extract best params from existing DB without running trials
     if args.dump_best:
@@ -915,7 +923,10 @@ def main():
     print(f"  Trials:      {n_trials}")
     print(f"  Objective:   total_pnl * min(pf, 3.0)")
     print(f"  Data:        {DATA_DIRS}")
-    print(f"  Slippage:    {tgc.SLIPPAGE_PCT}% per leg")
+    if getattr(tgc, "USE_DYNAMIC_SLIPPAGE", False):
+        print(f"  Slippage:    DYNAMIC (base={tgc.SLIP_BASE_SPREAD}+{tgc.SLIP_PRICE_COEFF}/price + K={tgc.SLIP_IMPACT_K}*sqrt(participation))")
+    else:
+        print(f"  Slippage:    {tgc.SLIPPAGE_PCT}% per leg (legacy constant)")
     print(f"  Vol cap:     {tgc.VOL_CAP_PCT}% of cumulative dollar vol")
     print(f"  DB:          {db_path}")
     print(f"  Study:       {study_name}")
