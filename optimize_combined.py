@@ -670,6 +670,12 @@ def _build_param_snapshot():
     tgc globals during this trial's backtest."""
     g = tgc.__dict__
     names = (
+        # Helper-function consumers (_classify_candle2, _get_tiered_targets)
+        'H_MIN_GAP_PCT', 'G_MIN_GAP_PCT', 'A_MIN_GAP_PCT', 'F_MIN_GAP_PCT',
+        'L_TIER1_FLOAT', 'L_TIER2_FLOAT',
+        'L_TIER1_TARGET1_PCT', 'L_TIER1_TARGET2_PCT',
+        'L_TIER2_TARGET1_PCT', 'L_TIER2_TARGET2_PCT',
+        'L_TIER3_TARGET1_PCT', 'L_TIER3_TARGET2_PCT',
         'A_STOP_PCT', 'A_TARGET_PCT', 'A_TIME_LIMIT_MINUTES', 'A_TRAIL_ACTIVATE_PCT', 'A_TRAIL_PCT',
         'B_MAX_DIP_PCT', 'B_MAX_ENTRY_CANDLE', 'B_MIN_GAP_PCT', 'B_MIN_RECLAIM_VOL_MULT',
         'B_PARTIAL_SELL_PCT', 'B_STOP_PCT', 'B_TARGET1_PCT', 'B_TARGET2_PCT', 'B_TIME_LIMIT_MINUTES',

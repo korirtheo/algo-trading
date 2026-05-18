@@ -471,39 +471,60 @@ def _compute_vwap(mh):
     return cum_tp_vol / cum_vol
 
 
-def _get_tiered_targets(float_shares):
-    """Return (target1_pct, target2_pct) based on float size."""
-    if float_shares < L_TIER1_FLOAT:
-        return L_TIER1_TARGET1_PCT, L_TIER1_TARGET2_PCT
-    elif float_shares < L_TIER2_FLOAT:
-        return L_TIER2_TARGET1_PCT, L_TIER2_TARGET2_PCT
+def _get_tiered_targets(float_shares, params=None):
+    """Return (target1_pct, target2_pct) based on float size.
+    When params is a dict, read mutable thresholds from it (thread-safe);
+    else fall back to module globals (back-compat)."""
+    if params is None:
+        t1f, t2f = L_TIER1_FLOAT, L_TIER2_FLOAT
+        t1_t1, t1_t2 = L_TIER1_TARGET1_PCT, L_TIER1_TARGET2_PCT
+        t2_t1, t2_t2 = L_TIER2_TARGET1_PCT, L_TIER2_TARGET2_PCT
+        t3_t1, t3_t2 = L_TIER3_TARGET1_PCT, L_TIER3_TARGET2_PCT
     else:
-        return L_TIER3_TARGET1_PCT, L_TIER3_TARGET2_PCT
+        t1f = params['L_TIER1_FLOAT']; t2f = params['L_TIER2_FLOAT']
+        t1_t1 = params['L_TIER1_TARGET1_PCT']; t1_t2 = params['L_TIER1_TARGET2_PCT']
+        t2_t1 = params['L_TIER2_TARGET1_PCT']; t2_t2 = params['L_TIER2_TARGET2_PCT']
+        t3_t1 = params['L_TIER3_TARGET1_PCT']; t3_t2 = params['L_TIER3_TARGET2_PCT']
+    if float_shares < t1f:
+        return t1_t1, t1_t2
+    elif float_shares < t2f:
+        return t2_t1, t2_t2
+    else:
+        return t3_t1, t3_t2
 
 
-def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_confirm=False):
+def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_confirm=False, params=None):
     """Classify on candle 2 for strategies H, G, A, F.
-    Priority: H > G > A > F (highest conviction first)."""
+    Priority: H > G > A > F (highest conviction first).
+    When params is a dict, read mutable min_gap thresholds from it (thread-safe);
+    else fall back to module globals (back-compat)."""
+    if params is None:
+        h_gap, g_gap, a_gap, f_gap = H_MIN_GAP_PCT, G_MIN_GAP_PCT, A_MIN_GAP_PCT, F_MIN_GAP_PCT
+    else:
+        h_gap = params['H_MIN_GAP_PCT']
+        g_gap = params['G_MIN_GAP_PCT']
+        a_gap = params['A_MIN_GAP_PCT']
+        f_gap = params['F_MIN_GAP_PCT']
     # H: high conviction - gap>=25%, body>=5%, 2nd green + new hi + vol confirm
-    if (gap_pct >= H_MIN_GAP_PCT
+    if (gap_pct >= h_gap
             and body_pct >= H_MIN_BODY_PCT
             and second_green and second_new_high
             and (not H_REQUIRE_VOL_CONFIRM or vol_confirm)):
         return "H"
     # G: gap>=25%, 2nd green + new hi (strong runners)
-    if (gap_pct >= G_MIN_GAP_PCT
+    if (gap_pct >= g_gap
             and body_pct >= G_MIN_BODY_PCT
             and (not G_REQUIRE_2ND_GREEN or second_green)
             and (not G_REQUIRE_2ND_NEW_HIGH or second_new_high)):
         return "G"
     # A: gap>=15%, 2nd green + new hi (quick scalp)
-    if (gap_pct >= A_MIN_GAP_PCT
+    if (gap_pct >= a_gap
             and A_MIN_BODY_PCT <= body_pct <= A_MAX_BODY_PCT
             and (not A_REQUIRE_2ND_GREEN or second_green)
             and (not A_REQUIRE_2ND_NEW_HIGH or second_new_high)):
         return "A"
     # F: gap>=10%, 2nd green (catch-all)
-    if (gap_pct >= F_MIN_GAP_PCT
+    if (gap_pct >= f_gap
             and body_pct >= F_MIN_BODY_PCT
             and (not F_REQUIRE_2ND_GREEN or second_green)
             and (not F_REQUIRE_2ND_NEW_HIGH or second_new_high)):
@@ -530,6 +551,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     if params is None:
         _g = globals()
         params = {n: _g[n] for n in (
+            # Names consumed by helper functions (_classify_candle2, _get_tiered_targets)
+            'H_MIN_GAP_PCT', 'G_MIN_GAP_PCT', 'A_MIN_GAP_PCT', 'F_MIN_GAP_PCT',
+            'L_TIER1_FLOAT', 'L_TIER2_FLOAT',
+            'L_TIER1_TARGET1_PCT', 'L_TIER1_TARGET2_PCT',
+            'L_TIER2_TARGET1_PCT', 'L_TIER2_TARGET2_PCT',
+            'L_TIER3_TARGET1_PCT', 'L_TIER3_TARGET2_PCT',
             'A_STOP_PCT', 'A_TARGET_PCT', 'A_TIME_LIMIT_MINUTES', 'A_TRAIL_ACTIVATE_PCT', 'A_TRAIL_PCT',
             'B_MAX_DIP_PCT', 'B_MAX_ENTRY_CANDLE', 'B_MIN_GAP_PCT', 'B_MIN_RECLAIM_VOL_MULT',
             'B_PARTIAL_SELL_PCT', 'B_STOP_PCT', 'B_TARGET1_PCT', 'B_TARGET2_PCT', 'B_TIME_LIMIT_MINUTES',
@@ -749,7 +776,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         l_eligible = (float_shares is not None
                       and float_shares <= L_MAX_FLOAT
                       and pick["gap_pct"] >= L_MIN_GAP_PCT)
-        l_tgt1, l_tgt2 = _get_tiered_targets(float_shares) if l_eligible else (0, 0)
+        l_tgt1, l_tgt2 = _get_tiered_targets(float_shares, params=params) if l_eligible else (0, 0)
         states.append({
             "ticker": ticker,
             "premarket_high": pick["premarket_high"],
@@ -1724,6 +1751,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 strategy = _classify_candle2(
                     st["gap_pct"], st["first_candle_body_pct"],
                     second_green, second_new_high, vol_confirm,
+                    params=params,
                 )
                 if strategy:
                     st["strategy"] = strategy
