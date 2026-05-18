@@ -57,6 +57,70 @@ if hasattr(_sys.stdout, 'buffer'):
     _sys.stdout = io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8",
                                     errors="replace", line_buffering=True)
 
+# --- LIQUIDITY-AWARE SLIPPAGE MODEL ---
+# Default OFF for backward compatibility: when USE_DYNAMIC_SLIPPAGE is False
+# (the legacy mode), fills use the constant SLIPPAGE_PCT just like before.
+# Turn on by setting tgc.USE_DYNAMIC_SLIPPAGE = True before simulate_day_combined.
+#
+# Total per-leg slippage = (base_spread + impact) * regime_mult
+#   base_spread = SLIP_BASE_SPREAD + SLIP_PRICE_COEFF / max(price, 0.1)
+#                   $0.50 stock: 0.05 + 1.0 = 1.05% spread before impact
+#                   $5    stock: 0.05 + 0.10 = 0.15%
+#                   $20   stock: 0.05 + 0.025 = 0.075%
+#   impact      = SLIP_IMPACT_K * sqrt(participation_rate) [Almgren-Chriss square-root law]
+#                   participation_rate = position_dollars / cumulative_dollar_volume_to_fill
+#                   At 5% participation:   K=3 -> 0.67% impact
+#                   At 50%:                K=3 -> 2.12% impact
+#                   At 100% (you ARE):     K=3 -> 3.0%   impact
+#   regime_mult = 1.0 + REGIME_AMP * max(0, (regime_factor - 20) / 20)
+#                   default REGIME_AMP=0 disables it; opt-in by passing a VIX-like value
+USE_DYNAMIC_SLIPPAGE = False
+SLIP_BASE_SPREAD = 0.05
+SLIP_PRICE_COEFF = 0.5
+SLIP_IMPACT_K = 3.0
+REGIME_AMP = 0.0  # opt-in regime amplifier
+
+
+def compute_slippage_pct(price, position_dollars, cum_dollar_volume, regime_factor=20.0):
+    """Liquidity-aware slippage in percent (one-leg, e.g. 0.4 = 0.4%).
+
+    When USE_DYNAMIC_SLIPPAGE is False, returns the legacy constant SLIPPAGE_PCT
+    so existing studies + the live engine reproduce identical numbers.
+    """
+    if not USE_DYNAMIC_SLIPPAGE:
+        return SLIPPAGE_PCT
+    if price <= 0:
+        return SLIPPAGE_PCT
+    base_spread = SLIP_BASE_SPREAD + SLIP_PRICE_COEFF / max(price, 0.1)
+    if cum_dollar_volume > 1 and position_dollars > 0:
+        participation = position_dollars / cum_dollar_volume
+        impact = SLIP_IMPACT_K * (participation ** 0.5)
+    else:
+        impact = 0.0
+    regime_mult = 1.0 + REGIME_AMP * max(0.0, (regime_factor - 20.0) / 20.0)
+    return (base_spread + impact) * regime_mult
+
+
+def _exit_slip_pct(price, shares_being_sold, st, ts, regime_factor=20.0):
+    """Compute slippage % for an exit fill on this state at this timestamp."""
+    if not USE_DYNAMIC_SLIPPAGE:
+        return SLIPPAGE_PCT
+    pos_dollars = shares_being_sold * price
+    pre = st["mh"].loc[st["mh"].index <= ts]
+    if len(pre) > 0:
+        cum_dollar_vol = float((pre["Volume"] * pre["Close"]).sum())
+    else:
+        cum_dollar_vol = 0.0
+    return compute_slippage_pct(price, pos_dollars, cum_dollar_vol, regime_factor)
+
+
+def _entry_slip_pct(fill_price, trade_size, dollar_vol, regime_factor=20.0):
+    """Slippage % for an entry of trade_size dollars when cumulative dollar vol is dollar_vol."""
+    if not USE_DYNAMIC_SLIPPAGE:
+        return SLIPPAGE_PCT
+    return compute_slippage_pct(fill_price, trade_size, dollar_vol, regime_factor)
+
+
 # --- FLOAT DATA (for strategy L) ---
 FLOAT_DATA = {}
 _float_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "float_data.json")
@@ -890,7 +954,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
 
                 # --- Helper: close entire remaining position ---
                 def _close_position(st, price, reason, ts_now):
-                    sell_price = price * (1 - SLIPPAGE_PCT / 100)
+                    sell_price = price * (1 - _exit_slip_pct(price, st["shares"], st, ts_now) / 100)
                     proceeds = st["shares"] * sell_price
                     partial_procs = (st.get("p_partial_proceeds", 0)
                                      + st.get("d_partial_proceeds", 0)
@@ -950,7 +1014,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         tgt1 = st["entry_price"] * (1 + P_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (P_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
                             partial_proceeds = partial_shares * sell_price
                             st["p_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1011,7 +1075,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         tgt1 = st["entry_price"] * (1 + D_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (D_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
                             partial_proceeds = partial_shares * sell_price
                             st["d_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1071,7 +1135,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         tgt1 = st["entry_price"] * (1 + M_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (M_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
                             partial_proceeds = partial_shares * sell_price
                             st["m_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1122,7 +1186,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         tgt1 = st["entry_price"] * (1 + V_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (V_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
                             partial_proceeds = partial_shares * sell_price
                             st["v_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1180,7 +1244,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         tgt1 = st["entry_price"] * (1 + st["l_target1_pct"] / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (L_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - SLIPPAGE_PCT / 100)
+                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
                             partial_proceeds = partial_shares * sell_price
                             st["l_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1333,7 +1397,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                         if c_high >= tgt1_price:
                             sell_shares = int(st["shares"] * partial_pct / 100)
                             if sell_shares > 0:
-                                sell_price = tgt1_price * (1 - SLIPPAGE_PCT / 100)
+                                sell_price = tgt1_price * (1 - _exit_slip_pct(tgt1_price, sell_shares, st, ts) / 100)
                                 proceeds = sell_shares * sell_price
                                 st["shares"] -= sell_shares
                                 st[ppkey] += proceeds
@@ -2127,7 +2191,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
                 if trade_size < 50:
                     continue
 
-            entry_price = fill_price * (1 + SLIPPAGE_PCT / 100)
+            # dollar_vol computed above for the vol-cap check; reuse for slippage impact
+            _slip_in = _entry_slip_pct(fill_price, trade_size, dollar_vol if VOL_CAP_PCT > 0 else 0)
+            entry_price = fill_price * (1 + _slip_in / 100)
             st["entry_price"] = entry_price
             st["entry_time"] = ts
             st["position_cost"] = trade_size
@@ -2165,7 +2231,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False):
         if st["entry_price"] is not None and st["shares"] > 0:
             last_ts = st["mh"].index[-1]
             last_close = float(st["mh"].iloc[-1]["Close"])
-            sell_price = last_close * (1 - SLIPPAGE_PCT / 100)
+            sell_price = last_close * (1 - _exit_slip_pct(last_close, st["shares"], st, last_ts) / 100)
             proceeds = st["shares"] * sell_price
             partial_procs = (st.get("p_partial_proceeds", 0)
                              + st.get("d_partial_proceeds", 0)

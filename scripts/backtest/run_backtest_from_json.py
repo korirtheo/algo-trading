@@ -16,7 +16,11 @@ import json
 # Parse args
 json_path = "results/params/optuna_best_params_v8.json"
 no_charts = "--no-charts" in sys.argv
-remaining = [a for a in sys.argv[1:] if a not in ("--no-charts",)]
+dynamic_slip = "--dynamic-slip" in sys.argv
+slippage = None  # if set, overrides SLIPPAGE_PCT (legacy constant slippage)
+vol_cap = None   # if set, overrides VOL_CAP_PCT
+slip_impact_k = None  # if set, overrides SLIP_IMPACT_K
+remaining = [a for a in sys.argv[1:] if a not in ("--no-charts", "--dynamic-slip")]
 
 data_dirs = []
 i = 0
@@ -24,16 +28,45 @@ while i < len(remaining):
     if remaining[i] == "--json" and i + 1 < len(remaining):
         json_path = remaining[i + 1]
         i += 2
+    elif remaining[i] == "--slippage" and i + 1 < len(remaining):
+        slippage = float(remaining[i + 1])
+        i += 2
+    elif remaining[i] == "--vol-cap" and i + 1 < len(remaining):
+        vol_cap = float(remaining[i + 1])
+        i += 2
+    elif remaining[i] == "--slip-impact-k" and i + 1 < len(remaining):
+        slip_impact_k = float(remaining[i + 1])
+        i += 2
     else:
         data_dirs.append(remaining[i])
         i += 1
 if not data_dirs:
     data_dirs = ["stored_data_combined"]
 
-# Load JSON
+# Load JSON. Accept either the optuna-dump wrapped format
+# ({trial_number, score, ..., params: {...}}) or a flat params dict
+# (e.g. config/trial_432_params.json).
 with open(json_path) as f:
     data = json.load(f)
-params = data["params"]
+if "params" in data and isinstance(data["params"], dict):
+    params = data["params"]
+else:
+    params = data
+    data = {
+        "trial_number": data.get("trial_number", "n/a"),
+        "score": data.get("score", 0),
+        "total_pnl": data.get("total_pnl", 0),
+        "pf": data.get("pf", 0),
+        "enabled": ",".join(s.upper() for s in "hgafdvpmrwobkcseijnl"
+                            if params.get(f"enable_{s}", True)),
+        "n_strategies": sum(1 for s in "hgafdvpmrwobkcseijnl"
+                            if params.get(f"enable_{s}", True)),
+        "priority": ">".join(s.upper() for s in sorted(
+            [c for c in "hgafdvpmrwobkcseijnl" if params.get(f"enable_{c}", True)],
+            key=lambda c: params.get(f"priority_{c}", 99),
+        )),
+        "params": params,
+    }
 
 # Save fd before imports can break stdout
 _backup_fd = os.dup(1)
@@ -210,6 +243,20 @@ for s in ALL_STRATS:
 # Priority
 priority_dict = {s.upper(): params[f"priority_{s}"] for s in ALL_STRATS}
 overrides.append(f"STRAT_PRIORITY = {priority_dict}")
+
+# Slippage / vol-cap overrides (CLI flags)
+if slippage is not None:
+    overrides.append(f"SLIPPAGE_PCT = {slippage}")
+    print(f"  Slippage override: {slippage}% per leg (legacy constant)")
+if vol_cap is not None:
+    overrides.append(f"VOL_CAP_PCT = {vol_cap}")
+    print(f"  Vol-cap override:  {vol_cap}% of cumulative dollar vol")
+if dynamic_slip:
+    overrides.append("USE_DYNAMIC_SLIPPAGE = True")
+    print(f"  Slippage model:    DYNAMIC (base_spread + sqrt(participation) impact)")
+if slip_impact_k is not None:
+    overrides.append(f"SLIP_IMPACT_K = {slip_impact_k}")
+    print(f"  SLIP_IMPACT_K:     {slip_impact_k}")
 
 override_block = "\n# --- Optuna params injected by run_backtest_from_json.py ---\n"
 override_block += "\n".join(overrides)

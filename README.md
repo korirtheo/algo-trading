@@ -34,7 +34,9 @@ trading from AWS with a real-time React dashboard.
 | Run live without dashboard | `python -m live.main --no-dash` |
 | Scanner only (test) | `python -m live.main --scan-only` |
 | Backtest current live params, 2-yr | `python scripts/backtest/run_backtest_from_json.py --json config/trial_432_params.json --slippage 0.3 --vol-cap 5.0 stored_data_jan_feb_2024 stored_data_jan_mar_2024 stored_data_apr_jun_2024 stored_data_jul_sep_2024 stored_data_oct_dec_2024 stored_data_jan_mar_2025 stored_data_apr_jun_2025 stored_data_jul_2025 stored_data_oos stored_data` |
-| Backtest with cash override | `python run_live_params_backtest.py --data stored_data_mar_may_2026 --cash 10000 --slippage 0.3 --vol-cap 5.0` |
+| Backtest with cash override (legacy slippage) | `python run_live_params_backtest.py --data stored_data_mar_may_2026 --cash 10000 --slippage 0.3 --vol-cap 5.0` |
+| Backtest with **dynamic slippage** (honest) | `python run_live_params_backtest.py --data stored_data_mar_may_2026 --cash 10000 --vol-cap 5.0 --dynamic-slip` |
+| 2-yr backtest with dynamic slippage + charts | `python scripts/backtest/run_backtest_from_json.py --json config/trial_432_params.json --vol-cap 5.0 --dynamic-slip stored_data_jan_feb_2024 stored_data_jan_mar_2024 stored_data_apr_jun_2024 stored_data_jul_sep_2024 stored_data_oct_dec_2024 stored_data_jan_mar_2025 stored_data_apr_jun_2025 stored_data_jul_2025 stored_data_oos stored_data` |
 | Backtest single day live (today) | `python scripts/backtest/backtest_today.py` |
 | Re-optimize at honest cost | `python optimize_combined.py --trials 500 --slippage 0.3 --vol-cap 5.0 --db optuna_combined_honest.db --study combined_honest_slip03 --params-out optuna_best_params_honest.json` |
 | Optimize current-best inspection | `python optimize_combined.py --dump-best --db <db> --study <name> --params-out <json>` |
@@ -187,16 +189,61 @@ states, final_cash, unsettled_proceeds, selection_log = \
 
 ### Cost model
 
-Two knobs control trade economics:
+The simulator now supports **two slippage modes**: a legacy constant (default, for reproducibility) and a liquidity-aware dynamic model (the honest one for new analysis).
 
-| Constant | Default | Honest value (2024-26 small caps) | Effect |
-|---|---|---|---|
-| `SLIPPAGE_PCT` | 0.05 (test_full) | **0.3** | Constant slippage applied to every entry and exit price (one-way) |
-| `VOL_CAP_PCT` | 5.0 | 5.0 | Caps `position_dollars ≤ VOL_CAP_PCT × cumulative_dollar_volume_to_entry`. Prevents the simulator from sizing into "we ARE the market" territory |
+| Knob | Default | Effect |
+|---|---|---|
+| `SLIPPAGE_PCT` | 0.05 (in test_full) | Legacy constant slippage when `USE_DYNAMIC_SLIPPAGE = False` |
+| `VOL_CAP_PCT` | 5.0 | Caps `position_dollars ≤ VOL_CAP_PCT × cumulative_dollar_volume_to_entry` |
+| `USE_DYNAMIC_SLIPPAGE` | **False** | Master switch. Set to True to use the liquidity-aware model |
+| `SLIP_BASE_SPREAD` | 0.05 | Minimum spread at infinitely liquid price |
+| `SLIP_PRICE_COEFF` | 0.5 | How spread scales with `1/price` |
+| `SLIP_IMPACT_K` | 3.0 | Square-root impact coefficient (Almgren-Chriss) |
+| `REGIME_AMP` | 0.0 | VIX/ATR amplifier (opt-in; 0 = disabled) |
 
-**The 5% vol cap is enforced in [test_green_candle_combined.py:2109](test_green_candle_combined.py#L2109).** It's measured against *cumulative dollar volume traded since 9:30 ET up to entry*, NOT against ADV (Average Daily Volume). At typical entry times (9:35–10:00 ET) this is roughly 5–15% of full-day ADV, so 5% of cumulative ≈ 0.25–0.75% of ADV — a reasonable retail-trader participation rate.
+**Vol cap** — enforced in [test_green_candle_combined.py:2109](test_green_candle_combined.py#L2109). It's measured against *cumulative dollar volume traded since 9:30 ET up to entry*, NOT against ADV. At typical entry times (9:35–10:00 ET), 5% of cumulative ≈ 0.25–0.75% of full-day ADV.
 
-**Slippage is constant in the current model.** That's accurate for ~$10–25K orders on top-20 gappers (real fills are within 0.1–0.5% of candle close on liquid names, 1–2% on penny stocks). It's **not** accurate when the compounding curve scales position sizes into the $1M+ range — see [Findings](#findings--open-questions).
+#### Legacy constant slippage (`USE_DYNAMIC_SLIPPAGE = False`)
+
+Every entry/exit uses the same `SLIPPAGE_PCT`. Accurate for ~$10–25K orders on top-20 gappers (real fills are within 0.1–0.5% of candle close on liquid names, 1–2% on penny stocks). **Not** accurate when the compounding curve scales position sizes into the $1M+ range, where a constant 0.3% massively understates real impact.
+
+#### Dynamic liquidity-aware slippage (`USE_DYNAMIC_SLIPPAGE = True`)
+
+Per-leg slippage = `(base_spread + impact) × regime_mult`, where:
+
+```
+base_spread = SLIP_BASE_SPREAD + SLIP_PRICE_COEFF / max(price, 0.1)
+              $0.50 stock: 0.05 + 1.00 = 1.05% spread before impact
+              $5    stock: 0.05 + 0.10 = 0.15%
+              $20   stock: 0.05 + 0.025 = 0.075%
+
+impact      = SLIP_IMPACT_K × sqrt(participation_rate)   [Almgren-Chriss]
+              participation_rate = position_dollars / cumulative_dollar_volume_to_fill
+              5% participation:  K=3 → 0.67% impact
+              50%:               K=3 → 2.12% impact
+              100% (you ARE):    K=3 → 3.00% impact
+
+regime_mult = 1.0 + REGIME_AMP × max(0, (regime_factor - 20) / 20)
+              default REGIME_AMP=0 → regime_mult = 1.0 always
+```
+
+This is the **single most important upgrade to the simulator** because it changes what the optimizer optimizes for. With dynamic slippage:
+- Penny stocks cost 1–3% per leg before any impact, not 0.05%
+- Compounding into $1M+ positions adds 1–10% impact on top of base spread
+- The optimizer naturally selects configs that avoid micro-cap participation, not just configs that have positive flat-cost edge
+
+**Empirical example** — cleaned trial 432 on Mar–May 2026 (43 OOS days, $10K start):
+
+| Metric | Legacy 0.3% flat | **Dynamic** |
+|---|---|---|
+| Final equity | $670,130 | **$251,750** |
+| Sharpe (daily) | 4.97 | **3.74** |
+| Win rate | 59.5% | 53.8% |
+| Best day / Worst day | +$298K / -$20K | +$122K / -$33K |
+
+Strategies that flipped from winners to losers under dynamic costs: **B** (Red-to-Green) and **M** (Midday Range). Their per-trade edge was being subsidized by the unrealistically low flat slippage. Confirmed Phase-2 disable candidates.
+
+**Usage**: pass `--dynamic-slip` to `run_live_params_backtest.py` or `scripts/backtest/run_backtest_from_json.py`. Optionally `--slip-impact-k <N>` to tune the impact coefficient.
 
 ### Strategies
 
@@ -476,17 +523,28 @@ Replay of the trial 432 backtest on the full 530-day data:
 
 Single most-impactful trade: SPRB(L) on 2025-10-06 = **$+11,045,697 from one fill**. The kind of trade that's a simulator artifact (impossible at real liquidity).
 
-### 6. Open: realistic slippage model
+### 6. Realistic slippage model — SHIPPED
 
-The constant `SLIPPAGE_PCT = 0.3` is correct for $10–50K orders on top-20 gappers, wrong at scale. Industry-standard square-root impact law:
+Replaced the constant `SLIPPAGE_PCT` with a liquidity-aware function across all 9 fill call sites in `test_green_candle_combined.py`. Backward-compatible: `USE_DYNAMIC_SLIPPAGE = False` (default) reproduces every legacy result byte-for-byte.
+
+Total per-leg slippage now computes as:
 
 ```
-slippage_pct = base_pct + k × sqrt(participation_rate)
+slippage_pct = (base_spread + impact) × regime_mult
+  base_spread = 0.05 + 0.5 / max(price, 0.1)              # spread widens for penny stocks
+  impact      = 3.0 × sqrt(position_dollars / cumulative_dollar_volume)   # Almgren-Chriss
+  regime_mult = 1.0 + REGIME_AMP × max(0, (regime - 20) / 20)              # opt-in (default off)
 ```
 
-Where `participation_rate = position_dollars / cumulative_dollar_volume`. A $5M order with $5M cumulative volume produces 100% participation × k=3 = 30% additional slippage. That alone would flip the SPRB trade from $+11M to a loss.
+**Opt in** with `--dynamic-slip` on any backtest entry point or set `tgc.USE_DYNAMIC_SLIPPAGE = True`.
 
-Implementation pending — would replace the 12 references to `SLIPPAGE_PCT` in `test_green_candle_combined.py` with a function call threading in `(price, position_size, cumulative_volume)`.
+**Direct comparison** on cleaned trial 432 / Mar–May 2026 OOS / $10K start: legacy $670K → dynamic $252K (62% reduction). Two strategies (B and M) flipped from net winners to losers under realistic costs — confirmed candidates for permanent disable.
+
+See [Cost model](#cost-model) for the full parameter table and formula.
+
+### 7. Open: empirical slippage calibration
+
+The dynamic model's `SLIP_IMPACT_K = 3.0` is a literature-default value for small-caps. Once the live engine has been trading post-bug-fix for ~50+ fills, regress observed slippage against `(price, position_size, cum_vol)` to calibrate K empirically. Adjust + re-optimize as data accumulates.
 
 ---
 
