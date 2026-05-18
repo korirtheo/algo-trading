@@ -1046,13 +1046,38 @@ def main():
     all_dates, daily_picks = load_all_picks(DATA_DIRS)
     all_dates = [d for d in all_dates if DATE_RANGE[0] <= d <= DATE_RANGE[1]]
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
+    # Pre-set SQLite WAL mode ONCE before Optuna's connection pool spawns
+    # parallel threads. WAL is a per-database setting (not per-connection), so
+    # setting it once is enough; subsequent connections inherit it.
+    # WAL allows concurrent reads while a writer holds the lock, dramatically
+    # cutting "database is locked" failures with n_jobs > 1.
+    import sqlite3
+    _bootstrap_conn = sqlite3.connect(db_path, timeout=60)
+    try:
+        _bootstrap_conn.execute("PRAGMA journal_mode=WAL")
+        _bootstrap_conn.execute("PRAGMA synchronous=NORMAL")
+        _bootstrap_conn.commit()
+    finally:
+        _bootstrap_conn.close()
+
+    # Each Optuna connection still needs a generous busy_timeout for the
+    # remaining contention cases (multiple writers queueing).
+    from sqlalchemy import event
+    rdb = optuna.storages.RDBStorage(
+        url=f"sqlite:///{db_path}",
+        engine_kwargs={"connect_args": {"timeout": 120}},
+    )
+
+    @event.listens_for(rdb.engine, "connect")
+    def _set_busy_timeout(dbapi_conn, _):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA busy_timeout=120000")
+        cur.close()
+
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
-        storage=optuna.storages.RDBStorage(
-            url=f"sqlite:///{db_path}",
-            engine_kwargs={"connect_args": {"timeout": 30}},
-        ),
+        storage=rdb,
         load_if_exists=True,
         sampler=TPESampler(n_startup_trials=200),
     )
