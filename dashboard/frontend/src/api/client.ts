@@ -137,6 +137,20 @@ export interface Summary {
   tracking_count: number;
 }
 
+export interface HaltEvent {
+  ticker: string;
+  reason: string;
+  halt_price: number | null;
+  resume_price: number | null;
+  halt_time: string | null;
+  resume_ts: string | null;
+  action: 'TRADED' | 'OPEN' | 'WATCHING' | 'SKIPPED';
+  entry_price?: number | null;
+  exit_price?: number | null;
+  pnl?: number | null;
+  reason_exit?: string;
+}
+
 export const api = {
   account: () => fetchJSON<Account>('/api/account'),
   positions: () => fetchJSON<Position[]>('/api/positions'),
@@ -147,4 +161,5 @@ export const api = {
   chart: (symbol: string) => fetchJSON<ChartData>(`/api/charts/${symbol}`),
   summary: () => fetchJSON<Summary>('/api/summary'),
   diagnostics: () => fetchJSON<DiagnosticsItem[]>('/api/diagnostics'),
+  halts: () => fetchJSON<HaltEvent[]>('/api/halts/today'),
 };

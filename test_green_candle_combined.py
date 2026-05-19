@@ -2532,7 +2532,11 @@ if __name__ == "__main__":
 
     print("Loading data...")
     all_dates, daily_picks = load_all_picks(data_dirs)
-    all_dates = [d for d in all_dates if "2024-01-01" <= d <= "2026-02-28"]
+    # No hardcoded date filter — backtest whatever the data dirs contain.
+    # The optimizer's DATE_RANGE filtering happens upstream in optimize_combined.main().
+    if not all_dates:
+        print("  ERROR: no trading days loaded from data_dirs.")
+        sys.exit(1)
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
 
     # Pre-scan for R (Multi-Day Runner) candidates

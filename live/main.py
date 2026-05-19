@@ -32,6 +32,7 @@ from live.scanner import PreMarketScanner
 from live.streamer import BarStreamer
 from live.engine_combined import CombinedEngine
 from live.executor import OrderExecutor
+from live.halt_monitor import HaltMonitor
 
 ET = ZoneInfo("America/New_York")
 
@@ -400,6 +401,73 @@ def _run_one_day(executor, args, log):
 
     log.info("Streaming... waiting for signals")
 
+    # Phase 5b: Halt-resume monitor (intraday discovery channel)
+    halt_monitor = None
+    try:
+        from config.settings import (
+            HALT_MONITOR_ENABLED, HALT_MIN_PRICE, HALT_MAX_PRICE,
+            HALT_MAX_FLOAT, HALT_REASONS_TRADED, HALT_POLL_INTERVAL_SECS,
+            FLOAT_DATA,
+        )
+    except ImportError:
+        HALT_MONITOR_ENABLED = False
+
+    if HALT_MONITOR_ENABLED:
+        _whitelist = {r.upper() for r in HALT_REASONS_TRADED}
+
+        def _halt_eligible(ev):
+            reason = (ev.reason or "").strip().upper()
+            if reason not in _whitelist:
+                return False
+            rp = ev.resume_price
+            if rp is None or not (HALT_MIN_PRICE <= rp <= HALT_MAX_PRICE):
+                return False
+            fl = FLOAT_DATA.get(ev.ticker)
+            if fl is not None and fl > HALT_MAX_FLOAT:
+                return False
+            return True
+
+        def _on_resume(ev):
+            # Runs on the halt-monitor poller thread.
+            ticker = ev.ticker
+            try:
+                added = engine.on_intraday_addition(ticker, ev, source="halt_resume")
+                if added:
+                    streamer.add_symbol(ticker)
+                    if not args.no_dash:
+                        try:
+                            from dashboard.backend.app import bridge
+                            evs = getattr(bridge, "halt_events", [])
+                            evs.append({
+                                "ticker": ticker, "reason": ev.reason,
+                                "halt_price": ev.halt_price,
+                                "resume_price": ev.resume_price,
+                                "resume_ts": str(ev.resume_dt) if ev.resume_dt else None,
+                            })
+                            bridge.halt_events = evs[-200:]
+                        except Exception:
+                            pass
+            except Exception as e:
+                log.exception("halt-monitor on_resume(%s) failed: %s", ticker, e)
+
+        halt_monitor = HaltMonitor(
+            on_resume=_on_resume,
+            eligibility_fn=_halt_eligible,
+            poll_interval_secs=HALT_POLL_INTERVAL_SECS,
+        )
+        halt_monitor.start()
+        if not args.no_dash:
+            try:
+                from dashboard.backend.app import bridge
+                bridge.halt_monitor = halt_monitor
+            except Exception:
+                pass
+        log.info("Halt-resume monitor enabled (reasons=%s, $%g-$%g, max_float=%dM)",
+                 sorted(_whitelist), HALT_MIN_PRICE, HALT_MAX_PRICE,
+                 HALT_MAX_FLOAT // 1_000_000)
+    else:
+        log.info("Halt-resume monitor DISABLED (HALT_MONITOR_ENABLED=false)")
+
     # REST polling fallback: fetch 2-min bars for tickers that the IEX stream misses
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.requests import StockBarsRequest
@@ -515,6 +583,8 @@ def _run_one_day(executor, args, log):
     # Stop streamer and print daily summary
     streamer.flush_pending()
     streamer.stop()
+    if halt_monitor is not None:
+        halt_monitor.stop()
 
     summary = engine.get_summary()
     log.info("=" * 60)

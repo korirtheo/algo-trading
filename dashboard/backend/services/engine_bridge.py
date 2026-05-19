@@ -63,6 +63,8 @@ class EngineBridge:
         self.engine = engine
         self.executor = executor
         self.scanner_candidates = scanner_candidates or []
+        self.halt_monitor = None     # set by live/main.py once monitor starts
+        self.halt_events = []        # list of dicts pushed from main.py on each fire
 
     def get_account(self):
         """Get account info from Alpaca."""
@@ -355,6 +357,69 @@ class EngineBridge:
                 "done": ticker_done,
             })
         return result
+
+    def get_halt_events(self):
+        """Return today's halt-resume events with the strategy's action + result."""
+        out = []
+        engine_trades_by_ticker = {}
+        if self.engine:
+            for t in self.engine.trades_today:
+                if t.get("strategy") == "HALT":
+                    engine_trades_by_ticker.setdefault(t["ticker"], []).append(t)
+
+        monitor_events = []
+        if self.halt_monitor is not None:
+            try:
+                monitor_events = self.halt_monitor.get_today_events()
+            except Exception:
+                monitor_events = []
+
+        def _entry_action(ticker: str):
+            # 1) Closed trade today
+            trs = engine_trades_by_ticker.get(ticker, [])
+            if trs:
+                t = trs[-1]
+                return {
+                    "action": "TRADED",
+                    "entry_price": t["entry_price"],
+                    "exit_price": t["exit_price"],
+                    "pnl": t["pnl"],
+                    "reason": t["reason"],
+                }
+            # 2) Open halt position in engine
+            if self.engine and ticker in getattr(self.engine, "halt_states", {}):
+                st = self.engine.halt_states[ticker]
+                if st.get("entry_price"):
+                    return {
+                        "action": "OPEN",
+                        "entry_price": st["entry_price"],
+                        "exit_price": None, "pnl": None,
+                        "reason": "OPEN",
+                    }
+                return {"action": "WATCHING"}
+            return {"action": "SKIPPED"}
+
+        for ev in monitor_events:
+            ticker = ev.ticker
+            base = {
+                "ticker": ticker,
+                "reason": ev.reason,
+                "halt_price": ev.halt_price,
+                "resume_price": ev.resume_price,
+                "halt_time": ev.halt_time.isoformat() if ev.halt_time else None,
+                "resume_ts": str(ev.resume_dt) if ev.resume_dt else None,
+            }
+            base.update(_entry_action(ticker))
+            out.append(base)
+
+        # Fall back to the pushed events from main.py if monitor isn't wired
+        if not out and self.halt_events:
+            for ev in self.halt_events:
+                ev = dict(ev)
+                ev.update(_entry_action(ev.get("ticker", "")))
+                out.append(ev)
+
+        return out
 
     def get_engine_summary(self):
         """Get overall engine state summary."""

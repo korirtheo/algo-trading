@@ -21,6 +21,17 @@ MIN_GAP_PCT = 8.0             # Lowest min_gap across all strategies (V=8%, O=8%
 TOP_N = 20                    # Max candidates per day
 MIN_PM_VOLUME = 250_000       # Minimum premarket volume
 
+# --- Halt-Resume Scanner (intraday discovery channel) ---
+HALT_MONITOR_ENABLED = os.environ.get("HALT_MONITOR_ENABLED", "true").lower() == "true"
+HALT_MIN_PRICE = 1.0
+HALT_MAX_PRICE = 50.0
+HALT_MAX_FLOAT = 50_000_000
+# NASDAQ halt reason codes to trade. T1=news pending, T2=news released,
+# T12=other regulatory, LUDP/LUDS=volatility halt up/down. Market-wide
+# (M1-M9) and operational (O1-O3) halts excluded.
+HALT_REASONS_TRADED = ["T1", "T2", "T12", "LUDP", "LUDS"]
+HALT_POLL_INTERVAL_SECS = 30
+
 # --- Float Data ---
 FLOAT_DATA = {}
 _float_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "float_data.json")

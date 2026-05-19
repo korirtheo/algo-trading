@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 import test_green_candle_combined as tgc
 from optimize_combined import set_strategy_params
 from test_full import SLIPPAGE_PCT, VOL_CAP_PCT, ET_TZ
+from strategies import halt_resume as hr
+from config.settings import FLOAT_DATA
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -95,6 +97,10 @@ class CombinedEngine:
         self.daily_pnl = 0.0
         self.trades_today = _load_today_trades()
         self.daily_pnl = sum(t.get("pnl", 0) for t in self.trades_today if isinstance(t.get("pnl"), (int, float)))
+        # Halt-resume scanner state: tickers added mid-day by the halt monitor.
+        # These run a SEPARATE evaluator (strategies.halt_resume) and never
+        # touch simulate_day_combined.
+        self.halt_states = {}        # ticker -> state dict from hr.create_state
 
     def initialize_watchlist(self, candidates):
         """Set up from scanner candidates.
@@ -110,6 +116,7 @@ class CombinedEngine:
         self.position_entry.clear()
         self.daily_pnl = 0.0
         self.trades_today = []
+        self.halt_states.clear()
 
         self.picks = []
         for cand in candidates:
@@ -128,12 +135,50 @@ class CombinedEngine:
 
         log.info("Initialized %d candidates for combined strategy", len(self.picks))
 
+    def on_intraday_addition(self, ticker, halt_event, source="halt_resume"):
+        """Register a ticker discovered mid-day (e.g. via halt-resume scanner).
+
+        Initializes per-ticker bar tracking and a halt-resume strategy state.
+        Does NOT add to self.picks — the halt-resume path runs separately from
+        simulate_day_combined.
+
+        Args:
+            ticker: symbol string
+            halt_event: object exposing .reason, .resume_dt, .resume_price,
+                        .halt_price (see live.halt_monitor.HaltEvent)
+            source: tag for logs/diagnostics. Currently only "halt_resume".
+        """
+        ticker = ticker.upper()
+        if ticker in self.halt_states:
+            log.debug("on_intraday_addition: %s already tracked (skip)", ticker)
+            return False
+
+        float_shares = FLOAT_DATA.get(ticker)  # None if unknown — permissive
+        if not hr.is_eligible(halt_event, float_shares=float_shares):
+            log.info("on_intraday_addition: %s ineligible (reason=%s resume=%s float=%s)",
+                     ticker, halt_event.reason, halt_event.resume_price, float_shares)
+            return False
+
+        self.bar_data.setdefault(ticker, [])
+        self.halt_states[ticker] = hr.create_state(ticker, halt_event,
+                                                   float_shares=float_shares)
+        log.info("INTRADAY-ADD %s (source=%s): reason=%s resume=$%.3f float=%s",
+                 ticker, source, halt_event.reason,
+                 halt_event.resume_price or 0.0,
+                 (f"{float_shares/1e6:.1f}M" if float_shares else "N/A"))
+        return True
+
     def on_bar(self, symbol, bar):
         """Process a completed 2-min bar.
 
         Appends to the ticker's bar history, rebuilds the DataFrame,
         and runs the full simulation to detect state changes.
         """
+        # Halt-resume path runs separately from the simulate_day_combined flow.
+        if symbol in self.halt_states:
+            self._on_bar_halt(symbol, bar)
+            return
+
         if symbol not in self.bar_data:
             return
 
@@ -262,6 +307,152 @@ class CombinedEngine:
 
             self.last_states[ticker] = dict(st)
 
+    def _on_bar_halt(self, symbol, bar):
+        """Halt-resume strategy bar handler. Runs independently of
+        simulate_day_combined. Mirrors the entry/exit/partial bookkeeping in
+        on_bar so the same dashboard + trade-log surfaces apply.
+        """
+        ts = bar["timestamp"]
+        self.bar_data.setdefault(symbol, []).append({
+            "timestamp": ts,
+            "Open": bar["Open"],
+            "High": bar["High"],
+            "Low": bar["Low"],
+            "Close": bar["Close"],
+            "Volume": bar["Volume"],
+        })
+
+        state = self.halt_states.get(symbol)
+        if state is None or state.get("done"):
+            return
+
+        c_open = float(bar["Open"])
+        c_high = float(bar["High"])
+        c_low = float(bar["Low"])
+        c_close = float(bar["Close"])
+        c_vol = float(bar["Volume"])
+
+        # ----- Entry path -----
+        if state["entry_price"] is None:
+            # Per spec open-question (2): single-position semantics — skip if
+            # already in a (non-halt) trade.
+            if self.active_position is not None and self.active_position != symbol:
+                log.debug("HALT %s: signal suppressed — already long %s",
+                          symbol, self.active_position)
+                return
+
+            fired = hr.check_signal(state, c_open, c_high, c_low, c_close, c_vol)
+            if not fired:
+                return
+
+            cash = self.executor.get_buying_power()
+            cum_vol = self._cum_vol(symbol)
+            entry_price = state["signal_price"]
+            log.info("HALT-SIGNAL %s: price=$%.3f reason=%s cum_vol=%d",
+                     symbol, entry_price, state["halt_reason"], cum_vol)
+            order = self.executor.buy(symbol, cash, entry_price,
+                                       cumulative_volume=cum_vol)
+            if order is None:
+                log.warning("HALT BUY REJECTED %s (vol_cap or executor error)", symbol)
+                state["done"] = True
+                return
+
+            shares = getattr(order, "qty", None)
+            shares = float(shares) if shares is not None else (cash / entry_price)
+            state["entry_price"] = entry_price
+            state["entry_time"] = ts
+            state["shares"] = shares
+            state["position_cost"] = shares * entry_price
+            state["highest_since_entry"] = c_high
+            self.active_position = symbol
+            self.position_entry[symbol] = {
+                "entry_price": entry_price,
+                "shares": shares,
+                "cost": state["position_cost"],
+                "strategy": "HALT",
+                "entry_time": ts,
+            }
+            log.info("HALT-ENTRY %s: %.2f shares @ $%.3f ($%s)",
+                     symbol, shares, entry_price, format(state["position_cost"], ",.0f"))
+            return
+
+        # ----- Exit path -----
+        entry_time = state.get("entry_time") or ts
+        try:
+            mins_in = max(0, int((ts - entry_time).total_seconds() // 60))
+        except Exception:
+            mins_in = 0
+
+        # Minutes to 4:00 PM ET — used by EOD branch
+        try:
+            ts_et = ts.astimezone(ET) if hasattr(ts, "astimezone") else ts
+            close_dt = datetime.combine(ts_et.date(),
+                                        datetime.strptime("16:00", "%H:%M").time(),
+                                        tzinfo=ET)
+            mins_to_close = max(0, int((close_dt - ts_et).total_seconds() // 60))
+        except Exception:
+            mins_to_close = 999
+
+        should_exit, exit_price, reason = hr.check_exit(
+            state, c_high, c_low, c_close, mins_in, mins_to_close,
+        )
+        if not should_exit:
+            return
+
+        if reason == "PARTIAL":
+            sell_shares = state["shares"] * (hr.DEFAULT_PARAMS["partial_sell_pct"] / 100.0)
+            log.info("HALT-PARTIAL %s: %.2f shares @ $%.3f",
+                     symbol, sell_shares, exit_price)
+            self.executor.sell(symbol, shares=sell_shares, reason="HALT_PARTIAL")
+            state["shares"] = max(0.0, state["shares"] - sell_shares)
+            state["partial_proceeds"] = sell_shares * exit_price
+            return
+
+        # Full exit
+        log.info("HALT-EXIT %s (%s): @ $%.3f", symbol, reason, exit_price)
+        order = self.executor.sell(symbol, reason=f"HALT_{reason}")
+        if order is not None or True:  # always finalize state even if executor was noop
+            entry = state["entry_price"] or 0.0
+            pnl = (exit_price - entry) * state["shares"] + state.get("partial_proceeds", 0.0) - state.get("position_cost", 0.0)
+            # Recompute pnl cleanly: partial_proceeds are gross. Final pnl is
+            # (partial_proceeds + remaining_shares*exit_price) - original_cost.
+            try:
+                orig_cost = state.get("position_cost", entry * (state["shares"] + 0))
+                # state["shares"] is now post-partial; reconstruct original
+                if state.get("partial_taken"):
+                    partial_pct = hr.DEFAULT_PARAMS["partial_sell_pct"] / 100.0
+                    orig_shares = state["shares"] / max(1.0 - partial_pct, 1e-9)
+                else:
+                    orig_shares = state["shares"]
+                orig_cost = entry * orig_shares
+                proceeds = state.get("partial_proceeds", 0.0) + state["shares"] * exit_price
+                pnl = proceeds - orig_cost
+            except Exception:
+                pass
+
+            state["exit_price"] = exit_price
+            state["exit_time"] = ts
+            state["exit_reason"] = reason
+            state["pnl"] = pnl
+            state["done"] = True
+            self.daily_pnl += pnl
+            if self.active_position == symbol:
+                self.active_position = None
+            trade = {
+                "ticker": symbol,
+                "strategy": "HALT",
+                "entry_price": entry,
+                "exit_price": exit_price,
+                "pnl": pnl,
+                "reason": f"HALT_{reason}",
+                "entry_time": state.get("entry_time"),
+                "exit_time": ts,
+            }
+            self.trades_today.append(trade)
+            _append_trade(trade)
+            log.info("HALT-CLOSED %s: PnL=$%s | $%.2f -> $%.2f",
+                     symbol, format(pnl, "+,.2f"), entry, exit_price)
+
     def _cum_vol(self, ticker):
         """Get cumulative volume for a ticker."""
         bars = self.bar_data.get(ticker, [])
@@ -272,6 +463,10 @@ class CombinedEngine:
         if self.active_position:
             self.executor.sell(self.active_position, reason="EOD_CLOSE")
             self.active_position = None
+        # Mark any unfinished halt-resume states as done so they don't fire
+        # entries on the next session if the process keeps running.
+        for st in self.halt_states.values():
+            st["done"] = True
         self.executor.close_all_positions(reason="EOD_CLOSE")
         self._log_eod_diagnostics()
 
@@ -289,6 +484,7 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
+            df = df[~df.index.duplicated(keep="last")]
             pick_copy = dict(pick)
             pick_copy["market_hour_candles"] = df
             if pick_copy["market_open"] is None:

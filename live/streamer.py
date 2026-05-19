@@ -74,16 +74,61 @@ class BarStreamer:
         self.pending = {}  # symbol -> (slot_index, TwoMinBar)
         self._symbols = []
         self._running = False
+        self._lock = threading.Lock()
+
+    async def _on_bar_async(self, bar):
+        self._handle_bar(bar)
 
     def subscribe(self, symbols):
         """Subscribe to 1-min bars for given symbols."""
-        self._symbols = list(symbols)
-        log.info(f"Subscribing to {len(self._symbols)} symbols: {self._symbols}")
+        with self._lock:
+            self._symbols = list(symbols)
+            log.info(f"Subscribing to {len(self._symbols)} symbols: {self._symbols}")
+            if self._symbols:
+                self.stream.subscribe_bars(self._on_bar_async, *self._symbols)
 
-        async def _on_bar(bar):
-            self._handle_bar(bar)
+    def add_symbol(self, symbol):
+        """Subscribe to bars for a ticker after the stream is running.
 
-        self.stream.subscribe_bars(_on_bar, *self._symbols)
+        Used by the halt-resume monitor to attach mid-day discoveries to the
+        live bar feed. Safe to call from a background thread.
+        """
+        symbol = symbol.upper()
+        with self._lock:
+            if symbol in self._symbols:
+                log.debug(f"add_symbol: {symbol} already subscribed")
+                return False
+            self._symbols.append(symbol)
+        try:
+            self.stream.subscribe_bars(self._on_bar_async, symbol)
+            log.info(f"add_symbol: subscribed to {symbol} (total {len(self._symbols)})")
+            return True
+        except Exception as e:
+            log.error(f"add_symbol: subscribe_bars({symbol}) failed: {e}")
+            with self._lock:
+                if symbol in self._symbols:
+                    self._symbols.remove(symbol)
+            return False
+
+    def remove_symbol(self, symbol):
+        """Unsubscribe a ticker from the live feed."""
+        symbol = symbol.upper()
+        with self._lock:
+            if symbol not in self._symbols:
+                return False
+            self._symbols.remove(symbol)
+        try:
+            self.stream.unsubscribe_bars(symbol)
+            log.info(f"remove_symbol: unsubscribed {symbol} (total {len(self._symbols)})")
+            return True
+        except Exception as e:
+            log.warning(f"remove_symbol: unsubscribe_bars({symbol}) failed: {e}")
+            return False
+
+    def symbols(self):
+        """Return a snapshot of currently subscribed symbols."""
+        with self._lock:
+            return list(self._symbols)
 
     def _handle_bar(self, bar):
         """Process incoming 1-min bar, aggregate to 2-min."""

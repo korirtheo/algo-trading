@@ -6,6 +6,7 @@ import { Positions } from './components/Positions';
 import { TradeLog } from './components/TradeLog';
 import { StrategyPanel } from './components/StrategyPanel';
 import { Diagnostics } from './components/Diagnostics';
+import { HaltMonitor } from './components/HaltMonitor';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
@@ -51,6 +52,10 @@ function App() {
 
         <div className="row-diagnostics">
           <Diagnostics />
+        </div>
+
+        <div className="row-diagnostics">
+          <HaltMonitor />
         </div>
       </main>
     </div>
