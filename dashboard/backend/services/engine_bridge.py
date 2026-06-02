@@ -67,25 +67,46 @@ class EngineBridge:
         self.halt_events = []        # list of dicts pushed from main.py on each fire
 
     def get_account(self):
-        """Get account info from Alpaca."""
+        """Get account info from Alpaca.
+
+        Returns real Alpaca daily P&L (equity - last_equity) instead of the
+        engine's sim accumulator, plus an open_pnl sum across all positions
+        so the dashboard reflects what the broker actually shows.
+        """
         if not self.executor:
             return {"cash": 0, "buying_power": 0, "equity": 0, "portfolio_value": 0,
-                    "daily_pnl": 0, "status": "inactive", "pdt": False, "daytrade_count": 0}
+                    "daily_pnl": 0, "open_pnl": 0, "engine_daily_pnl": 0,
+                    "status": "inactive", "pdt": False, "daytrade_count": 0}
         try:
             acct = self.executor.get_account()
+            equity = float(acct.equity)
+            last_equity = float(acct.last_equity) if acct.last_equity else equity
+            alpaca_daily_pnl = equity - last_equity
+
+            open_pnl = 0.0
+            try:
+                for p in self.executor.client.get_all_positions():
+                    open_pnl += float(p.unrealized_pl or 0.0)
+            except Exception:
+                pass
+
             return {
                 "cash": float(acct.cash),
                 "buying_power": float(acct.buying_power),
-                "equity": float(acct.equity),
+                "equity": equity,
+                "last_equity": last_equity,
                 "portfolio_value": float(acct.portfolio_value),
-                "daily_pnl": self.engine.daily_pnl if self.engine else 0,
+                "daily_pnl": alpaca_daily_pnl,
+                "open_pnl": open_pnl,
+                "engine_daily_pnl": self.engine.daily_pnl if self.engine else 0,
                 "status": str(acct.status),
                 "pdt": acct.pattern_day_trader,
                 "daytrade_count": acct.daytrade_count,
             }
         except Exception as e:
             log.error(f"Error getting account: {e}")
-            return {"cash": 0, "buying_power": 0, "equity": 0, "daily_pnl": 0, "error": str(e)}
+            return {"cash": 0, "buying_power": 0, "equity": 0, "daily_pnl": 0,
+                    "open_pnl": 0, "engine_daily_pnl": 0, "error": str(e)}
 
     def get_positions(self):
         """Get current positions from Alpaca + engine state."""
@@ -420,6 +441,107 @@ class EngineBridge:
                 out.append(ev)
 
         return out
+
+    def get_slippage_data(self, limit=100):
+        """Read logs/fills_calibration.csv and return last N rows + aggregates.
+
+        Stage-1 calibration log written by OrderExecutor._reconcile_fill_async.
+        Each row is one terminal-status order (filled / partially_filled / etc).
+        """
+        import csv as _csv
+        import os as _os
+        from statistics import median
+
+        path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
+            _os.path.abspath(__file__)))), "logs", "fills_calibration.csv")
+        rows = []
+        if _os.path.exists(path):
+            try:
+                with open(path, newline="") as f:
+                    for r in _csv.DictReader(f):
+                        rows.append(r)
+            except Exception as e:
+                log.warning(f"get_slippage_data read failed: {e}")
+
+        # Parse numeric fields where present
+        def _f(s):
+            try:
+                return float(s) if s not in ("", None) else None
+            except Exception:
+                return None
+
+        cleaned = []
+        for r in rows:
+            cleaned.append({
+                "ts_signal": r.get("ts_signal", ""),
+                "ts_fill": r.get("ts_fill", ""),
+                "ticker": r.get("ticker", ""),
+                "side": r.get("side", ""),
+                "strategy": r.get("strategy", ""),
+                "signal_price": _f(r.get("signal_price")),
+                "fill_price": _f(r.get("fill_price")),
+                "slip_bp": _f(r.get("slip_bp")),
+                "qty": _f(r.get("qty")),
+                "dollar_amount": _f(r.get("dollar_amount")),
+                "cum_dollar_vol": _f(r.get("cum_dollar_vol")),
+                "participation_rate": _f(r.get("participation_rate")),
+                "status": r.get("status", ""),
+                "order_id": r.get("order_id", ""),
+            })
+
+        # Compute aggregates over rows that actually filled with a slip value
+        filled = [r for r in cleaned if r["slip_bp"] is not None
+                  and r["status"] in ("filled", "partially_filled")]
+        slips = [r["slip_bp"] for r in filled]
+        dollar_total = sum(r["dollar_amount"] or 0.0 for r in filled)
+        dollar_slip_cost = sum((r["slip_bp"] or 0) / 10_000 * (r["dollar_amount"] or 0)
+                                for r in filled)
+
+        stats = {
+            "n_total": len(cleaned),
+            "n_filled": len(filled),
+            "avg_slip_bp": (sum(slips) / len(slips)) if slips else None,
+            "median_slip_bp": median(slips) if slips else None,
+            "max_slip_bp": max(slips) if slips else None,
+            "min_slip_bp": min(slips) if slips else None,
+            "p95_slip_bp": (sorted(slips)[int(len(slips) * 0.95)] if len(slips) >= 20 else None),
+            "dollar_volume_traded": dollar_total,
+            "realized_slip_cost": dollar_slip_cost,
+        }
+
+        # Per-strategy breakdown — same metrics, grouped by `strategy` field.
+        from collections import defaultdict
+        groups = defaultdict(list)
+        for r in filled:
+            groups[(r["strategy"] or "?")].append(r)
+        by_strategy = []
+        for strat, items in groups.items():
+            s = [it["slip_bp"] for it in items]
+            buys = [it for it in items if it["side"] == "buy"]
+            sells = [it for it in items if it["side"] == "sell"]
+            dvol = sum(it["dollar_amount"] or 0.0 for it in items)
+            cost = sum((it["slip_bp"] or 0) / 10_000 * (it["dollar_amount"] or 0)
+                        for it in items)
+            by_strategy.append({
+                "strategy": strat,
+                "n": len(items),
+                "n_buys": len(buys),
+                "n_sells": len(sells),
+                "avg_slip_bp": sum(s) / len(s),
+                "median_slip_bp": median(s),
+                "min_slip_bp": min(s),
+                "max_slip_bp": max(s),
+                "avg_buy_slip_bp": (sum(it["slip_bp"] for it in buys) / len(buys)) if buys else None,
+                "avg_sell_slip_bp": (sum(it["slip_bp"] for it in sells) / len(sells)) if sells else None,
+                "dollar_volume": dvol,
+                "realized_cost": cost,
+            })
+        # Most-traded first
+        by_strategy.sort(key=lambda x: -x["dollar_volume"])
+
+        # Return latest N rows (most recent first)
+        recent = list(reversed(cleaned[-limit:]))
+        return {"stats": stats, "by_strategy": by_strategy, "rows": recent}
 
     def get_engine_summary(self):
         """Get overall engine state summary."""

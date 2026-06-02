@@ -5,8 +5,8 @@ import os
 import json
 
 # --- Alpaca API ---
-ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PK34OGXUBAOCLG7E6KYTI6QMZ3")
-ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ")
+ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PKRI4NR6NV7GEDYDEB47CWKJDW")
+ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "535mtYN3KBDUVwJ8rBFdyemboDpaZ4qTszcqW74odRZR")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
 ALPACA_FEED = "iex"  # "sip" for full market data, "iex" for free tier
 
@@ -15,6 +15,16 @@ SLIPPAGE_PCT = 0.05
 VOL_CAP_PCT = 5.0            # Max % of traded volume to take
 EOD_EXIT_MINUTES = 15         # Close all positions 15 min before market close
 MAX_PRICE = 50.0              # Skip stocks above this price
+
+# --- PDT (Pattern Day Trader) ---
+# At equity < $25K an account can do at most 3 day-trades in any rolling
+# 5-business-day window. The 4th flips the account to PDT-flagged and
+# blocks all trading until equity is funded back above $25K.
+PDT_EQUITY_FLOOR = 25_000.0    # SEC's hard floor — Alpaca enforces this
+PDT_EQUITY_BUFFER = 0.0        # Literal SEC rule — gate only fires when
+                               # equity drops below $25K AND daytrade_count >= 3.
+                               # Set higher (e.g. 2_500) to add safety headroom.
+PDT_DAYTRADES_MAX = 3          # Max safe day-trades while under the floor
 
 # --- Scanner ---
 MIN_GAP_PCT = 8.0             # Lowest min_gap across all strategies (V=8%, O=8%)

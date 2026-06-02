@@ -9,6 +9,7 @@ services:
       - ALPACA_API_KEY=${ALPACA_API_KEY}
       - ALPACA_API_SECRET=${ALPACA_API_SECRET}
       - ALPACA_PAPER=${ALPACA_PAPER:-true}
+      - LIVE_PARAMS_PATH=${LIVE_PARAMS_PATH:-config/trial_432_params.json}
     volumes:
       - ./logs:/app/logs
     logging:

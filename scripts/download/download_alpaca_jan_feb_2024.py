@@ -83,6 +83,7 @@ def main():
                 start=datetime(2024, 1, 1),
                 end=datetime(2024, 3, 1),  # exclusive end, covers all of Feb
                 adjustment="raw",
+                feed="sip",
             )
             # Get 1-minute bars, then resample to 2-minute
             bars = client.get_stock_bars(request)

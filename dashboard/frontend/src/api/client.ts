@@ -162,4 +162,55 @@ export const api = {
   summary: () => fetchJSON<Summary>('/api/summary'),
   diagnostics: () => fetchJSON<DiagnosticsItem[]>('/api/diagnostics'),
   halts: () => fetchJSON<HaltEvent[]>('/api/halts/today'),
+  slippage: () => fetchJSON<SlippageData>('/api/slippage/recent'),
 };
+
+export interface SlippageRow {
+  ts_signal: string;
+  ts_fill: string;
+  ticker: string;
+  side: 'buy' | 'sell';
+  strategy: string;
+  signal_price: number | null;
+  fill_price: number | null;
+  slip_bp: number | null;
+  qty: number | null;
+  dollar_amount: number | null;
+  cum_dollar_vol: number | null;
+  participation_rate: number | null;
+  status: string;
+  order_id: string;
+}
+
+export interface SlippageStats {
+  n_total: number;
+  n_filled: number;
+  avg_slip_bp: number | null;
+  median_slip_bp: number | null;
+  max_slip_bp: number | null;
+  min_slip_bp: number | null;
+  p95_slip_bp: number | null;
+  dollar_volume_traded: number;
+  realized_slip_cost: number;
+}
+
+export interface SlippageByStrategy {
+  strategy: string;
+  n: number;
+  n_buys: number;
+  n_sells: number;
+  avg_slip_bp: number;
+  median_slip_bp: number;
+  min_slip_bp: number;
+  max_slip_bp: number;
+  avg_buy_slip_bp: number | null;
+  avg_sell_slip_bp: number | null;
+  dollar_volume: number;
+  realized_cost: number;
+}
+
+export interface SlippageData {
+  stats: SlippageStats;
+  by_strategy: SlippageByStrategy[];
+  rows: SlippageRow[];
+}

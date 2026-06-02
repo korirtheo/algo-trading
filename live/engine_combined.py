@@ -28,8 +28,16 @@ from config.settings import FLOAT_DATA
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
 
-PARAMS_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "config", "trial_432_params.json")
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# LIVE_PARAMS_PATH env var lets us switch the live config (e.g. between
+# trial_432, trial_6_extracted, or a fresh optimizer dump) without code
+# changes. Path is resolved relative to the project root if not absolute.
+_env_params = os.environ.get("LIVE_PARAMS_PATH")
+if _env_params:
+    PARAMS_PATH = _env_params if os.path.isabs(_env_params) \
+        else os.path.join(_PROJECT_ROOT, _env_params)
+else:
+    PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_432_params.json")
 
 
 def load_trial_params(path=None):
@@ -242,13 +250,14 @@ class CombinedEngine:
                     entry_price = st["entry_price"]
                     strategy = st.get("strategy", "?")
                     trade_size = st.get("position_cost", cash)
-                    cum_vol = self._cum_vol(ticker)
+                    cum_dollar = self._cum_dollar_vol(ticker)
 
-                    log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_vol=%d",
-                             ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_vol)
+                    log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_$vol=$%.0f",
+                             ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_dollar)
 
                     order = self.executor.buy(ticker, trade_size, entry_price,
-                                             cumulative_volume=cum_vol)
+                                             cumulative_dollar_volume=cum_dollar,
+                                             strategy=strategy)
                     if order:
                         self.active_position = ticker
                         self.position_entry[ticker] = {
@@ -273,7 +282,13 @@ class CombinedEngine:
                     exit_reason = st.get("exit_reason", "UNKNOWN")
                     pnl = st.get("pnl", 0)
 
-                    order = self.executor.sell(ticker, reason=exit_reason)
+                    entry_info = self.position_entry.get(ticker, {})
+                    order = self.executor.sell(
+                        ticker, reason=exit_reason,
+                        signal_price=exit_price,
+                        cumulative_dollar_volume=self._cum_dollar_vol(ticker),
+                        strategy=entry_info.get("strategy", "?"),
+                    )
                     if order:
                         self.active_position = None
                         self.daily_pnl += pnl
@@ -303,7 +318,12 @@ class CombinedEngine:
                 sold_shares = prev["shares"] - st["shares"]
                 if sold_shares > 0.001 and ticker == self.active_position:
                     log.info("PARTIAL SELL %s: %.2f shares", ticker, sold_shares)
-                    self.executor.sell(ticker, shares=sold_shares, reason="PARTIAL")
+                    pinfo = self.position_entry.get(ticker, {})
+                    self.executor.sell(
+                        ticker, shares=sold_shares, reason="PARTIAL",
+                        signal_price=st.get("partial_price") or st.get("close"),
+                        strategy=pinfo.get("strategy", "?"),
+                    )
 
             self.last_states[ticker] = dict(st)
 
@@ -346,12 +366,13 @@ class CombinedEngine:
                 return
 
             cash = self.executor.get_buying_power()
-            cum_vol = self._cum_vol(symbol)
+            cum_dollar = self._cum_dollar_vol(symbol)
             entry_price = state["signal_price"]
-            log.info("HALT-SIGNAL %s: price=$%.3f reason=%s cum_vol=%d",
-                     symbol, entry_price, state["halt_reason"], cum_vol)
+            log.info("HALT-SIGNAL %s: price=$%.3f reason=%s cum_$vol=$%.0f",
+                     symbol, entry_price, state["halt_reason"], cum_dollar)
             order = self.executor.buy(symbol, cash, entry_price,
-                                       cumulative_volume=cum_vol)
+                                       cumulative_dollar_volume=cum_dollar,
+                                       strategy="HALT")
             if order is None:
                 log.warning("HALT BUY REJECTED %s (vol_cap or executor error)", symbol)
                 state["done"] = True
@@ -403,14 +424,16 @@ class CombinedEngine:
             sell_shares = state["shares"] * (hr.DEFAULT_PARAMS["partial_sell_pct"] / 100.0)
             log.info("HALT-PARTIAL %s: %.2f shares @ $%.3f",
                      symbol, sell_shares, exit_price)
-            self.executor.sell(symbol, shares=sell_shares, reason="HALT_PARTIAL")
+            self.executor.sell(symbol, shares=sell_shares, reason="HALT_PARTIAL",
+                               signal_price=exit_price, strategy="HALT")
             state["shares"] = max(0.0, state["shares"] - sell_shares)
             state["partial_proceeds"] = sell_shares * exit_price
             return
 
         # Full exit
         log.info("HALT-EXIT %s (%s): @ $%.3f", symbol, reason, exit_price)
-        order = self.executor.sell(symbol, reason=f"HALT_{reason}")
+        order = self.executor.sell(symbol, reason=f"HALT_{reason}",
+                                    signal_price=exit_price, strategy="HALT")
         if order is not None or True:  # always finalize state even if executor was noop
             entry = state["entry_price"] or 0.0
             pnl = (exit_price - entry) * state["shares"] + state.get("partial_proceeds", 0.0) - state.get("position_cost", 0.0)
@@ -454,9 +477,67 @@ class CombinedEngine:
                      symbol, format(pnl, "+,.2f"), entry, exit_price)
 
     def _cum_vol(self, ticker):
-        """Get cumulative volume for a ticker."""
+        """Cumulative SHARE volume for a ticker (engine-local — undercounts
+        after mid-day restart)."""
         bars = self.bar_data.get(ticker, [])
         return sum(b["Volume"] for b in bars)
+
+    def _cum_dollar_vol(self, ticker):
+        """Cumulative DOLLAR volume since 9:30 ET today, fetched live from
+        Alpaca. Replaces the engine-local estimate so the vol-cap is accurate
+        regardless of when the engine started (mid-day restarts, halt-resume
+        tickers added intraday, etc.).
+
+        Uses **SIP** feed (consolidated tape across all US exchanges) even
+        though the live stream is IEX-only — IEX is ~2-3% of total US volume,
+        so vol-cap built on IEX would clamp positions to ~3% of what it
+        should. SIP historical bars are available on the free tier; only the
+        real-time stream is paid.
+
+        Falls back to engine-local sum(close*volume) if the REST call fails.
+        """
+        try:
+            from alpaca.data.historical import StockHistoricalDataClient
+            from alpaca.data.requests import StockBarsRequest
+            from alpaca.data.timeframe import TimeFrame
+            from datetime import time as dt_time, timedelta
+            from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
+            client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
+            now_et = datetime.now(ET)
+            market_open = datetime.combine(now_et.date(), dt_time(9, 30), tzinfo=ET)
+            # Free-tier SIP forbids querying the last ~15 min of "recent SIP".
+            # Clamp the end of the SIP window to now - 16 min and add the
+            # engine-local IEX bars for that tail. Slightly understates true
+            # cumulative dollar volume by the IEX/SIP ratio over the last
+            # 16 min, but is correct to within a few percent.
+            sip_cutoff = now_et - timedelta(minutes=16)
+            sip_dvol = 0.0
+            if sip_cutoff > market_open:
+                req = StockBarsRequest(
+                    symbol_or_symbols=ticker,
+                    timeframe=TimeFrame.Minute,
+                    start=market_open,
+                    end=sip_cutoff,
+                    adjustment="raw",
+                    feed="sip",
+                )
+                resp = client.get_stock_bars(req)
+                if not resp.df.empty:
+                    df = resp.df.reset_index()
+                    sip_dvol = float((df["close"] * df["volume"]).sum())
+            # Add engine-local IEX bars that arrived AFTER the SIP cutoff.
+            tail_dvol = 0.0
+            for b in self.bar_data.get(ticker, []):
+                ts = b["timestamp"]
+                ts_et = ts.astimezone(ET) if hasattr(ts, "astimezone") else ts
+                if ts_et >= sip_cutoff:
+                    tail_dvol += float(b["Close"]) * float(b["Volume"])
+            return sip_dvol + tail_dvol
+        except Exception as e:
+            log.warning(f"_cum_dollar_vol({ticker}) REST failed: {e}; "
+                        f"falling back to local")
+            bars = self.bar_data.get(ticker, [])
+            return float(sum(float(b["Close"]) * float(b["Volume"]) for b in bars))
 
     def eod_close(self):
         """Force close all positions."""

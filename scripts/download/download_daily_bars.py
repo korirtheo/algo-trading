@@ -23,16 +23,21 @@ from alpaca.data.timeframe import TimeFrame
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(line_buffering=True)
 
-ALPACA_KEY = "PK34OGXUBAOCLG7E6KYTI6QMZ3"
-ALPACA_SECRET = "DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ"
+ALPACA_KEY = os.environ.get("ALPACA_API_KEY", "PKF56A65KVUCGU4DBDPIYRKHNC")
+ALPACA_SECRET = os.environ.get("ALPACA_API_SECRET", "7pmp8Nk3dkZqWweqkAsB9Rkg6QDbBn4YrKfxv6V5Q14p")
 
 RATE_LIMIT_DELAY = 0.35
 BATCH_SIZE = 500
 
-# Date ranges per data directory
+# Date ranges per data directory — include a ~2-month lookback so the
+# previous-close lookup works on every trading day of the target year.
 DATE_RANGES = {
-    "stored_data_2023": ("2022-11-01", "2024-01-01"),
+    "stored_data_2019": ("2018-11-01", "2020-01-01"),
+    "stored_data_2020": ("2019-11-01", "2021-01-01"),
+    "stored_data_2021": ("2020-11-01", "2022-01-01"),
     "stored_data_2022": ("2021-11-01", "2023-01-01"),
+    "stored_data_2023": ("2022-11-01", "2024-01-01"),
+    "stored_data_jan_feb_2024": ("2023-11-01", "2024-03-01"),
 }
 
 

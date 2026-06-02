@@ -7,6 +7,7 @@ import { TradeLog } from './components/TradeLog';
 import { StrategyPanel } from './components/StrategyPanel';
 import { Diagnostics } from './components/Diagnostics';
 import { HaltMonitor } from './components/HaltMonitor';
+import { Slippage } from './components/Slippage';
 import { useWebSocket } from './hooks/useWebSocket';
 
 function App() {
@@ -56,6 +57,10 @@ function App() {
 
         <div className="row-diagnostics">
           <HaltMonitor />
+        </div>
+
+        <div className="row-diagnostics">
+          <Slippage />
         </div>
       </main>
     </div>

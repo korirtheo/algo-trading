@@ -230,7 +230,11 @@ float_data.json
 
 # Optuna study databases & output
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 optuna_output.txt
+optuna_best_*.json
 # Result files (DBs already covered above; JSON best-params under results/ stay tracked)
 results/logs/
 

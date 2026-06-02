@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy only what's needed for live trading
 COPY config/ ./config/
 COPY live/ ./live/
+COPY strategies/ ./strategies/
 COPY dashboard/ ./dashboard/
 COPY *.py ./
 

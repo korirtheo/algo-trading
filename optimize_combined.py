@@ -31,16 +31,15 @@ import test_green_candle_combined as tgc
 from test_full import load_all_picks, SLIPPAGE_PCT, STARTING_CASH, MARGIN_THRESHOLD
 
 DATA_DIRS = [
-    # Mar-Dec 2024 + 2025 (~452 training days). Two regimes: 2024 momentum/AI
-    # runners + 2025 mixed/small-cap squeeze. Fastest path to convergence
-    # without sacrificing meaningful regime diversity.
-    # Held out for OOS / blind tests (NOT in training):
-    #   stored_data_2022                  -> blind OOS (251 days, 2022 bear)
-    #   stored_data                       -> Jan-Feb 2026 (38 days)
-    #   stored_data_mar_may_2026          -> Mar-May 2026 (43 days)
-    # Skipped (broken data):
-    #   stored_data_jan_feb_2024          -> sparse PM, every pick filtered out
-    #   stored_data_combined/stored_data_2023 -> 0.93 picks/day
+    # Full 2021-2026 training window (~1330 days across 5+ years, 4 distinct
+    # regimes): SPAC/meme 2021, bear 2022, recovery 2023, momentum/AI 2024-25,
+    # mixed 2026 YTD. Maximum regime diversity. NO held-out OOS in this run —
+    # comparison against trial #6 on the same dataset is the validation.
+    # Skipped (still broken — sparse premarket coverage):
+    #   stored_data_jan_feb_2024          -> mostly IEX-feed bars (2-7% PM)
+    "stored_data_2021",           # 2021-01 -> 2021-12        (252 days)
+    "stored_data_2022",           # 2022-01 -> 2022-12        (251 days)
+    "stored_data_2023",           # 2023-01 -> 2023-12        (250 days)
     "stored_data_jan_mar_2024",   # 2024-03                    (18 days)
     "stored_data_apr_jun_2024",   # 2024-04 -> 2024-06         (62 days)
     "stored_data_jul_sep_2024",   # 2024-07 -> 2024-09         (63 days)
@@ -49,8 +48,10 @@ DATA_DIRS = [
     "stored_data_apr_jun_2025",   # 2025-04 -> 2025-06         (61 days)
     "stored_data_jul_2025",       # 2025-07                    (21 days)
     "stored_data_oos",            # 2025-08 -> 2025-12        (105 days)
+    "stored_data",                # 2026-01 -> 2026-02         (38 days)
+    "stored_data_mar_may_2026",   # 2026-03 -> 2026-05         (43 days)
 ]
-DATE_RANGE = ("2024-01-01", "2025-12-31")
+DATE_RANGE = ("2021-01-01", "2026-05-31")
 
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
@@ -986,6 +987,11 @@ def main():
                         help="Optuna study name (default: combined_v8_20strats_2024_2026)")
     parser.add_argument("--params-out", default=None,
                         help="Best-trial JSON output path (default: optuna_best_params_v8.json)")
+    parser.add_argument("--regime-filter", default=None,
+                        choices=["squeeze", "normal", "dead"],
+                        help="Filter daily picks to ONLY days where the regime gate "
+                             "classifies as the given regime. Used to train regime "
+                             "specialists. Requires strategies/regime_gate.py.")
     args = parser.parse_args()
     n_trials = args.trials
 
@@ -1054,6 +1060,17 @@ def main():
     all_dates, daily_picks = load_all_picks(DATA_DIRS)
     all_dates = [d for d in all_dates if DATE_RANGE[0] <= d <= DATE_RANGE[1]]
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
+
+    # Optional regime filter — keeps only days where today's pre-market scan
+    # matches the requested regime. Used to train per-regime specialists.
+    if args.regime_filter:
+        from strategies.regime_gate import classify_regime
+        filtered = [d for d in all_dates
+                    if classify_regime(daily_picks.get(d, [])) == args.regime_filter]
+        print(f"  Regime filter '{args.regime_filter}': {len(filtered)} days "
+              f"kept ({100*len(filtered)/max(1,len(all_dates)):.1f}%)")
+        all_dates = filtered
+        daily_picks = {d: daily_picks[d] for d in all_dates}
     # Pre-set SQLite WAL mode ONCE before Optuna's connection pool spawns
     # parallel threads. WAL is a per-database setting (not per-connection), so
     # setting it once is enough; subsequent connections inherit it.
@@ -1093,10 +1110,16 @@ def main():
     n_existing = len(study.trials)
     if n_existing > 0:
         print(f"\n  Resuming: {n_existing} existing trials found")
-        best = study.best_trial
-        print(f"  Current best: score={best.value:,.0f}, "
-              f"PnL=${best.user_attrs.get('total_pnl', 0):,.0f}, "
-              f"PF={best.user_attrs.get('pf', 0):.2f}")
+        # Only report current best if at least one trial actually COMPLETED.
+        # On a fresh-but-stale DB (all RUNNING/FAIL/PRUNED) study.best_trial
+        # raises "Record does not exist."
+        try:
+            best = study.best_trial
+            print(f"  Current best: score={best.value:,.0f}, "
+                  f"PnL=${best.user_attrs.get('total_pnl', 0):,.0f}, "
+                  f"PF={best.user_attrs.get('pf', 0):.2f}")
+        except (ValueError, Exception) as e:
+            print(f"  (No complete trials yet — starting fresh)")
 
     print(f"\n  Starting optimization ({n_trials} trials)...\n")
     start_time = time.time()
