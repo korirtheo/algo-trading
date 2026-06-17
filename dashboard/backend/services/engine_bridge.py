@@ -452,8 +452,10 @@ class EngineBridge:
         import os as _os
         from statistics import median
 
+        # File is engine_bridge.py at dashboard/backend/services/engine_bridge.py
+        # so we need 4 dirname()s to reach the project root, then logs/...
         path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
-            _os.path.abspath(__file__)))), "logs", "fills_calibration.csv")
+            _os.path.dirname(_os.path.abspath(__file__))))), "logs", "fills_calibration.csv")
         rows = []
         if _os.path.exists(path):
             try:

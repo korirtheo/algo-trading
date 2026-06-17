@@ -26,9 +26,11 @@ async def get_slippage_health():
       (b) file empty/header  -> no terminal fills yet OR _reconcile_fill_async dying
       (c) path mismatch      -> dashboard reading different dir than executor
     """
+    # File is slippage.py at dashboard/backend/routers/slippage.py
+    # so we need 4 dirname()s to reach the project root, then logs/...
     path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))),
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))),
         "logs", "fills_calibration.csv",
     )
     info = {

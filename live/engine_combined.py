@@ -41,10 +41,29 @@ else:
 
 
 def load_trial_params(path=None):
-    """Load trial params from JSON and apply to tgc module."""
+    """Load trial params from JSON and apply to tgc module.
+
+    Supports two on-disk formats:
+      1. Flat dict of param name -> value (legacy trial_432_params.json style)
+      2. Extracted-trial dict with top-level metadata + "params" subkey
+         (e.g. trial_124_microcap_pump_extracted.json). For this format we
+         use the params subkey and merge over the trial_432 baseline so any
+         params Optuna didn't touch fall back to a known-good default.
+    """
     path = path or PARAMS_PATH
     with open(path) as f:
-        params = json.load(f)
+        raw = json.load(f)
+    if isinstance(raw, dict) and "params" in raw and isinstance(raw["params"], dict):
+        baseline_path = os.path.join(_PROJECT_ROOT, "config", "trial_432_params.json")
+        with open(baseline_path) as bf:
+            baseline = json.load(bf)
+        params = dict(baseline)
+        params.update(raw["params"])
+        log.info("Loaded extracted trial #%s (study=%s): %d tuned params merged over %d baseline keys",
+                 raw.get("trial_number", "?"), raw.get("study", "?"),
+                 len(raw["params"]), len(baseline))
+    else:
+        params = raw
     set_strategy_params(params)
     log.info("Loaded %d params from %s", len(params), os.path.basename(path))
 
