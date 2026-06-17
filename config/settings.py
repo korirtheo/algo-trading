@@ -5,8 +5,8 @@ import os
 import json
 
 # --- Alpaca API ---
-ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PKRI4NR6NV7GEDYDEB47CWKJDW")
-ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "535mtYN3KBDUVwJ8rBFdyemboDpaZ4qTszcqW74odRZR")
+ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PKIPXFIETM7H4BAGQ64FQV3IWJ")
+ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "25RY682kuN9EBcFr6SFxgbSpFjdZkn613PLKPy1TdYzG")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
 ALPACA_FEED = "iex"  # "sip" for full market data, "iex" for free tier
 
@@ -16,15 +16,50 @@ VOL_CAP_PCT = 5.0            # Max % of traded volume to take
 EOD_EXIT_MINUTES = 15         # Close all positions 15 min before market close
 MAX_PRICE = 50.0              # Skip stocks above this price
 
-# --- PDT (Pattern Day Trader) ---
-# At equity < $25K an account can do at most 3 day-trades in any rolling
-# 5-business-day window. The 4th flips the account to PDT-flagged and
-# blocks all trading until equity is funded back above $25K.
-PDT_EQUITY_FLOOR = 25_000.0    # SEC's hard floor — Alpaca enforces this
-PDT_EQUITY_BUFFER = 0.0        # Literal SEC rule — gate only fires when
-                               # equity drops below $25K AND daytrade_count >= 3.
-                               # Set higher (e.g. 2_500) to add safety headroom.
-PDT_DAYTRADES_MAX = 3          # Max safe day-trades while under the floor
+# --- LIVE SAFETY RAILS (broker-side enforcement, even if engine dies) ---
+# Bracket orders attach a STOP and a TAKE-PROFIT leg to every buy. Alpaca
+# enforces these regardless of whether the Python engine is alive.
+#
+# The bracket stop is a SAFETY NET — read from the strategy's Optuna-tuned
+# X_STOP_PCT and BUFFERED so the engine's tighter intra-bar logic fires
+# first. Bracket only triggers if the engine fails to call sell() (network
+# drop, crash, halt-resume gap, etc.).
+#
+# Resolved per-trade as:
+#   strategy_stop = tgc.{STRATEGY}_STOP_PCT  (e.g. tgc.G_STOP_PCT = 2.0)
+#   bracket_stop  = min(strategy_stop * BUFFER_MULT, MAX_STOP_PCT)
+#   if strategy_stop == 0 (trail-only strategy):  use DEFAULT_STOP_PCT
+LIVE_BRACKET_ORDERS = True
+LIVE_BRACKET_BUFFER_MULT = 1.5         # bracket is 50% wider than strategy stop
+LIVE_BRACKET_DEFAULT_STOP_PCT = 12.0   # fallback for trail-only strategies (H, etc.)
+LIVE_BRACKET_MAX_STOP_PCT = 25.0       # absolute ceiling — never wider than this
+LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires first
+# Hard cap on position size: never more than this fraction of total EQUITY
+# per single trade. Equity-basis (not literal cash) is correct because:
+#   1. backtest's cash_box[0] accumulates wins — matches equity, not cash
+#   2. on margin accounts, cash can be near-zero while equity is healthy
+#   3. drawdowns eat cash first; cash-basis would lock the bot out
+# Prevents the bot from putting 100%+ of equity (via buying power) into
+# one microcap when position_cost arrives misconfigured.
+LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # cap at 30% of EQUITY per trade (name kept for import-stability)
+
+# --- PDT (Pattern Day Trader) — NO-OP'd 2026-06-17 ---
+# FINRA abolished the $25K minimum and the 4-day-trade-in-5-days counter
+# effective 2026-06-04, replacing the PDT framework with risk-based
+# intraday margin under amended Rule 4210. The local gate is no-op'd by
+# setting the floor to 0 (executor._pdt_blocked returns False when
+# equity >= threshold, and any positive equity now satisfies that).
+#
+# Code path kept in executor.py for reversibility: if Alpaca enforces
+# internally during their 18-month transition (until 2027-10-20) and we
+# get rejected orders, flip PDT_EQUITY_FLOOR back to 25_000.0.
+#
+# Refs:
+#   FINRA — https://www.finra.org/investors/insights/intraday-margin-requirements
+#   SEC SR-FINRA-2025-017 (effective 2026-06-04)
+PDT_EQUITY_FLOOR = 0.0         # no-op — was 25_000.0 pre-2026-06-04
+PDT_EQUITY_BUFFER = 0.0
+PDT_DAYTRADES_MAX = 3          # unused while floor=0; dead code in executor
 
 # --- Scanner ---
 MIN_GAP_PCT = 8.0             # Lowest min_gap across all strategies (V=8%, O=8%)

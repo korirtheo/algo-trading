@@ -23,13 +23,45 @@ from alpaca.trading.requests import (
     LimitOrderRequest,
     GetOrdersRequest,
     ClosePositionRequest,
+    StopLossRequest,
+    TakeProfitRequest,
 )
-from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, QueryOrderStatus
+from alpaca.trading.enums import OrderSide, TimeInForce, OrderStatus, QueryOrderStatus, OrderClass
 
 from config.settings import (
     ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER, VOL_CAP_PCT,
     PDT_EQUITY_FLOOR, PDT_EQUITY_BUFFER, PDT_DAYTRADES_MAX,
+    LIVE_BRACKET_ORDERS, LIVE_BRACKET_BUFFER_MULT,
+    LIVE_BRACKET_DEFAULT_STOP_PCT, LIVE_BRACKET_MAX_STOP_PCT,
+    LIVE_BRACKET_TARGET_PCT, LIVE_MAX_POSITION_PCT_OF_CASH,
 )
+
+import test_green_candle_combined as tgc
+
+
+def _resolve_bracket_stop_pct(strategy_code):
+    """Compute the bracket safety-net stop % for this strategy.
+
+    Reads the strategy's Optuna-tuned `{STRATEGY}_STOP_PCT` from the tgc
+    module (set by set_strategy_params at engine startup) and buffers it
+    by LIVE_BRACKET_BUFFER_MULT so the engine's intra-bar stop fires first
+    under normal conditions.
+
+    Falls back to LIVE_BRACKET_DEFAULT_STOP_PCT for:
+      - Strategies with no fixed stop (e.g. H with trail-only logic, where
+        H_STOP_PCT = 0)
+      - Strategies the executor doesn't recognize (e.g. HALT_RESUME, MANUAL)
+      - Unknown strategy codes
+    """
+    if not strategy_code or strategy_code in ("MANUAL", "HALT", "HALT_RESUME"):
+        return LIVE_BRACKET_DEFAULT_STOP_PCT
+    attr = f"{strategy_code.upper()}_STOP_PCT"
+    raw = getattr(tgc, attr, None)
+    if raw is None or raw <= 0:
+        # Strategy has no fixed hard stop (trail-only or unset): use default
+        return LIVE_BRACKET_DEFAULT_STOP_PCT
+    buffered = float(raw) * LIVE_BRACKET_BUFFER_MULT
+    return min(buffered, LIVE_BRACKET_MAX_STOP_PCT)
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -221,6 +253,30 @@ class OrderExecutor:
         if self._pdt_blocked(ticker):
             return None
 
+        # HARD EQUITY CAP — never trade more than LIVE_MAX_POSITION_PCT_OF_CASH
+        # of total equity on a single position. Equity (not literal cash) is
+        # the right basis because the backtest's `cash_box[0]` accumulates
+        # wins into the same pool — matching backtest semantics. Using `cash`
+        # would lock the bot out after drawdowns eat the buffer (e.g. account
+        # at $73 cash, $4.9K equity — cash-basis cap = $22/trade, unusable).
+        # Equity-basis also correctly accommodates margin accounts.
+        if LIVE_MAX_POSITION_PCT_OF_CASH > 0:
+            try:
+                acc = self.client.get_account()
+                cap_basis = float(acc.equity)
+                equity_cap = cap_basis * (LIVE_MAX_POSITION_PCT_OF_CASH / 100)
+                if dollar_amount > equity_cap:
+                    log.warning(
+                        f"EQUITY CAP: {ticker} sized from ${dollar_amount:,.0f} to "
+                        f"${equity_cap:,.0f} ({LIVE_MAX_POSITION_PCT_OF_CASH}% of "
+                        f"${cap_basis:,.0f} equity)"
+                    )
+                    dollar_amount = equity_cap
+            except Exception as e:
+                log.error(f"Equity cap fetch failed for {ticker}: {e}")
+                # If we can't read account equity, refuse to trade — better safe than sorry
+                return None
+
         # Volume cap check
         if VOL_CAP_PCT > 0 and cumulative_dollar_volume > 0:
             vol_limit = cumulative_dollar_volume * (VOL_CAP_PCT / 100)
@@ -231,6 +287,14 @@ class OrderExecutor:
             if dollar_amount < 50:
                 log.info(f"Skip {ticker}: vol-capped amount ${dollar_amount:.0f} too small")
                 return None
+        elif VOL_CAP_PCT > 0:
+            # Vol cap is configured but cum_dollar_volume came in as 0 —
+            # silent vol-cap bypass. Log so we know when this happens.
+            log.warning(
+                f"VOL CAP SILENTLY DISABLED on {ticker}: cum_dollar_vol=0; "
+                f"falling through with dollar_amount=${dollar_amount:,.0f}. "
+                f"Cash cap is the only size guard."
+            )
 
         # Whole shares only. Most small-caps aren't fractionable on Alpaca,
         # and our $1-$50 universe always yields dozens+ of whole shares —
@@ -242,24 +306,56 @@ class OrderExecutor:
                      f"at ${current_price:.2f} -> {shares} shares")
             return None
 
+        # Pre-compute bracket stop / take-profit prices.
+        # The bracket is a SAFETY NET — strategy-specific stops (engine-side)
+        # are tighter and fire first. The bracket only kicks in if the engine
+        # fails to call sell() (network drop, crash, halt-resume gap, etc.).
+        # Stop % is derived from the strategy's Optuna-tuned X_STOP_PCT,
+        # buffered so engine fires first under normal conditions.
+        bracket_stop_pct = _resolve_bracket_stop_pct(strategy)
+        bracket_stop = round(current_price * (1 - bracket_stop_pct / 100), 2)
+        bracket_target = round(current_price * (1 + LIVE_BRACKET_TARGET_PCT / 100), 2)
+
         ts_signal = datetime.now(ET).isoformat()
         try:
-            order = self.client.submit_order(
-                MarketOrderRequest(
-                    symbol=ticker,
-                    qty=shares,
-                    side=OrderSide.BUY,
-                    time_in_force=TimeInForce.DAY,
+            if LIVE_BRACKET_ORDERS:
+                order = self.client.submit_order(
+                    MarketOrderRequest(
+                        symbol=ticker,
+                        qty=shares,
+                        side=OrderSide.BUY,
+                        time_in_force=TimeInForce.DAY,
+                        order_class=OrderClass.BRACKET,
+                        stop_loss=StopLossRequest(stop_price=str(bracket_stop)),
+                        take_profit=TakeProfitRequest(limit_price=str(bracket_target)),
+                    )
                 )
-            )
-            log.info(f"BUY {ticker}: {shares} shares @ ~${current_price:.2f} "
-                     f"(${dollar_amount:,.0f}) | order_id={order.id}")
+                log.info(
+                    f"BUY {ticker} [BRACKET] strategy={strategy}: {shares} shares "
+                    f"@ ~${current_price:.2f} (${dollar_amount:,.0f}) | "
+                    f"stop=${bracket_stop:.2f} (-{bracket_stop_pct:.1f}%) "
+                    f"target=${bracket_target:.2f} (+{LIVE_BRACKET_TARGET_PCT}%) | "
+                    f"order_id={order.id}"
+                )
+            else:
+                order = self.client.submit_order(
+                    MarketOrderRequest(
+                        symbol=ticker,
+                        qty=shares,
+                        side=OrderSide.BUY,
+                        time_in_force=TimeInForce.DAY,
+                    )
+                )
+                log.info(f"BUY {ticker}: {shares} shares @ ~${current_price:.2f} "
+                         f"(${dollar_amount:,.0f}) | order_id={order.id}")
             self.positions[ticker] = {
                 "order_id": str(order.id),
                 "shares": shares,
                 "entry_price": current_price,
                 "entry_time": datetime.now(ET),
                 "dollar_amount": dollar_amount,
+                "bracket_stop": bracket_stop if LIVE_BRACKET_ORDERS else None,
+                "bracket_target": bracket_target if LIVE_BRACKET_ORDERS else None,
             }
             # Stage-1 calibration: background poll for the fill, append row
             # to logs/fills_calibration.csv. Doesn't change live behavior.
@@ -289,7 +385,8 @@ class OrderExecutor:
         ts_signal = datetime.now(ET).isoformat()
         try:
             if shares is None:
-                # Close entire position
+                # Close entire position. close_position() automatically cancels
+                # any pending bracket child legs before submitting the close.
                 order = self.client.close_position(ticker)
                 log.info(f"SELL ALL {ticker} ({reason}) | order_id={order.id}")
             else:
@@ -323,6 +420,16 @@ class OrderExecutor:
 
             return order
         except Exception as e:
+            err_str = str(e).lower()
+            # Bracket child legs may have already closed the position; treat
+            # "no position" / "position not found" as success and clear state.
+            if any(s in err_str for s in ("position not found", "no position",
+                                           "position does not exist", "404")):
+                log.info(f"SELL {ticker} ({reason}): position already closed "
+                         f"(likely bracket leg fired). Clearing local state.")
+                if ticker in self.positions:
+                    del self.positions[ticker]
+                return None
             log.error(f"SELL {ticker} FAILED: {e}")
             return None
 
