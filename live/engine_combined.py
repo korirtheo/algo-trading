@@ -215,6 +215,35 @@ class CombinedEngine:
                  (f"{float_shares/1e6:.1f}M" if float_shares else "N/A"))
         return True
 
+    def _log_bar_to_csv(self, symbol, bar):
+        """Append each 2-min bar to a per-ticker CSV for backtest-vs-live audit.
+
+        Output path: logs/bars/<YYYY-MM-DD>/<symbol>.csv
+        Captures the EXACT bars the bot's engine processed, so a follow-up
+        backtest can run on the same data and produce an apples-to-apples
+        comparison (no source-mismatch artifact from SIP-vs-IEX or resample
+        boundary differences).
+        """
+        import csv
+        try:
+            today = datetime.now(ET).strftime("%Y-%m-%d")
+            bars_dir = os.path.join(
+                _PROJECT_ROOT, "logs", "bars", today
+            )
+            os.makedirs(bars_dir, exist_ok=True)
+            path = os.path.join(bars_dir, f"{symbol}.csv")
+            new_file = not os.path.exists(path)
+            with open(path, "a", newline="") as f:
+                w = csv.writer(f)
+                if new_file:
+                    w.writerow(["timestamp", "Open", "High", "Low", "Close", "Volume"])
+                w.writerow([
+                    bar["timestamp"], bar["Open"], bar["High"],
+                    bar["Low"], bar["Close"], bar["Volume"],
+                ])
+        except Exception as e:
+            log.warning("Failed to log bar for %s: %s", symbol, e)
+
     def on_bar(self, symbol, bar):
         """Process a completed 2-min bar.
 
@@ -228,6 +257,9 @@ class CombinedEngine:
 
         if symbol not in self.bar_data:
             return
+
+        # Log raw bar for backtest comparison (no perf impact: 1 CSV append).
+        self._log_bar_to_csv(symbol, bar)
 
         ts = bar["timestamp"]
         self.bar_data[symbol].append({
