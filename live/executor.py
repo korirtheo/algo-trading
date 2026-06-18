@@ -370,6 +370,37 @@ class OrderExecutor:
             log.error(f"BUY {ticker} FAILED: {e}")
             return None
 
+    def _cancel_bracket_legs_for_ticker(self, ticker):
+        """Cancel ALL open orders for this ticker (bracket stop + target).
+
+        Required before submitting any sell — otherwise Alpaca rejects with
+        "insufficient qty available" because the bracket's stop_loss and
+        take_profit child orders hold all shares as `held_for_orders`.
+
+        Race-safe: if the bracket fires during cancellation, the position
+        closes itself and the subsequent sell harmlessly errors with
+        "position not found" (caught downstream).
+        """
+        try:
+            open_orders = self.client.get_orders(
+                GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[ticker])
+            )
+            cancelled = 0
+            for o in open_orders:
+                try:
+                    self.client.cancel_order_by_id(o.id)
+                    cancelled += 1
+                except Exception as e:
+                    log.warning(f"Could not cancel bracket leg {o.id} ({ticker}): {e}")
+            if cancelled > 0:
+                log.info(f"Cancelled {cancelled} bracket leg(s) for {ticker} before sell")
+                # Brief sleep to let Alpaca register cancellations before sell
+                time.sleep(0.4)
+            return cancelled
+        except Exception as e:
+            log.warning(f"_cancel_bracket_legs_for_ticker {ticker} failed: {e}")
+            return 0
+
     def sell(self, ticker, shares=None, reason="MANUAL",
              signal_price=None, cumulative_dollar_volume=0, strategy=None):
         """Sell a position (full or partial).
@@ -383,10 +414,20 @@ class OrderExecutor:
             cumulative_dollar_volume / strategy: calibration context.
         """
         ts_signal = datetime.now(ET).isoformat()
+
+        # PHASE 1A FIX (2026-06-18): cancel bracket legs first so the engine's
+        # strategy-tuned exits (STOP/TARGET/TRAIL/TIME_STOP) can override the
+        # wider bracket safety stop. Without this, every sell() got rejected
+        # with "insufficient qty available" because bracket children held the
+        # shares — and the bracket eventually fired its safety stop instead
+        # of the engine's tighter optimized stop. Observed today on APWC.
+        if LIVE_BRACKET_ORDERS:
+            self._cancel_bracket_legs_for_ticker(ticker)
+
         try:
             if shares is None:
-                # Close entire position. close_position() automatically cancels
-                # any pending bracket child legs before submitting the close.
+                # Close entire position. With bracket legs already canceled,
+                # close_position is now reliable.
                 order = self.client.close_position(ticker)
                 log.info(f"SELL ALL {ticker} ({reason}) | order_id={order.id}")
             else:
