@@ -67,6 +67,26 @@ def load_trial_params(path=None):
     set_strategy_params(params)
     log.info("Loaded %d params from %s", len(params), os.path.basename(path))
 
+    # Live-only: zero the volume caps when IEX feed under-counts cum_$vol.
+    # Without this, sizing binds at ~$100 on hot gappers because the IEX feed
+    # only sees ~0.1% of market volume. The 30% equity cap in the executor
+    # remains binding for true risk control. See config/settings.py for
+    # the LIVE_DISABLE_VOL_CAPS rationale + removal trigger.
+    try:
+        from config.settings import LIVE_DISABLE_VOL_CAPS
+    except ImportError:
+        LIVE_DISABLE_VOL_CAPS = False
+    if LIVE_DISABLE_VOL_CAPS:
+        tgc.MAX_2MIN_PARTICIPATION = 0.0
+        tgc.MAX_REGIME_PARTICIPATION = 0.0
+        tgc.VOL_CAP_PCT = 0.0
+        log.warning(
+            "LIVE_DISABLE_VOL_CAPS=True: zeroed MAX_2MIN_PARTICIPATION, "
+            "MAX_REGIME_PARTICIPATION, VOL_CAP_PCT. Sizing falls back to "
+            "30%% equity cap in executor.py. Restore by setting "
+            "LIVE_DISABLE_VOL_CAPS=False once SIP feed is active."
+        )
+
     # Log enabled strategies
     enabled = []
     for s in "HGAFDVPMRWOBKCEIJNL":

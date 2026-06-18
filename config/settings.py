@@ -43,6 +43,17 @@ LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires
 # one microcap when position_cost arrives misconfigured.
 LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # cap at 30% of EQUITY per trade (name kept for import-stability)
 
+# --- IEX FEED WORKAROUND (2026-06-18) ---
+# Live cum_$vol from IEX-only feed under-counts by 100-1000x on hot gappers
+# (~2% market share on most stocks, but <0.5% on heavily-routed names like
+# APWC at open). This causes the simulator's vol/regime/participation caps
+# to bind absurdly tight (e.g. $116 position on a stock with $2.1M real
+# cum_$vol). When this flag is True, those caps are zeroed in live mode
+# so position sizing depends purely on the equity cap above (30%).
+# TURN OFF when ALPACA_FEED is upgraded to "sip" (then caps re-bind on
+# accurate participation rates).
+LIVE_DISABLE_VOL_CAPS = True
+
 # --- PDT (Pattern Day Trader) — NO-OP'd 2026-06-17 ---
 # FINRA abolished the $25K minimum and the 4-day-trade-in-5-days counter
 # effective 2026-06-04, replacing the PDT framework with risk-based
