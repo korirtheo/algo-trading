@@ -1,0 +1,15 @@
+{
+  "trial_number": 19,
+  "study": "W21 g target/trail tuning (target cap=40)",
+  "train_score": 33398120,
+  "forward_mar_jun_2026": 430957,
+  "forward_geomean": 40.8,
+  "note": "NOT DEPLOYED. Saved as reference. Target was capped at 40; W21b will expand to 100.",
+  "params": {
+    "g_stop_pct": 19.0,
+    "g_target_pct": 40.0,
+    "g_time_limit_min": 21.0,
+    "g_trail_activate_pct": 0.0,
+    "g_trail_pct": 1.0
+  }
+}

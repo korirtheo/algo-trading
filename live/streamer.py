@@ -143,12 +143,12 @@ class BarStreamer:
                 prev_bar.merge(bar)
                 if prev_bar.count >= 2:
                     # 2-min bar complete
-                    self.on_2min_bar(symbol, prev_bar.to_dict())
+                    log.info(f"EMIT 2min: {symbol} c={prev_bar.close:.2f} count={prev_bar.count}"); self.on_2min_bar(symbol, prev_bar.to_dict())
                     del self.pending[symbol]
                 return
             else:
                 # New slot — emit previous bar (even if only 1 min) and start new
-                self.on_2min_bar(symbol, prev_bar.to_dict())
+                log.info(f"EMIT 2min: {symbol} c={prev_bar.close:.2f} count={prev_bar.count}"); self.on_2min_bar(symbol, prev_bar.to_dict())
 
         # Start new pending bar
         self.pending[symbol] = (slot, TwoMinBar(bar))

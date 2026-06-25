@@ -12,6 +12,7 @@ and backtest see byte-identical data.
 import csv
 import io
 import logging
+import os
 import threading
 import time as time_mod
 import urllib.request
@@ -20,10 +21,59 @@ from datetime import datetime, date, time as dt_time
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
 
+# 2026-06-24: persist every newly-seen halt to data/halts.csv so we accumulate
+# history going forward. The .txt source went dead; rebuilding via daily scrape.
+_HALTS_CSV_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "data", "halts.csv",
+)
+_HALTS_CSV_HEADER = [
+    "halt_date", "halt_time", "ticker", "reason",
+    "resume_time", "resume_quote_time", "resume_trade_time",
+    "halt_price", "resume_price",
+]
+_HALTS_CSV_LOCK = threading.Lock()
+
+
+def _persist_halt_event(ev: "HaltEvent") -> None:
+    """Append a HaltEvent row to data/halts.csv (idempotent on `key`)."""
+    try:
+        os.makedirs(os.path.dirname(_HALTS_CSV_PATH), exist_ok=True)
+        seen = set()
+        if os.path.exists(_HALTS_CSV_PATH):
+            with open(_HALTS_CSV_PATH, "r", newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    seen.add(f"{row['halt_date']}|{row['ticker']}|{row['halt_time']}")
+        row_key = f"{ev.halt_date.isoformat()}|{ev.ticker}|{ev.halt_time.isoformat()}"
+        if row_key in seen:
+            return
+        with _HALTS_CSV_LOCK:
+            need_header = not os.path.exists(_HALTS_CSV_PATH) or os.path.getsize(_HALTS_CSV_PATH) == 0
+            with open(_HALTS_CSV_PATH, "a", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                if need_header:
+                    w.writerow(_HALTS_CSV_HEADER)
+                w.writerow([
+                    ev.halt_date.isoformat() if ev.halt_date else "",
+                    ev.halt_time.isoformat() if ev.halt_time else "",
+                    ev.ticker or "",
+                    ev.reason or "",
+                    ev.resume_time.isoformat() if ev.resume_time else "",
+                    ev.resume_quote_time.isoformat() if ev.resume_quote_time else "",
+                    ev.resume_trade_time.isoformat() if ev.resume_trade_time else "",
+                    ev.halt_price if ev.halt_price is not None else "",
+                    ev.resume_price if ev.resume_price is not None else "",
+                ])
+    except Exception as e:
+        log.warning("Failed to persist halt event %s: %s", ev.ticker, e)
+
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
 
-NASDAQ_HALT_URL = "https://www.nasdaqtrader.com/dynamic/symdir/tradehalts.txt"
+# NASDAQ swapped the .txt endpoint for an HTML "Page Not Available" placeholder
+# sometime before 2026-06-24 — the live monitor had been silently failing for
+# weeks. The RSS feed is the only currently-working public source.
+NASDAQ_HALT_URL = "https://www.nasdaqtrader.com/rss.aspx?feed=tradehalts"
 POLL_INTERVAL_SECS = 30           # how often to refetch the halt log
 MARKET_OPEN = dt_time(9, 30)
 MARKET_CLOSE = dt_time(16, 0)
@@ -94,61 +144,43 @@ def _parse_date(s: str) -> Optional[date]:
 
 
 def parse_halt_log(text: str) -> list[HaltEvent]:
-    """Parse the NASDAQ trade-halt log into HaltEvent rows.
+    """Parse the NASDAQ trade-halt RSS feed into HaltEvent rows.
 
-    The published file is pipe-delimited with a header row. Column names vary
-    slightly over the years, so we map by name (case-insensitive).
+    Switched 2026-06-24 from pipe-delimited .txt (dead — returns HTML) to the
+    RSS feed at /rss.aspx?feed=tradehalts. Fields live under the ndaq: namespace.
     """
     events: list[HaltEvent] = []
-    if not text or "|" not in text:
+    if not text or "<rss" not in text.lower():
         return events
-
-    # Drop blank lines + any leading non-pipe junk
-    lines = [ln for ln in text.splitlines() if "|" in ln]
-    reader = csv.reader(io.StringIO("\n".join(lines)), delimiter="|")
-    rows = list(reader)
-    if not rows:
+    import xml.etree.ElementTree as _ETree
+    ns = {"ndaq": "http://www.nasdaqtrader.com/"}
+    try:
+        root = _ETree.fromstring(text)
+    except _ETree.ParseError as e:
+        log.warning("halt-log RSS parse error: %s", e)
         return events
-
-    header = [h.strip().lower() for h in rows[0]]
-    def col(name_options: tuple[str, ...]) -> Optional[int]:
-        for n in name_options:
-            for i, h in enumerate(header):
-                if h == n.lower():
-                    return i
-        return None
-
-    idx_date = col(("halt date",))
-    idx_time = col(("halt time",))
-    idx_sym = col(("issue symbol", "symbol"))
-    idx_reason = col(("reason code",))
-    idx_resume_time = col(("resumption time",))
-    idx_resume_quote = col(("resumption quote time",))
-    idx_resume_trade = col(("resumption trade time",))
-    idx_halt_price = col(("halt price",))
-    idx_resume_price = col(("resumption price",))
-
-    if idx_sym is None or idx_date is None or idx_time is None:
-        log.warning("halt-log parser: missing required columns; header=%s", header)
-        return events
-
-    for row in rows[1:]:
-        if len(row) <= idx_sym:
+    for item in root.findall(".//item"):
+        def _get(tag):
+            el = item.find(f"ndaq:{tag}", ns)
+            return (el.text or "").strip() if el is not None and el.text else ""
+        d = _parse_date(_get("HaltDate"))
+        ht = _parse_time(_get("HaltTime"))
+        sym = _get("IssueSymbol")
+        if d is None or ht is None or not sym:
             continue
-        d = _parse_date(row[idx_date])
-        ht = _parse_time(row[idx_time])
-        if d is None or ht is None:
-            continue
+        # Resume date — usually same as halt date; if RSS gives a different one,
+        # we still store the resume_time only (HaltEvent's resume_dt builds from
+        # halt_date + resume_time, which is fine for same-day resumes).
         events.append(HaltEvent(
             halt_date=d,
             halt_time=ht,
-            ticker=row[idx_sym].strip().upper(),
-            reason=(row[idx_reason].strip() if idx_reason is not None and len(row) > idx_reason else ""),
-            resume_time=(_parse_time(row[idx_resume_time]) if idx_resume_time is not None and len(row) > idx_resume_time else None),
-            resume_quote_time=(_parse_time(row[idx_resume_quote]) if idx_resume_quote is not None and len(row) > idx_resume_quote else None),
-            resume_trade_time=(_parse_time(row[idx_resume_trade]) if idx_resume_trade is not None and len(row) > idx_resume_trade else None),
-            halt_price=(_parse_price(row[idx_halt_price]) if idx_halt_price is not None and len(row) > idx_halt_price else None),
-            resume_price=(_parse_price(row[idx_resume_price]) if idx_resume_price is not None and len(row) > idx_resume_price else None),
+            ticker=sym.upper(),
+            reason=_get("ReasonCode"),
+            resume_time=_parse_time(_get("ResumptionTradeTime")) or _parse_time(_get("ResumptionQuoteTime")),
+            resume_quote_time=_parse_time(_get("ResumptionQuoteTime")),
+            resume_trade_time=_parse_time(_get("ResumptionTradeTime")),
+            halt_price=_parse_price(_get("PauseThresholdPrice")),
+            resume_price=None,  # not present in RSS
         ))
     return events
 
@@ -244,6 +276,13 @@ class HaltMonitor:
         events = parse_halt_log(raw)
         self.last_event_count = len(events)
         today = now_et.date()
+
+        # 2026-06-24: persist EVERY event in the feed (not just today's resumed
+        # ones) so we accumulate history for backtest. The RSS feed includes
+        # multi-year history per poll, so this catches all events we've ever
+        # seen across restarts (dedup keyed by halt_date|ticker|halt_time).
+        for ev in events:
+            _persist_halt_event(ev)
 
         for ev in events:
             if ev.halt_date != today:

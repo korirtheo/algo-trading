@@ -34,6 +34,19 @@ LIVE_BRACKET_BUFFER_MULT = 1.5         # bracket is 50% wider than strategy stop
 LIVE_BRACKET_DEFAULT_STOP_PCT = 12.0   # fallback for trail-only strategies (H, etc.)
 LIVE_BRACKET_MAX_STOP_PCT = 25.0       # absolute ceiling — never wider than this
 LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires first
+
+# --- Marketable limit BUY orders (2026-06-24): cap entry slippage ---
+# When > 0, BUY orders go in as marketable LIMIT orders with limit_price =
+# signal_price * (1 + buffer/100) instead of MarketOrderRequest. Fills happen
+# at or below the limit. If the market is already above the limit when the
+# order arrives at Alpaca, the order sits (DAY TIF) and may fill if price comes
+# back, or never fills (we skip the trade — better than overpaying).
+# 2026-06-24 CCXI: signal $12.6363, fill $12.83 = +153bp. With buffer=1.5%, limit
+# would have been $12.83 — order fills at limit (capped slippage instead of
+# uncapped). Calibrate via fills_calibration.csv: median G entry slip ~0-50bp,
+# tail to 150bp. 1.5% catches most fills, blocks the worst tails.
+# Set to 0 to revert to MarketOrderRequest behavior.
+LIVE_BUY_LIMIT_BUFFER_PCT = 1.5
 # Hard cap on position size: never more than this fraction of total EQUITY
 # per single trade. Equity-basis (not literal cash) is correct because:
 #   1. backtest's cash_box[0] accumulates wins — matches equity, not cash
@@ -41,7 +54,13 @@ LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires
 #   3. drawdowns eat cash first; cash-basis would lock the bot out
 # Prevents the bot from putting 100%+ of equity (via buying power) into
 # one microcap when position_cost arrives misconfigured.
-LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # cap at 30% of EQUITY per trade (name kept for import-stability)
+LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # cap at 30% of EQUITY per trade
+# 2026-06-23: reverted from 100 back to 30 — backtest IS applying vol caps
+# (5% cum_$vol, 8% v_regime, 15% v_eff_adj — test_green_candle_combined.py:2976-2990).
+# Backtest's "deploy" is actually capped by vol, not 100% cash. The 30%
+# equity wrapper is a reasonable proxy for vol caps while IEX feed under-counts.
+# WHEN SIP UPGRADE COMPLETES: set LIVE_DISABLE_VOL_CAPS=False + raise this to
+# 100 (vol caps will become the natural size limit, matching backtest behavior).
 
 # --- IEX FEED WORKAROUND (2026-06-18) ---
 # Live cum_$vol from IEX-only feed under-counts by 100-1000x on hot gappers

@@ -1,0 +1,30 @@
+{
+  "reclaim_after_dip": {
+    "n": 5123,
+    "days": 846,
+    "total_pnl": 824666.6636819161,
+    "mean": 160.9733874061909,
+    "wr": 71.40347452664454,
+    "pf": 21.4169750544006,
+    "exit_breakdown": {
+      "TRAIL": 5042,
+      "TIME_STOP": 78,
+      "STOP": 2,
+      "EOD": 1
+    }
+  },
+  "any_green_above_open": {
+    "n": 6230,
+    "days": 851,
+    "total_pnl": 1278252.6671670338,
+    "mean": 205.17699312472453,
+    "wr": 75.8908507223114,
+    "pf": 27.78318773749173,
+    "exit_breakdown": {
+      "TRAIL": 6161,
+      "TIME_STOP": 63,
+      "STOP": 5,
+      "EOD": 1
+    }
+  }
+}

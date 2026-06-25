@@ -34,6 +34,7 @@ from config.settings import (
     LIVE_BRACKET_ORDERS, LIVE_BRACKET_BUFFER_MULT,
     LIVE_BRACKET_DEFAULT_STOP_PCT, LIVE_BRACKET_MAX_STOP_PCT,
     LIVE_BRACKET_TARGET_PCT, LIVE_MAX_POSITION_PCT_OF_CASH,
+    LIVE_BUY_LIMIT_BUFFER_PCT,
 )
 
 import test_green_candle_combined as tgc
@@ -277,8 +278,17 @@ class OrderExecutor:
                 # If we can't read account equity, refuse to trade — better safe than sorry
                 return None
 
-        # Volume cap check
-        if VOL_CAP_PCT > 0 and cumulative_dollar_volume > 0:
+        # Volume cap check.
+        # 2026-06-23 FIX: previously this block ignored LIVE_DISABLE_VOL_CAPS,
+        # causing GITS to be sized to $169 (5% of $3,374 cum_$vol) instead of
+        # the intended $26K (30% of cash). Now we explicitly skip vol cap when
+        # the disable flag is set, deferring purely to the equity cap above.
+        from config.settings import LIVE_DISABLE_VOL_CAPS as _live_disable_vol
+        if _live_disable_vol:
+            # IEX-feed under-counting makes vol-cap bind absurdly tight.
+            # When disabled, equity cap (30% of equity) is the only size guard.
+            pass
+        elif VOL_CAP_PCT > 0 and cumulative_dollar_volume > 0:
             vol_limit = cumulative_dollar_volume * (VOL_CAP_PCT / 100)
             if vol_limit > 0 and dollar_amount > vol_limit:
                 log.info(f"Vol cap: {ticker} limited from ${dollar_amount:,.0f} "
@@ -316,37 +326,42 @@ class OrderExecutor:
         bracket_stop = round(current_price * (1 - bracket_stop_pct / 100), 2)
         bracket_target = round(current_price * (1 + LIVE_BRACKET_TARGET_PCT / 100), 2)
 
+        # 2026-06-24 FIX: use marketable LIMIT order (capped slippage) when
+        # LIVE_BUY_LIMIT_BUFFER_PCT > 0. CCXI today filled +153bp above signal —
+        # a Market order has no upper bound. A LIMIT at signal * (1 + buffer/100)
+        # fills at-or-below limit, or sits/skips if the market is already above.
+        # Set buffer=0 in settings to revert to MarketOrderRequest behavior.
+        use_limit = LIVE_BUY_LIMIT_BUFFER_PCT and LIVE_BUY_LIMIT_BUFFER_PCT > 0
+        limit_price = round(current_price * (1 + LIVE_BUY_LIMIT_BUFFER_PCT / 100), 2) if use_limit else None
+
+        def _build_buy_req(with_bracket: bool):
+            kwargs = dict(symbol=ticker, qty=shares, side=OrderSide.BUY,
+                          time_in_force=TimeInForce.DAY)
+            if with_bracket:
+                kwargs.update(order_class=OrderClass.BRACKET,
+                              stop_loss=StopLossRequest(stop_price=str(bracket_stop)),
+                              take_profit=TakeProfitRequest(limit_price=str(bracket_target)))
+            if use_limit:
+                kwargs["limit_price"] = str(limit_price)
+                return LimitOrderRequest(**kwargs)
+            return MarketOrderRequest(**kwargs)
+
         ts_signal = datetime.now(ET).isoformat()
         try:
             if LIVE_BRACKET_ORDERS:
-                order = self.client.submit_order(
-                    MarketOrderRequest(
-                        symbol=ticker,
-                        qty=shares,
-                        side=OrderSide.BUY,
-                        time_in_force=TimeInForce.DAY,
-                        order_class=OrderClass.BRACKET,
-                        stop_loss=StopLossRequest(stop_price=str(bracket_stop)),
-                        take_profit=TakeProfitRequest(limit_price=str(bracket_target)),
-                    )
-                )
+                order = self.client.submit_order(_build_buy_req(with_bracket=True))
+                order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"
                 log.info(
-                    f"BUY {ticker} [BRACKET] strategy={strategy}: {shares} shares "
+                    f"BUY {ticker} [BRACKET/{order_kind}] strategy={strategy}: {shares} shares "
                     f"@ ~${current_price:.2f} (${dollar_amount:,.0f}) | "
                     f"stop=${bracket_stop:.2f} (-{bracket_stop_pct:.1f}%) "
                     f"target=${bracket_target:.2f} (+{LIVE_BRACKET_TARGET_PCT}%) | "
                     f"order_id={order.id}"
                 )
             else:
-                order = self.client.submit_order(
-                    MarketOrderRequest(
-                        symbol=ticker,
-                        qty=shares,
-                        side=OrderSide.BUY,
-                        time_in_force=TimeInForce.DAY,
-                    )
-                )
-                log.info(f"BUY {ticker}: {shares} shares @ ~${current_price:.2f} "
+                order = self.client.submit_order(_build_buy_req(with_bracket=False))
+                order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"
+                log.info(f"BUY {ticker} [{order_kind}]: {shares} shares @ ~${current_price:.2f} "
                          f"(${dollar_amount:,.0f}) | order_id={order.id}")
             self.positions[ticker] = {
                 "order_id": str(order.id),

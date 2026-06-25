@@ -1,0 +1,38 @@
+[
+  {
+    "label": "A. March-era (no slippage model, no caps)",
+    "final": 31736858.668486696,
+    "pnl": 31711858.668486696,
+    "multiple": 1269.4743467394678,
+    "n_trades": 2452,
+    "win_rate": 66.02773246329528,
+    "max_dd_pct": -5.705718137030647
+  },
+  {
+    "label": "B. Slippage ON only (Almgren-Chriss, no participation caps)",
+    "final": 12811.006480225224,
+    "pnl": -12188.993519774776,
+    "multiple": 0.5124402592090089,
+    "n_trades": 965,
+    "win_rate": 51.70984455958549,
+    "max_dd_pct": -73.31701732022795
+  },
+  {
+    "label": "C. Participation caps ON only (no slippage model)",
+    "final": 31736858.668486696,
+    "pnl": 31711858.668486696,
+    "multiple": 1269.4743467394678,
+    "n_trades": 2452,
+    "win_rate": 66.02773246329528,
+    "max_dd_pct": -5.705718137030647
+  },
+  {
+    "label": "D. CURRENT realistic execution (slippage + caps)",
+    "final": 14665.386841359272,
+    "pnl": -10334.613158640728,
+    "multiple": 0.5866154736543708,
+    "n_trades": 1120,
+    "win_rate": 50.535714285714285,
+    "max_dd_pct": -72.63727108740245
+  }
+]

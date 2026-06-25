@@ -14,6 +14,8 @@ For live trading, it:
 import json
 import logging
 import os
+import threading
+import time
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -132,7 +134,7 @@ def _append_trade(trade):
 class CombinedEngine:
     """Runs all 12 strategies using the backtest's simulate_day_combined()."""
 
-    def __init__(self, executor, params_path=None):
+    def __init__(self, executor, params_path=None, fill_stream=None):
         self.executor = executor
         self.params = load_trial_params(params_path)
         self.bar_data = {}      # ticker -> list of (timestamp, OHLCV dict)
@@ -148,6 +150,13 @@ class CombinedEngine:
         # These run a SEPARATE evaluator (strategies.halt_resume) and never
         # touch simulate_day_combined.
         self.halt_states = {}        # ticker -> state dict from hr.create_state
+
+        # Pending orders awaiting fill notification via TradingStream.
+        # Replaces the 15s polling that caused 85 duplicate fills on GITS 2026-06-23.
+        # Format: order_id -> {ticker, strategy, signal_price, signal_time, side}
+        self.pending_orders = {}
+        self._pending_lock = threading.Lock()
+        self.fill_stream = fill_stream  # FillStream instance, or None for legacy polling
 
     def initialize_watchlist(self, candidates):
         """Set up from scanner candidates.
@@ -181,6 +190,26 @@ class CombinedEngine:
             })
 
         log.info("Initialized %d candidates for combined strategy", len(self.picks))
+
+        # FIX 2026-06-22: detect orphan positions at startup.
+        # If the engine was restarted while a position was open at Alpaca,
+        # the engine has no internal record of it and no strategy will
+        # manage exits. Close any orphan immediately at startup to avoid
+        # uncontrolled positions (the SAGT pattern observed today).
+        try:
+            existing = self.executor.client.get_all_positions()
+            for p in existing:
+                qty = float(p.qty)
+                if qty < 1: continue
+                log.warning("ORPHAN POSITION at startup: %s qty=%.0f avg=$%.4f — closing",
+                            p.symbol, qty, float(p.avg_entry_price))
+                try:
+                    self.executor._cancel_bracket_legs_for_ticker(p.symbol)
+                    self.executor.client.close_position(p.symbol)
+                except Exception as e:
+                    log.error("ORPHAN close failed for %s: %s", p.symbol, e)
+        except Exception as e:
+            log.warning("Orphan-position check failed: %s", e)
 
     def on_intraday_addition(self, ticker, halt_event, source="halt_resume"):
         """Register a ticker discovered mid-day (e.g. via halt-resume scanner).
@@ -304,6 +333,77 @@ class CombinedEngine:
                 log.debug("  sim-entry: %s strat=%s entry=$%.3f cost=$%.0f",
                           st["ticker"], st.get("strategy"), st.get("entry_price"), st.get("position_cost", 0))
 
+        # FIX 2026-06-24: comprehensive per-bar reconciliation with Alpaca.
+        # Fixes 4 bugs from 2026-06-24 CCXI incident:
+        #   1) pop key ordering — was popping None after clearing active_position
+        #   2) KeyError silently swallowed when position_entry missing the ticker dict
+        #   3) active_position stuck forever if Alpaca says no-position but internal empty
+        #   4) no fallback to rehydrate position_entry from Alpaca when stream miss the fill
+        if self.active_position is not None:
+            ticker_pos = self.active_position  # snapshot — don't read after mutation
+            try:
+                actual_pos = self.executor.client.get_open_position(ticker_pos)
+                actual_qty = float(actual_pos.qty)
+                internal = self.position_entry.get(ticker_pos, {})
+                internal_qty = float(internal.get("shares", 0))
+                if abs(actual_qty - internal_qty) >= 1.0:
+                    log.warning("RECONCILE %s: internal=%.0f, Alpaca=%.0f → fixing",
+                                ticker_pos, internal_qty, actual_qty)
+                    if actual_qty < 1:
+                        # Position closed externally (bracket child, etc.)
+                        log.info("RECONCILE %s: position closed externally — clearing", ticker_pos)
+                        self.position_entry.pop(ticker_pos, None)  # pop BEFORE clearing active
+                        self.active_position = None
+                    else:
+                        # Position open at Alpaca but internal record missing or wrong.
+                        # Stream fill notification likely missed (TradingStream race).
+                        # Rehydrate position_entry from Alpaca + pending_orders metadata.
+                        if ticker_pos not in self.position_entry or not internal:
+                            try:
+                                actual_avg = float(getattr(actual_pos, "avg_entry_price", 0)) \
+                                             or float(actual_pos.cost_basis) / max(actual_qty, 1)
+                            except (AttributeError, ValueError, ZeroDivisionError, TypeError):
+                                actual_avg = 0.0
+                            # Recover strategy + entry_time from pending_orders if we still have it
+                            with self._pending_lock:
+                                pending_match = next(
+                                    (p for p in self.pending_orders.values()
+                                     if p.get("ticker") == ticker_pos and p.get("side") == "buy"),
+                                    None,
+                                )
+                            strategy = (pending_match or {}).get("strategy", "G")
+                            entry_time = (pending_match or {}).get("signal_time", ts)
+                            self.position_entry[ticker_pos] = {
+                                "entry_price": actual_avg,
+                                "shares": actual_qty,
+                                "cost": actual_qty * actual_avg,
+                                "strategy": strategy,
+                                "entry_time": entry_time,
+                            }
+                            log.info("RECONCILE %s: rehydrated from Alpaca — strategy=%s "
+                                     "qty=%.0f avg=$%.3f entry_time=%s",
+                                     ticker_pos, strategy, actual_qty, actual_avg, entry_time)
+                        else:
+                            self.position_entry[ticker_pos]["shares"] = actual_qty
+            except Exception:
+                # No position at Alpaca. Before clearing active_position, check if there
+                # are PENDING BUY orders for this ticker — a held/pending_new bracket has
+                # not yet created an Alpaca position. Clearing here would let the next
+                # bar fire a duplicate signal (2026-06-25 KUST: 3 brackets placed for
+                # one signal, exhausted buying power before any filled).
+                with self._pending_lock:
+                    has_pending_buy = any(
+                        p.get("ticker") == ticker_pos and p.get("side") == "buy"
+                        for p in self.pending_orders.values()
+                    )
+                if has_pending_buy:
+                    log.debug("RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
+                              ticker_pos)
+                else:
+                    log.warning("RECONCILE %s: no position at Alpaca → clearing active_position", ticker_pos)
+                    self.position_entry.pop(ticker_pos, None)
+                    self.active_position = None
+
         # Store all sub-states per ticker for diagnostics
         per_ticker = {}
         for st in states:
@@ -314,6 +414,19 @@ class CombinedEngine:
         for st in states:
             ticker = st["ticker"]
             prev = self.last_states.get(ticker)
+
+            # FIX 2026-06-22: when a ticker is already active, only respond
+            # to state changes from the SAME strategy that owns the position.
+            # The simulator returns one state PER STRATEGY per ticker (G state,
+            # L state, etc.). Without this guard, an irrelevant strategy's
+            # state (e.g. L's parallel evaluation of SAGT) triggers phantom
+            # partial-sells when its shares value differs from prev. The
+            # SAGT 30% phantom sell at 14:35 today is the symptom.
+            if (ticker == self.active_position
+                    and self.position_entry.get(ticker, {}).get("strategy")
+                    and st.get("strategy")
+                    and st["strategy"] != self.position_entry[ticker]["strategy"]):
+                continue
 
             # New entry detected
             if st.get("entry_price") is not None and (prev is None or prev.get("entry_price") is None):
@@ -330,17 +443,46 @@ class CombinedEngine:
                                              cumulative_dollar_volume=cum_dollar,
                                              strategy=strategy)
                     if order:
+                        # 2026-06-23 FIX: previously polled for 15s and gave up — caused
+                        # 85 untracked duplicate fills on GITS today (microcap fills took
+                        # >15s; each "give up" triggered a NEW signal).
+                        # New: claim the slot IMMEDIATELY (active_position + pending_orders),
+                        # register fill callback with TradingStream, return control.
+                        # Next bar's signal sees active_position != None and skips.
+                        # Stream callback resolves position_entry with actual filled qty/avg
+                        # when the fill arrives — could be 2s or 30s, no longer matters.
                         self.active_position = ticker
-                        self.position_entry[ticker] = {
-                            "entry_price": entry_price,
-                            "shares": st.get("shares", 0),
-                            "cost": trade_size,
-                            "strategy": strategy,
-                            "entry_time": ts,
-                        }
-                        log.info("ENTRY %s (%s): %.2f shares @ $%.3f ($%s)",
-                                 ticker, strategy, st.get("shares", 0), entry_price,
-                                 format(trade_size, ",.0f"))
+                        # 2026-06-24 FIX: bootstrap position_entry IMMEDIATELY (using
+                        # signal_price as entry estimate, shares=0 placeholder). The
+                        # CCXI 2026-06-24 incident showed that the TradingStream fill
+                        # callback can silently miss, leaving position_entry empty for
+                        # the entire trade. Without strategy/entry_time, TIME_STOP can't
+                        # fire, and RECONCILE can't rehydrate (no internal record to update).
+                        # With this bootstrap, RECONCILE will see internal_qty=0 < Alpaca
+                        # actual_qty, hit the "rehydrate" path, and self-heal on the next bar.
+                        if ticker not in self.position_entry:
+                            self.position_entry[ticker] = {
+                                "entry_price": entry_price,
+                                "shares": 0,  # placeholder — RECONCILE/stream fills this in
+                                "cost": trade_size,
+                                "strategy": strategy,
+                                "entry_time": ts,
+                            }
+                        with self._pending_lock:
+                            self.pending_orders[str(order.id)] = {
+                                "ticker": ticker, "strategy": strategy,
+                                "signal_price": entry_price, "signal_time": ts,
+                                "side": "buy", "requested_cost": trade_size,
+                            }
+                        if self.fill_stream is not None:
+                            self.fill_stream.register(order.id, self._on_buy_fill)
+                            log.info("BUY %s: order %s placed, awaiting TradingStream fill notification",
+                                     ticker, order.id)
+                            # Set safety-net polling: if stream misses for >60s, force-poll
+                            self._schedule_safety_poll(order.id, ticker, "buy", entry_price, ts, strategy)
+                        else:
+                            # Legacy path — no stream, poll inline (kept for backward compat)
+                            self._poll_buy_fill_inline(order, ticker, strategy, entry_price, ts)
                     else:
                         log.warning("BUY REJECTED %s: order returned None (vol_cap or executor error)", ticker)
                 elif self.active_position is not None:
@@ -361,40 +503,90 @@ class CombinedEngine:
                         strategy=entry_info.get("strategy", "?"),
                     )
                     if order:
-                        self.active_position = None
-                        self.daily_pnl += pnl
-                        entry_info = self.position_entry.get(ticker, {})
-
-                        trade = {
-                            "ticker": ticker,
-                            "strategy": entry_info.get("strategy", "?"),
-                            "entry_price": entry_info.get("entry_price", 0),
-                            "exit_price": exit_price,
-                            "pnl": pnl,
-                            "reason": exit_reason,
-                            "entry_time": entry_info.get("entry_time"),
-                            "exit_time": ts,
-                        }
-                        self.trades_today.append(trade)
-                        _append_trade(trade)
-                        log.info("EXIT %s (%s): PnL=$%s | $%.2f -> $%.2f",
-                                 ticker, exit_reason, format(pnl, "+,.2f"),
-                                 entry_info.get("entry_price", 0), exit_price)
+                        # 2026-06-23: stream-based sell tracking — don't clear
+                        # active_position until fill confirmed. Prevents phantom
+                        # "I sold" state when actually order was rejected/unfilled.
+                        with self._pending_lock:
+                            self.pending_orders[str(order.id)] = {
+                                "ticker": ticker, "strategy": entry_info.get("strategy", "?"),
+                                "signal_price": exit_price, "signal_time": ts,
+                                "side": "sell", "exit_reason": exit_reason,
+                                "expected_pnl": pnl,
+                                "pre_sell_shares": entry_info.get("shares", 0),
+                                "is_partial": False,
+                            }
+                        if self.fill_stream is not None:
+                            self.fill_stream.register(order.id, self._on_sell_fill)
+                            log.info("SELL %s (%s): order %s placed, awaiting stream fill",
+                                     ticker, exit_reason, order.id)
+                            self._schedule_sell_safety_poll(order.id, ticker)
+                        else:
+                            # Legacy synchronous behavior
+                            self.active_position = None
+                            self.daily_pnl += pnl
+                            entry_info_l = self.position_entry.get(ticker, {})
+                            trade = {
+                                "ticker": ticker,
+                                "strategy": entry_info_l.get("strategy", "?"),
+                                "entry_price": entry_info_l.get("entry_price", 0),
+                                "exit_price": exit_price,
+                                "pnl": pnl,
+                                "reason": exit_reason,
+                                "entry_time": entry_info_l.get("entry_time"),
+                                "exit_time": ts,
+                            }
+                            self.trades_today.append(trade)
+                            _append_trade(trade)
+                            log.info("EXIT %s (%s) [LEGACY]: PnL=$%s | $%.2f -> $%.2f",
+                                     ticker, exit_reason, format(pnl, "+,.2f"),
+                                     entry_info_l.get("entry_price", 0), exit_price)
 
             # Partial sell detected
+            # FIX 2026-06-22: previously used the simulator's `st.shares` diff
+            # directly, which was based on the phantom cash/entry_price size.
+            # Now compute a FRACTION sold from the simulator state and apply
+            # that fraction to the ACTUAL Alpaca position size.
             if (prev is not None
                 and st.get("shares", 0) < prev.get("shares", 0)
                 and st.get("entry_price") is not None
-                and prev.get("entry_price") is not None):
-                sold_shares = prev["shares"] - st["shares"]
-                if sold_shares > 0.001 and ticker == self.active_position:
-                    log.info("PARTIAL SELL %s: %.2f shares", ticker, sold_shares)
-                    pinfo = self.position_entry.get(ticker, {})
-                    self.executor.sell(
-                        ticker, shares=sold_shares, reason="PARTIAL",
-                        signal_price=st.get("partial_price") or st.get("close"),
-                        strategy=pinfo.get("strategy", "?"),
-                    )
+                and prev.get("entry_price") is not None
+                and ticker == self.active_position):
+                pinfo = self.position_entry.get(ticker, {})
+                actual_shares = float(pinfo.get("shares", 0))
+                if actual_shares >= 1:
+                    sim_frac_sold = (prev["shares"] - st["shares"]) / max(prev["shares"], 1e-9)
+                    if sim_frac_sold >= 0.01:
+                        sell_qty = int(actual_shares * sim_frac_sold)
+                        if sell_qty >= 1:
+                            log.info("PARTIAL SELL %s: %d shares (%.0f%% of actual %.0f)",
+                                     ticker, sell_qty, sim_frac_sold * 100, actual_shares)
+                            sell_order = self.executor.sell(
+                                ticker, shares=sell_qty, reason="PARTIAL",
+                                signal_price=st.get("partial_price") or st.get("close"),
+                                strategy=pinfo.get("strategy", "?"),
+                            )
+                            # FIX 2026-06-22: also poll the sell for terminal status.
+                            # Critical — if the sell only partially fills, our
+                            # position_entry update would over-decrement and
+                            # subsequent PARTIAL SELLs would target a non-existent
+                            # block of shares. Wait briefly for terminal state.
+                            actual_sold = sell_qty  # fallback assumption
+                            if sell_order is not None:
+                                import time as _time
+                                term = {"filled", "canceled", "rejected", "expired"}
+                                deadline = _time.time() + 10.0
+                                while _time.time() < deadline:
+                                    try:
+                                        o = self.executor.client.get_order_by_id(sell_order.id)
+                                        sst = o.status.value if hasattr(o.status, 'value') else str(o.status)
+                                        if o.filled_qty:
+                                            actual_sold = float(o.filled_qty)
+                                        if sst in term:
+                                            break
+                                    except Exception:
+                                        pass
+                                    _time.sleep(0.3)
+                            self.position_entry[ticker]["shares"] = actual_shares - actual_sold
 
             self.last_states[ticker] = dict(st)
 
@@ -552,6 +744,236 @@ class CombinedEngine:
         after mid-day restart)."""
         bars = self.bar_data.get(ticker, [])
         return sum(b["Volume"] for b in bars)
+
+    # Events that complete an order's lifecycle. Pop pending only on these.
+    # Non-terminal events (new, pending_new, held, accepted, partial_fill) arrive
+    # BEFORE 'fill' and would otherwise wipe out the pending entry.
+    _BUY_TERMINAL_EVENTS = {"fill", "canceled", "rejected", "expired", "done_for_day"}
+
+    # ----- Stream-based fill handling (2026-06-23, fixed 2026-06-24) -----
+    def _on_buy_fill(self, event_type, order):
+        """Called by FillStream when a buy order changes status.
+
+        On 'fill': records position_entry with actual filled qty + avg price, pops pending.
+        On 'partial_fill': records partial entry but keeps pending (more fills may come).
+        On 'canceled'/'rejected'/'expired': clears active_position, pops pending.
+        On other events ('new', 'pending_new', 'held', etc.): peeks pending without popping.
+
+        FIX 2026-06-24: previously popped on EVERY event. First non-fill event
+        ("pending_new" or "new") destroyed the pending entry before the actual
+        "fill" arrived, causing the 100+ RECONCILE bug chain on CCXI today.
+        """
+        oid = str(getattr(order, "id", ""))
+        is_terminal = event_type in self._BUY_TERMINAL_EVENTS
+        with self._pending_lock:
+            if is_terminal:
+                pending = self.pending_orders.pop(oid, None)
+            else:
+                pending = self.pending_orders.get(oid, None)
+        if pending is None:
+            # Already resolved (popped by an earlier terminal event), or never registered.
+            log.debug(f"BUY fill event {event_type} for unknown order {oid}")
+            return
+        ticker = pending["ticker"]
+        strategy = pending["strategy"]
+
+        if event_type in ("fill", "partial_fill"):
+            try:
+                actual_shares = float(order.filled_qty) if order.filled_qty else 0.0
+                actual_avg = float(order.filled_avg_price) if order.filled_avg_price else pending["signal_price"]
+            except (TypeError, ValueError):
+                actual_shares = 0.0; actual_avg = pending["signal_price"]
+            if actual_shares < 1:
+                log.warning("BUY %s STREAM-FILL: 0 shares filled (event=%s)", ticker, event_type)
+                # Don't clear active_position yet on partial_fill — may complete later
+                if event_type != "partial_fill":
+                    if self.active_position == ticker: self.active_position = None
+                return
+            actual_cost = actual_shares * actual_avg
+            self.position_entry[ticker] = {
+                "entry_price": actual_avg,
+                "shares": actual_shares,
+                "cost": actual_cost,
+                "strategy": strategy,
+                "entry_time": pending["signal_time"],
+            }
+            log.info("ENTRY %s (%s) [STREAM]: %.2f shares @ $%.3f ($%s) — order=%s event=%s",
+                     ticker, strategy, actual_shares, actual_avg,
+                     format(actual_cost, ",.0f"), oid, event_type)
+        elif event_type in ("canceled", "rejected", "expired", "done_for_day"):
+            # No fill — clear active_position so engine can react to next signal
+            log.warning("BUY %s [STREAM]: no fill (event=%s) — clearing active_position", ticker, event_type)
+            if self.active_position == ticker and ticker not in self.position_entry:
+                self.active_position = None
+        else:
+            log.debug(f"BUY {ticker} STREAM event={event_type} order={oid}")
+
+    def _on_sell_fill(self, event_type, order):
+        """Called by FillStream when a sell order changes status.
+
+        On 'fill': clears active_position (if full sell) or decrements shares
+                   (if partial), records trade, updates daily_pnl.
+        On 'partial_fill': decrements shares only, keeps position open + pending.
+        On 'canceled'/'rejected'/'expired': position is STILL OPEN — don't
+                   clear active_position (engine will retry exit next bar).
+        Same FIX 2026-06-24 as _on_buy_fill: only pop on terminal events.
+        """
+        oid = str(getattr(order, "id", ""))
+        is_terminal = event_type in self._BUY_TERMINAL_EVENTS  # same terminal set
+        with self._pending_lock:
+            if is_terminal:
+                pending = self.pending_orders.pop(oid, None)
+            else:
+                pending = self.pending_orders.get(oid, None)
+        if pending is None:
+            log.debug(f"SELL fill event {event_type} for unknown order {oid}")
+            return
+        ticker = pending["ticker"]
+        strategy = pending["strategy"]
+        exit_reason = pending.get("exit_reason", "UNKNOWN")
+        is_partial = pending.get("is_partial", False)
+
+        if event_type in ("fill", "partial_fill"):
+            try:
+                actual_sold = float(order.filled_qty) if order.filled_qty else 0.0
+                actual_avg = float(order.filled_avg_price) if order.filled_avg_price else pending["signal_price"]
+            except (TypeError, ValueError):
+                actual_sold = 0.0; actual_avg = pending["signal_price"]
+            if actual_sold < 1:
+                log.warning("SELL %s STREAM-FILL: 0 shares filled (event=%s)", ticker, event_type)
+                return
+            pinfo = self.position_entry.get(ticker, {})
+            pre_shares = float(pinfo.get("shares", 0))
+            remaining = max(0.0, pre_shares - actual_sold)
+            pinfo["shares"] = remaining
+            self.position_entry[ticker] = pinfo
+
+            if is_partial and event_type == "partial_fill":
+                # Still some shares pending in this partial sell — don't clear active
+                log.info("PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f (partial event, still pending)",
+                         ticker, actual_sold, actual_avg)
+                return
+
+            # Position fully closed by this fill (full sell, or partial sell that completed all of its target qty)
+            if remaining < 1 and not is_partial:
+                # Full exit
+                entry_price = float(pinfo.get("entry_price", 0))
+                # Compute realized PnL from actual fills (true vs expected)
+                pnl = (actual_avg - entry_price) * actual_sold
+                self.active_position = None
+                self.daily_pnl += pnl
+                trade = {
+                    "ticker": ticker, "strategy": strategy,
+                    "entry_price": entry_price,
+                    "exit_price": actual_avg,
+                    "pnl": pnl, "reason": exit_reason,
+                    "entry_time": pinfo.get("entry_time"),
+                    "exit_time": pending["signal_time"],
+                }
+                self.trades_today.append(trade)
+                _append_trade(trade)
+                log.info("EXIT %s (%s) [STREAM]: PnL=$%s | $%.2f -> $%.3f  (sold %.0f shares)",
+                         ticker, exit_reason, format(pnl, "+,.2f"),
+                         entry_price, actual_avg, actual_sold)
+            else:
+                # Partial sell completed — log but stay in position
+                log.info("PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f sold, %.0f remaining",
+                         ticker, actual_sold, actual_avg, remaining)
+        elif event_type in ("canceled", "rejected", "expired"):
+            log.warning("SELL %s [STREAM]: NO FILL (event=%s) — position STILL OPEN, engine will retry exit",
+                        ticker, event_type)
+        else:
+            log.debug(f"SELL {ticker} STREAM event={event_type} order={oid}")
+
+    def _schedule_sell_safety_poll(self, order_id, ticker):
+        """Safety net for sell orders — same logic as buy, polls after 60s."""
+        def _poll():
+            time.sleep(60.0)
+            with self._pending_lock:
+                still_pending = str(order_id) in self.pending_orders
+            if not still_pending: return
+            log.warning("SAFETY-POLL SELL %s order %s: stream silent 60s, polling Alpaca", ticker, order_id)
+            try:
+                o = self.executor.client.get_order_by_id(order_id)
+                status = o.status.value if hasattr(o.status, "value") else str(o.status)
+                status = status.lower().replace("orderstatus.", "")
+                if status == "filled" or (o.filled_qty and float(o.filled_qty) > 0):
+                    self._on_sell_fill("fill", o)
+                elif status in ("canceled", "rejected", "expired"):
+                    self._on_sell_fill(status, o)
+                else:
+                    log.warning("SAFETY-POLL SELL %s order %s: still %s after 60s — abandoning callback",
+                                ticker, order_id, status)
+                    with self._pending_lock:
+                        self.pending_orders.pop(str(order_id), None)
+            except Exception as e:
+                log.error(f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
+        threading.Thread(target=_poll, daemon=True, name=f"sell-safety-{str(order_id)[:8]}").start()
+
+    def _schedule_safety_poll(self, order_id, ticker, side, signal_price, signal_time, strategy):
+        """Background safety net: if TradingStream misses an event (stream disconnect,
+        callback bug, etc.), poll Alpaca after 60s to force-resolve the pending order.
+        """
+        def _poll():
+            time.sleep(60.0)
+            with self._pending_lock:
+                still_pending = str(order_id) in self.pending_orders
+            if not still_pending:
+                return  # stream already handled it
+            log.warning("SAFETY-POLL %s order %s: stream didn't notify in 60s, polling Alpaca", ticker, order_id)
+            try:
+                o = self.executor.client.get_order_by_id(order_id)
+                status = o.status.value if hasattr(o.status, "value") else str(o.status)
+                status = status.lower().replace("orderstatus.", "")
+                if status == "filled" or (o.filled_qty and float(o.filled_qty) > 0):
+                    # Manually invoke the same handler as stream would
+                    self._on_buy_fill("fill", o)
+                elif status in ("canceled", "rejected", "expired"):
+                    self._on_buy_fill(status, o)
+                else:
+                    log.warning("SAFETY-POLL %s order %s: status=%s after 60s, still pending — abandoning",
+                                ticker, order_id, status)
+                    with self._pending_lock:
+                        self.pending_orders.pop(str(order_id), None)
+                    if self.active_position == ticker and ticker not in self.position_entry:
+                        self.active_position = None
+            except Exception as e:
+                log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
+        threading.Thread(target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}").start()
+
+    def _poll_buy_fill_inline(self, order, ticker, strategy, entry_price, ts):
+        """LEGACY synchronous polling — used only when fill_stream is None.
+        Kept for backward compat / unit tests."""
+        actual_shares = 0.0
+        actual_avg = entry_price
+        terminal_states = {"filled", "canceled", "rejected", "expired"}
+        deadline = time.time() + 30.0  # extended from 15s
+        last_status = None
+        while time.time() < deadline:
+            try:
+                o = self.executor.client.get_order_by_id(order.id)
+                fst = o.status.value if hasattr(o.status, 'value') else str(o.status)
+                last_status = fst
+                if o.filled_qty: actual_shares = float(o.filled_qty)
+                if o.filled_avg_price: actual_avg = float(o.filled_avg_price)
+                if fst in terminal_states: break
+            except Exception:
+                pass
+            time.sleep(0.3)
+        else:
+            log.warning("BUY %s: order %s still %s after 30s polling — reconciliation",
+                        ticker, order.id, last_status)
+        if actual_shares < 1:
+            log.warning("BUY %s LEGACY-POLL: 0 shares filled in 30s — not recording position", ticker)
+            if self.active_position == ticker: self.active_position = None
+        else:
+            actual_cost = actual_shares * actual_avg
+            self.position_entry[ticker] = {
+                "entry_price": actual_avg, "shares": actual_shares, "cost": actual_cost,
+                "strategy": strategy, "entry_time": ts,
+            }
+            log.info("ENTRY %s (%s) [LEGACY-POLL]: %.2f shares @ $%.3f ($%s)",
+                     ticker, strategy, actual_shares, actual_avg, format(actual_cost, ",.0f"))
 
     def _cum_dollar_vol(self, ticker):
         """Cumulative DOLLAR volume since 9:30 ET today, fetched live from

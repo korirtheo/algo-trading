@@ -238,6 +238,9 @@ optuna_best_*.json
 # Result files (DBs already covered above; JSON best-params under results/ stay tracked)
 results/logs/
 
+# CSV data files (downloaded / regenerated)
+*.csv
+
 # Live trading logs
 logs/
 

@@ -1,0 +1,2072 @@
+[
+  {
+    "date": "2026-01-05",
+    "ticker": "MNTS",
+    "strategy": "G",
+    "pnl": 2513.9133561393683,
+    "ret_pct": 10.055653424557473,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 72.47386759581882
+  },
+  {
+    "date": "2026-01-05",
+    "ticker": "VRME",
+    "strategy": "L",
+    "pnl": 1984.6817836347545,
+    "ret_pct": 7.168643307743529,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 60.09487103468724
+  },
+  {
+    "date": "2026-01-05",
+    "ticker": "MNTS",
+    "strategy": "G",
+    "pnl": 171.68485867084746,
+    "ret_pct": 0.6239928738909772,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 72.47386759581882
+  },
+  {
+    "date": "2026-01-06",
+    "ticker": "EVTV",
+    "strategy": "G",
+    "pnl": 4999.371982574896,
+    "ret_pct": 16.849763409165384,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 38.22614107883818
+  },
+  {
+    "date": "2026-01-06",
+    "ticker": "EVTV",
+    "strategy": "G",
+    "pnl": 149.64111842146667,
+    "ret_pct": 0.4316199034919321,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 38.22614107883818
+  },
+  {
+    "date": "2026-01-07",
+    "ticker": "GLUE",
+    "strategy": "G",
+    "pnl": 1775.5443822777524,
+    "ret_pct": 5.099311973987894,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 36.8519675202998
+  },
+  {
+    "date": "2026-01-07",
+    "ticker": "GLUE",
+    "strategy": "G",
+    "pnl": -364.78298842642107,
+    "ret_pct": -0.9968154349876484,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 36.8519675202998
+  },
+  {
+    "date": "2026-01-08",
+    "ticker": "FLYX",
+    "strategy": "G",
+    "pnl": 2050.1439652948393,
+    "ret_pct": 5.658683084990629,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 93.63057324840763
+  },
+  {
+    "date": "2026-01-08",
+    "ticker": "VNRX",
+    "strategy": "G",
+    "pnl": 2.280793824018474,
+    "ret_pct": 0.014790947062807036,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 22.156107805390256
+  },
+  {
+    "date": "2026-01-08",
+    "ticker": "FLYX",
+    "strategy": "G",
+    "pnl": 3696.9612881544526,
+    "ret_pct": 9.657633546894798,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 93.63057324840763
+  },
+  {
+    "date": "2026-01-08",
+    "ticker": "VNRX",
+    "strategy": "G",
+    "pnl": 7.499868307256122,
+    "ret_pct": 1.9286533312209038,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 22.156107805390256
+  },
+  {
+    "date": "2026-01-12",
+    "ticker": "SOGP",
+    "strategy": "G",
+    "pnl": 3021.5670119780552,
+    "ret_pct": 7.196444852979804,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 31.923076923076938
+  },
+  {
+    "date": "2026-01-12",
+    "ticker": "BDSX",
+    "strategy": "G",
+    "pnl": 195.88566528561205,
+    "ret_pct": 0.4271891169159731,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 28.113553113553113
+  },
+  {
+    "date": "2026-01-12",
+    "ticker": "EVTV",
+    "strategy": "L",
+    "pnl": 3000.434626762326,
+    "ret_pct": 6.445831877284661,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 148.3264953573742
+  },
+  {
+    "date": "2026-01-12",
+    "ticker": "SOGP",
+    "strategy": "G",
+    "pnl": 846.046810253385,
+    "ret_pct": 1.8797486491663424,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 31.923076923076938
+  },
+  {
+    "date": "2026-01-12",
+    "ticker": "BDSX",
+    "strategy": "G",
+    "pnl": 498.0069741519619,
+    "ret_pct": 1.0814380389686544,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 28.113553113553113
+  },
+  {
+    "date": "2026-01-13",
+    "ticker": "WATT",
+    "strategy": "G",
+    "pnl": 3325.4587688995525,
+    "ret_pct": 6.711470911972968,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 23.50813743218806
+  },
+  {
+    "date": "2026-01-13",
+    "ticker": "WATT",
+    "strategy": "G",
+    "pnl": -549.7651111683299,
+    "ret_pct": -1.03975786440162,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 23.50813743218806
+  },
+  {
+    "date": "2026-01-14",
+    "ticker": "SEGG",
+    "strategy": "L",
+    "pnl": 7524.760945365444,
+    "ret_pct": 14.380930801769251,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 70.29702970297029
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "CJMB",
+    "strategy": "G",
+    "pnl": 10458.156682495086,
+    "ret_pct": 17.47413983832809,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 134.82142857142853
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "AUID",
+    "strategy": "G",
+    "pnl": 1711.819730265168,
+    "ret_pct": 2.309675220633794,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 94.45843828715364
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "SPHL",
+    "strategy": "L",
+    "pnl": -10225.980304569355,
+    "ret_pct": -12.39335309665932,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 247.55555555555557
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "CJMB",
+    "strategy": "L",
+    "pnl": 3732.679669126679,
+    "ret_pct": 5.1637776604077565,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 134.82142857142853
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "ATPC",
+    "strategy": "L",
+    "pnl": 6656.668731090031,
+    "ret_pct": 10.269838024223077,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 70.0
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "CJMB",
+    "strategy": "G",
+    "pnl": 3807.677825178631,
+    "ret_pct": 5.415749693900226,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 134.82142857142853
+  },
+  {
+    "date": "2026-01-15",
+    "ticker": "AUID",
+    "strategy": "G",
+    "pnl": 28.153712905652355,
+    "ret_pct": 0.03712888086422849,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 94.45843828715364
+  },
+  {
+    "date": "2026-01-16",
+    "ticker": "VERO",
+    "strategy": "G",
+    "pnl": 9828.967988867735,
+    "ret_pct": 12.929703188448213,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 301.39860139860144
+  },
+  {
+    "date": "2026-01-16",
+    "ticker": "TNMG",
+    "strategy": "G",
+    "pnl": -399.26634558545993,
+    "ret_pct": -1.3866302158454675,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 24.57627118644068
+  },
+  {
+    "date": "2026-01-16",
+    "ticker": "VERO",
+    "strategy": "L",
+    "pnl": 2822.7951777915296,
+    "ret_pct": 3.0535609377433803,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 301.39860139860144
+  },
+  {
+    "date": "2026-01-16",
+    "ticker": "VERO",
+    "strategy": "G",
+    "pnl": 6999.817163033949,
+    "ret_pct": 8.153782908903445,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 301.39860139860144
+  },
+  {
+    "date": "2026-01-16",
+    "ticker": "TNMG",
+    "strategy": "G",
+    "pnl": -5.298178483387005,
+    "ret_pct": -1.356270257783584,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 24.57627118644068
+  },
+  {
+    "date": "2026-01-20",
+    "ticker": "POLA",
+    "strategy": "G",
+    "pnl": 4375.61227220756,
+    "ret_pct": 7.701061341651945,
+    "n_news": 4,
+    "has_catalyst": false,
+    "gap_pct": 25.595238095238095
+  },
+  {
+    "date": "2026-01-20",
+    "ticker": "IVF",
+    "strategy": "L",
+    "pnl": 4092.9399397688394,
+    "ret_pct": 4.03632618587676,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 311.74298375184645
+  },
+  {
+    "date": "2026-01-20",
+    "ticker": "SHPH",
+    "strategy": "L",
+    "pnl": -13228.6747405184,
+    "ret_pct": -12.539557590531617,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 140.4907975460123
+  },
+  {
+    "date": "2026-01-20",
+    "ticker": "CCHH",
+    "strategy": "L",
+    "pnl": 1683.5541998984627,
+    "ret_pct": 6.947665588570029,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 50.60538116591927
+  },
+  {
+    "date": "2026-01-20",
+    "ticker": "POLA",
+    "strategy": "G",
+    "pnl": 77.91159096989463,
+    "ret_pct": 9.789587278609526,
+    "n_news": 4,
+    "has_catalyst": false,
+    "gap_pct": 25.595238095238095
+  },
+  {
+    "date": "2026-01-21",
+    "ticker": "PAVM",
+    "strategy": "G",
+    "pnl": 13598.411773180036,
+    "ret_pct": 14.73813037565354,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 190.6300484652665
+  },
+  {
+    "date": "2026-01-21",
+    "ticker": "PAVM",
+    "strategy": "L",
+    "pnl": 4367.6992548783455,
+    "ret_pct": 3.9801299252315845,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 190.6300484652665
+  },
+  {
+    "date": "2026-01-21",
+    "ticker": "PAVM",
+    "strategy": "G",
+    "pnl": 3872.3219878792443,
+    "ret_pct": 3.6577826824656996,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 190.6300484652665
+  },
+  {
+    "date": "2026-01-22",
+    "ticker": "GLSI",
+    "strategy": "G",
+    "pnl": 5572.309601282788,
+    "ret_pct": 4.883479903802387,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 21.928251121076233
+  },
+  {
+    "date": "2026-01-22",
+    "ticker": "CMCT",
+    "strategy": "L",
+    "pnl": 3785.2193777457433,
+    "ret_pct": 3.215299648727828,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 53.58361774744026
+  },
+  {
+    "date": "2026-01-22",
+    "ticker": "GLSI",
+    "strategy": "G",
+    "pnl": -1952.3691804993432,
+    "ret_pct": -1.6313570416259922,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 21.928251121076233
+  },
+  {
+    "date": "2026-01-23",
+    "ticker": "MOVE",
+    "strategy": "G",
+    "pnl": -1215.9554516547796,
+    "ret_pct": -1.0007001959612858,
+    "n_news": 6,
+    "has_catalyst": true,
+    "gap_pct": 188.95265423242472
+  },
+  {
+    "date": "2026-01-23",
+    "ticker": "RVYL",
+    "strategy": "G",
+    "pnl": 4675.494061103163,
+    "ret_pct": 3.833202003066634,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 40.26717557251907
+  },
+  {
+    "date": "2026-01-23",
+    "ticker": "MOVE",
+    "strategy": "G",
+    "pnl": 1679.0805356410274,
+    "ret_pct": 1.3958081341319917,
+    "n_news": 6,
+    "has_catalyst": true,
+    "gap_pct": 188.95265423242472
+  },
+  {
+    "date": "2026-01-23",
+    "ticker": "RVYL",
+    "strategy": "G",
+    "pnl": 3438.2451030678494,
+    "ret_pct": 2.7147808865961305,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 40.26717557251907
+  },
+  {
+    "date": "2026-01-26",
+    "ticker": "OPTT",
+    "strategy": "G",
+    "pnl": 13083.101813491216,
+    "ret_pct": 10.057168508823395,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 29.060012906001294
+  },
+  {
+    "date": "2026-01-26",
+    "ticker": "OPTT",
+    "strategy": "G",
+    "pnl": -1646.3492971431115,
+    "ret_pct": -1.1499227152542264,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 29.060012906001294
+  },
+  {
+    "date": "2026-01-27",
+    "ticker": "NUWE",
+    "strategy": "G",
+    "pnl": 5429.504727964668,
+    "ret_pct": 3.8364529184788125,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 105.58139534883722
+  },
+  {
+    "date": "2026-01-27",
+    "ticker": "PHGE",
+    "strategy": "G",
+    "pnl": 16839.697912978852,
+    "ret_pct": 11.538172017470176,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 43.65853658536586
+  },
+  {
+    "date": "2026-01-27",
+    "ticker": "NUWE",
+    "strategy": "G",
+    "pnl": -1005.874849054293,
+    "ret_pct": -0.6844847272577826,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 105.58139534883722
+  },
+  {
+    "date": "2026-01-27",
+    "ticker": "PHGE",
+    "strategy": "G",
+    "pnl": 6149.903488586628,
+    "ret_pct": 3.777874186963785,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 43.65853658536586
+  },
+  {
+    "date": "2026-01-28",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": 21912.461164365202,
+    "ret_pct": 13.034717153625797,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 96.29283489096572
+  },
+  {
+    "date": "2026-01-28",
+    "ticker": "FEED",
+    "strategy": "L",
+    "pnl": 10614.861785496381,
+    "ret_pct": 5.55821712738381,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 70.95238095238093
+  },
+  {
+    "date": "2026-01-28",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": 126.24554981144206,
+    "ret_pct": 15.231216651762441,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 96.29283489096572
+  },
+  {
+    "date": "2026-01-29",
+    "ticker": "TRX",
+    "strategy": "G",
+    "pnl": 18506.050673901773,
+    "ret_pct": 9.18000388768171,
+    "n_news": 5,
+    "has_catalyst": false,
+    "gap_pct": 24.352331606217618
+  },
+  {
+    "date": "2026-01-29",
+    "ticker": "TRX",
+    "strategy": "G",
+    "pnl": 8952.619117865426,
+    "ret_pct": 4.067580164388231,
+    "n_news": 5,
+    "has_catalyst": false,
+    "gap_pct": 24.352331606217618
+  },
+  {
+    "date": "2026-01-30",
+    "ticker": "VIVS",
+    "strategy": "L",
+    "pnl": 8271.319911582541,
+    "ret_pct": 3.6111487223508676,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 73.5294117647059
+  },
+  {
+    "date": "2026-02-02",
+    "ticker": "FUSE",
+    "strategy": "G",
+    "pnl": 14040.672430602397,
+    "ret_pct": 5.916324347789372,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 44.93670886075949
+  },
+  {
+    "date": "2026-02-02",
+    "ticker": "FATBP",
+    "strategy": "L",
+    "pnl": -3762.1327672630105,
+    "ret_pct": -14.760694246981435,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 70.76923076923076
+  },
+  {
+    "date": "2026-02-02",
+    "ticker": "FUSE",
+    "strategy": "G",
+    "pnl": 13679.979667364387,
+    "ret_pct": 5.442351888833118,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 44.93670886075949
+  },
+  {
+    "date": "2026-02-03",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": 15054.759350090986,
+    "ret_pct": 5.7632467606506514,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 64.02116402116403
+  },
+  {
+    "date": "2026-02-03",
+    "ticker": "GXAI",
+    "strategy": "G",
+    "pnl": 206.00835568725597,
+    "ret_pct": 0.0779875363422299,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 21.985815602836883
+  },
+  {
+    "date": "2026-02-03",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": -12178.662902957061,
+    "ret_pct": -4.4072232653385415,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 64.02116402116403
+  },
+  {
+    "date": "2026-02-03",
+    "ticker": "GXAI",
+    "strategy": "G",
+    "pnl": 10088.939263242879,
+    "ret_pct": 3.8168078248368182,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 21.985815602836883
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "FEED",
+    "strategy": "G",
+    "pnl": -1829.9439140862087,
+    "ret_pct": -0.666766632352754,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 34.756097560975604
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "ENPH",
+    "strategy": "G",
+    "pnl": 500.16022622113815,
+    "ret_pct": 0.18427428294069198,
+    "n_news": 18,
+    "has_catalyst": true,
+    "gap_pct": 28.75536480686695
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "EGHT",
+    "strategy": "G",
+    "pnl": -1815.3913210303144,
+    "ret_pct": -1.656138855299535,
+    "n_news": 13,
+    "has_catalyst": true,
+    "gap_pct": 20.48192771084338
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "FEED",
+    "strategy": "G",
+    "pnl": -1198.8794085871777,
+    "ret_pct": -0.4397612995423129,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 34.756097560975604
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "ENPH",
+    "strategy": "G",
+    "pnl": -236.43383893102873,
+    "ret_pct": -0.0869492127933647,
+    "n_news": 18,
+    "has_catalyst": true,
+    "gap_pct": 28.75536480686695
+  },
+  {
+    "date": "2026-02-04",
+    "ticker": "EGHT",
+    "strategy": "G",
+    "pnl": -7.897631992937249,
+    "ret_pct": -0.5109556789352783,
+    "n_news": 13,
+    "has_catalyst": true,
+    "gap_pct": 20.48192771084338
+  },
+  {
+    "date": "2026-02-05",
+    "ticker": "AIM",
+    "strategy": "G",
+    "pnl": -2001.8164561280573,
+    "ret_pct": -1.914250389198099,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 63.03317535545025
+  },
+  {
+    "date": "2026-02-05",
+    "ticker": "ZSL",
+    "strategy": "G",
+    "pnl": -2048.3344184248126,
+    "ret_pct": -0.7590301916227942,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 31.9047619047619
+  },
+  {
+    "date": "2026-02-05",
+    "ticker": "AIM",
+    "strategy": "G",
+    "pnl": 3.4623047264453817,
+    "ret_pct": 0.21521850752771796,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 63.03317535545025
+  },
+  {
+    "date": "2026-02-05",
+    "ticker": "ZSL",
+    "strategy": "G",
+    "pnl": -9475.485095488693,
+    "ret_pct": -3.5380880897965907,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 31.9047619047619
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "XXRP",
+    "strategy": "G",
+    "pnl": -26.87236369157472,
+    "ret_pct": -0.0678427064258275,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 38.938053097345126
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "UXRP",
+    "strategy": "G",
+    "pnl": -62.796780397071416,
+    "ret_pct": -0.5862099955050782,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 36.923076923076934
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": -3693.7084160793165,
+    "ret_pct": -1.8738858995664187,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 33.20000000000001
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "CCHH",
+    "strategy": "L",
+    "pnl": 2179.9619912414346,
+    "ret_pct": 1.4112721375797022,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 69.4305956441879
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "XXRP",
+    "strategy": "G",
+    "pnl": -1150.143007507526,
+    "ret_pct": -1.876425865411016,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 38.938053097345126
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "UXRP",
+    "strategy": "G",
+    "pnl": 2.006831179169211,
+    "ret_pct": 1.4352653713285541,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 36.923076923076934
+  },
+  {
+    "date": "2026-02-06",
+    "ticker": "TIRX",
+    "strategy": "G",
+    "pnl": -8.304534619510378,
+    "ret_pct": -0.09476810858503443,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 33.20000000000001
+  },
+  {
+    "date": "2026-02-09",
+    "ticker": "UOKA",
+    "strategy": "G",
+    "pnl": 43405.09849742259,
+    "ret_pct": 17.054933297335793,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 92.0168067226891
+  },
+  {
+    "date": "2026-02-09",
+    "ticker": "PLBY",
+    "strategy": "G",
+    "pnl": 893.0381082206222,
+    "ret_pct": 1.5577865962234791,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 20.754716981132066
+  },
+  {
+    "date": "2026-02-09",
+    "ticker": "UOKA",
+    "strategy": "G",
+    "pnl": 3004.909398867341,
+    "ret_pct": 1.0086742624072875,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 92.0168067226891
+  },
+  {
+    "date": "2026-02-09",
+    "ticker": "PLBY",
+    "strategy": "G",
+    "pnl": 28.66352857188747,
+    "ret_pct": 3.4537394931026535,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 20.754716981132066
+  },
+  {
+    "date": "2026-02-10",
+    "ticker": "QNCX",
+    "strategy": "G",
+    "pnl": 30875.27890946268,
+    "ret_pct": 10.260576807341364,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 117.99999999999997
+  },
+  {
+    "date": "2026-02-10",
+    "ticker": "SPOG",
+    "strategy": "G",
+    "pnl": -424.25638073547816,
+    "ret_pct": -2.386039797272839,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 24.36197981611718
+  },
+  {
+    "date": "2026-02-10",
+    "ticker": "QNCX",
+    "strategy": "G",
+    "pnl": -8055.939231891942,
+    "ret_pct": -2.4280454265348195,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 117.99999999999997
+  },
+  {
+    "date": "2026-02-10",
+    "ticker": "SPOG",
+    "strategy": "G",
+    "pnl": -2.403538473297658,
+    "ret_pct": -1.072643762197991,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 24.36197981611718
+  },
+  {
+    "date": "2026-02-13",
+    "ticker": "DXST",
+    "strategy": "G",
+    "pnl": -180.58104140008072,
+    "ret_pct": -2.0752072155667354,
+    "n_news": 5,
+    "has_catalyst": false,
+    "gap_pct": 21.55
+  },
+  {
+    "date": "2026-02-13",
+    "ticker": "RIME",
+    "strategy": "G",
+    "pnl": 1382.1175018580689,
+    "ret_pct": 0.6669719634901811,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 20.370370370370367
+  },
+  {
+    "date": "2026-02-13",
+    "ticker": "DXST",
+    "strategy": "G",
+    "pnl": -1.0237738001904404,
+    "ret_pct": -0.3813332197915185,
+    "n_news": 5,
+    "has_catalyst": false,
+    "gap_pct": 21.55
+  },
+  {
+    "date": "2026-02-13",
+    "ticker": "RIME",
+    "strategy": "G",
+    "pnl": 85.31690892830284,
+    "ret_pct": 2.6409758756085173,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 20.370370370370367
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "OLB",
+    "strategy": "G",
+    "pnl": -4641.206713744905,
+    "ret_pct": -1.4298663941765595,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 71.13948446157552
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "GXAI",
+    "strategy": "G",
+    "pnl": 1461.6416606057028,
+    "ret_pct": 0.6234204348548605,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 45.714285714285715
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "LFS",
+    "strategy": "G",
+    "pnl": -553.4851504367689,
+    "ret_pct": -1.3237848238349612,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 23.1404958677686
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "OLB",
+    "strategy": "L",
+    "pnl": 37142.50866857049,
+    "ret_pct": 13.451358577391023,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 71.13948446157552
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "GVH",
+    "strategy": "L",
+    "pnl": 5153.5273404970285,
+    "ret_pct": 10.066151137251918,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 58.64392046071932
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "OLB",
+    "strategy": "G",
+    "pnl": -43116.861428377975,
+    "ret_pct": -13.47616569630545,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 71.13948446157552
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "GXAI",
+    "strategy": "G",
+    "pnl": -1620.4714999618009,
+    "ret_pct": -0.5834384573736071,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 45.714285714285715
+  },
+  {
+    "date": "2026-02-17",
+    "ticker": "LFS",
+    "strategy": "G",
+    "pnl": 4.736012763217786,
+    "ret_pct": 0.8365240771601624,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 23.1404958677686
+  },
+  {
+    "date": "2026-02-18",
+    "ticker": "RXT",
+    "strategy": "G",
+    "pnl": 9608.096721830312,
+    "ret_pct": 3.017422851676075,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 137.9474940334129
+  },
+  {
+    "date": "2026-02-18",
+    "ticker": "RXT",
+    "strategy": "G",
+    "pnl": 28730.956799306616,
+    "ret_pct": 8.758671068319364,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 137.9474940334129
+  },
+  {
+    "date": "2026-02-25",
+    "ticker": "XWEL",
+    "strategy": "L",
+    "pnl": -47857.39249717997,
+    "ret_pct": -13.414462254461135,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 114.52380952380952
+  },
+  {
+    "date": "2026-02-26",
+    "ticker": "CURX",
+    "strategy": "G",
+    "pnl": 7617.283134126628,
+    "ret_pct": 3.1577802036078664,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 52.77337559429477
+  },
+  {
+    "date": "2026-02-26",
+    "ticker": "DNUT",
+    "strategy": "G",
+    "pnl": 2077.8622337679335,
+    "ret_pct": 3.32065074269925,
+    "n_news": 9,
+    "has_catalyst": true,
+    "gap_pct": 22.575250836120393
+  },
+  {
+    "date": "2026-02-26",
+    "ticker": "CURX",
+    "strategy": "G",
+    "pnl": 260.58431239951733,
+    "ret_pct": 5.1038671403401334,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 52.77337559429477
+  },
+  {
+    "date": "2026-02-26",
+    "ticker": "DNUT",
+    "strategy": "G",
+    "pnl": -6454.589271488658,
+    "ret_pct": -2.3701137839430353,
+    "n_news": 9,
+    "has_catalyst": true,
+    "gap_pct": 22.575250836120393
+  },
+  {
+    "date": "2026-02-27",
+    "ticker": "ENSC",
+    "strategy": "G",
+    "pnl": -22179.250757553033,
+    "ret_pct": -14.173379380994023,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 61.9746835443038
+  },
+  {
+    "date": "2026-02-27",
+    "ticker": "ENSC",
+    "strategy": "L",
+    "pnl": 2535.3874174106168,
+    "ret_pct": 1.4851720659120584,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 61.9746835443038
+  },
+  {
+    "date": "2026-02-27",
+    "ticker": "ENSC",
+    "strategy": "G",
+    "pnl": -40.16915981313696,
+    "ret_pct": -1.313564423107754,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 61.9746835443038
+  },
+  {
+    "date": "2026-03-17",
+    "ticker": "LNAI",
+    "strategy": "G",
+    "pnl": 19002.290699147678,
+    "ret_pct": 6.491640476485873,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 163.09579990561588
+  },
+  {
+    "date": "2026-03-17",
+    "ticker": "LNAI",
+    "strategy": "G",
+    "pnl": 2695.7839063102147,
+    "ret_pct": 0.8648047389303409,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 163.09579990561588
+  },
+  {
+    "date": "2026-03-18",
+    "ticker": "LBGJ",
+    "strategy": "G",
+    "pnl": 8951.218489344552,
+    "ret_pct": 4.604703537261305,
+    "n_news": 4,
+    "has_catalyst": false,
+    "gap_pct": 154.07166123778504
+  },
+  {
+    "date": "2026-03-18",
+    "ticker": "AIM",
+    "strategy": "G",
+    "pnl": -42137.11841169617,
+    "ret_pct": -13.306498767299967,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 104.22535211267605
+  },
+  {
+    "date": "2026-03-18",
+    "ticker": "LBGJ",
+    "strategy": "G",
+    "pnl": 164.94016052992038,
+    "ret_pct": 6.801331839680638,
+    "n_news": 4,
+    "has_catalyst": false,
+    "gap_pct": 154.07166123778504
+  },
+  {
+    "date": "2026-03-18",
+    "ticker": "AIM",
+    "strategy": "G",
+    "pnl": -65.51621422614426,
+    "ret_pct": -1.3689931945199907,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 104.22535211267605
+  },
+  {
+    "date": "2026-03-23",
+    "ticker": "AHMA",
+    "strategy": "G",
+    "pnl": 17339.859631311614,
+    "ret_pct": 5.973550596206593,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 37.2937293729373
+  },
+  {
+    "date": "2026-03-23",
+    "ticker": "AIFF",
+    "strategy": "G",
+    "pnl": 8807.366098705534,
+    "ret_pct": 12.534334107590567,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 24.836601307189536
+  },
+  {
+    "date": "2026-03-23",
+    "ticker": "MGRX",
+    "strategy": "L",
+    "pnl": -38614.02793691357,
+    "ret_pct": -14.85203395243172,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 143.0864197530864
+  },
+  {
+    "date": "2026-03-23",
+    "ticker": "AHMA",
+    "strategy": "G",
+    "pnl": 4869.237020662869,
+    "ret_pct": 1.5828887735469224,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 37.2937293729373
+  },
+  {
+    "date": "2026-03-23",
+    "ticker": "AIFF",
+    "strategy": "G",
+    "pnl": 138.91136739895092,
+    "ret_pct": 14.433903233235734,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 24.836601307189536
+  },
+  {
+    "date": "2026-03-24",
+    "ticker": "PAVS",
+    "strategy": "L",
+    "pnl": 34439.849622019625,
+    "ret_pct": 12.575147129643756,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 95.30880863989199
+  },
+  {
+    "date": "2026-03-24",
+    "ticker": "FEED",
+    "strategy": "L",
+    "pnl": 12565.195627553738,
+    "ret_pct": 4.075478063001054,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 53.84615384615387
+  },
+  {
+    "date": "2026-03-25",
+    "ticker": "RMSG",
+    "strategy": "G",
+    "pnl": 3489.1067254725494,
+    "ret_pct": 1.0873644865028609,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 107.40207373271889
+  },
+  {
+    "date": "2026-03-25",
+    "ticker": "RMSG",
+    "strategy": "G",
+    "pnl": 1652.5374080137117,
+    "ret_pct": 0.5094661292564339,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 107.40207373271889
+  },
+  {
+    "date": "2026-03-26",
+    "ticker": "AIFF",
+    "strategy": "G",
+    "pnl": 47141.60606967303,
+    "ret_pct": 14.459771336448066,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 22.619047619047628
+  },
+  {
+    "date": "2026-03-26",
+    "ticker": "EEIQ",
+    "strategy": "L",
+    "pnl": 83638.14537947107,
+    "ret_pct": 22.848072137266158,
+    "n_news": 4,
+    "has_catalyst": false,
+    "gap_pct": 75.45144866488405
+  },
+  {
+    "date": "2026-03-26",
+    "ticker": "AIFF",
+    "strategy": "G",
+    "pnl": -7098.479210257297,
+    "ret_pct": -1.9022583166641145,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 22.619047619047628
+  },
+  {
+    "date": "2026-03-27",
+    "ticker": "ARTL",
+    "strategy": "G",
+    "pnl": 63683.35442583467,
+    "ret_pct": 14.553856234120872,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 150.4702194357367
+  },
+  {
+    "date": "2026-03-27",
+    "ticker": "VSA",
+    "strategy": "G",
+    "pnl": 53043.693726374535,
+    "ret_pct": 11.795343167539484,
+    "n_news": 3,
+    "has_catalyst": false,
+    "gap_pct": 39.781021897810206
+  },
+  {
+    "date": "2026-03-27",
+    "ticker": "ARTL",
+    "strategy": "L",
+    "pnl": 43883.16920623777,
+    "ret_pct": 8.501441218255056,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 150.4702194357367
+  },
+  {
+    "date": "2026-03-27",
+    "ticker": "ARTL",
+    "strategy": "G",
+    "pnl": 14931.388646685751,
+    "ret_pct": 2.9788088520022273,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 150.4702194357367
+  },
+  {
+    "date": "2026-03-27",
+    "ticker": "VSA",
+    "strategy": "G",
+    "pnl": -65173.68068794889,
+    "ret_pct": -12.963592081424153,
+    "n_news": 3,
+    "has_catalyst": false,
+    "gap_pct": 39.781021897810206
+  },
+  {
+    "date": "2026-03-30",
+    "ticker": "SGML",
+    "strategy": "G",
+    "pnl": 7289.885509894812,
+    "ret_pct": 1.3016066913945439,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 23.900573613766728
+  },
+  {
+    "date": "2026-03-30",
+    "ticker": "SGML",
+    "strategy": "G",
+    "pnl": -1458.2304691984318,
+    "ret_pct": -0.25702117213883874,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 23.900573613766728
+  },
+  {
+    "date": "2026-03-31",
+    "ticker": "KIDZ",
+    "strategy": "G",
+    "pnl": 40082.384159983834,
+    "ret_pct": 7.0829462033155,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 76.58536585365856
+  },
+  {
+    "date": "2026-03-31",
+    "ticker": "VRAX",
+    "strategy": "G",
+    "pnl": -34878.8375985919,
+    "ret_pct": -14.963304383361375,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 51.56923076923076
+  },
+  {
+    "date": "2026-03-31",
+    "ticker": "KIDZ",
+    "strategy": "G",
+    "pnl": 9058.988341880147,
+    "ret_pct": 1.494926313461695,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 76.58536585365856
+  },
+  {
+    "date": "2026-03-31",
+    "ticker": "VRAX",
+    "strategy": "G",
+    "pnl": -985.646629392495,
+    "ret_pct": -14.07836615260241,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 51.56923076923076
+  },
+  {
+    "date": "2026-04-01",
+    "ticker": "RENX",
+    "strategy": "G",
+    "pnl": 80204.19556384254,
+    "ret_pct": 13.847964865238577,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 37.921348314606746
+  },
+  {
+    "date": "2026-04-01",
+    "ticker": "CYCN",
+    "strategy": "L",
+    "pnl": -83323.41770285391,
+    "ret_pct": -12.67413780104375,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 249.6774193548387
+  },
+  {
+    "date": "2026-04-01",
+    "ticker": "RENX",
+    "strategy": "G",
+    "pnl": -1952.2784238918684,
+    "ret_pct": -0.2960774615875932,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 37.921348314606746
+  },
+  {
+    "date": "2026-04-07",
+    "ticker": "RDGT",
+    "strategy": "G",
+    "pnl": 15975.547001101659,
+    "ret_pct": 16.76348331526767,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 87.97814207650273
+  },
+  {
+    "date": "2026-04-07",
+    "ticker": "RDGT",
+    "strategy": "G",
+    "pnl": 209.63962761367338,
+    "ret_pct": 17.72886146660796,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 87.97814207650273
+  },
+  {
+    "date": "2026-04-09",
+    "ticker": "ONCO",
+    "strategy": "G",
+    "pnl": -8285.527214365138,
+    "ret_pct": -1.8520227040736323,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 43.362831858407105
+  },
+  {
+    "date": "2026-04-09",
+    "ticker": "ONCO",
+    "strategy": "G",
+    "pnl": 2.9684002605108617,
+    "ret_pct": 0.04494403585701126,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 43.362831858407105
+  },
+  {
+    "date": "2026-04-10",
+    "ticker": "RAYA",
+    "strategy": "L",
+    "pnl": -75481.62031029316,
+    "ret_pct": -12.969174596550587,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 92.29927805731786
+  },
+  {
+    "date": "2026-04-13",
+    "ticker": "RMSG",
+    "strategy": "G",
+    "pnl": 70742.00244883558,
+    "ret_pct": 16.380376976215295,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 101.59744408945687
+  },
+  {
+    "date": "2026-04-13",
+    "ticker": "VRAX",
+    "strategy": "L",
+    "pnl": -16995.40179134019,
+    "ret_pct": -16.597462836402585,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 74.73583093179636
+  },
+  {
+    "date": "2026-04-13",
+    "ticker": "RMSG",
+    "strategy": "G",
+    "pnl": 1251.4671942757795,
+    "ret_pct": 17.31462536202249,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 101.59744408945687
+  },
+  {
+    "date": "2026-04-15",
+    "ticker": "AGAE",
+    "strategy": "G",
+    "pnl": 3555.4455769924098,
+    "ret_pct": 1.2497040001225466,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 57.83536585365855
+  },
+  {
+    "date": "2026-04-15",
+    "ticker": "AGAE",
+    "strategy": "G",
+    "pnl": 183.63236802829306,
+    "ret_pct": 3.1670672316925526,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 57.83536585365855
+  },
+  {
+    "date": "2026-04-16",
+    "ticker": "ONFO",
+    "strategy": "G",
+    "pnl": 69371.77616450656,
+    "ret_pct": 16.367224648652634,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 66.41679160419791
+  },
+  {
+    "date": "2026-04-16",
+    "ticker": "ZSPC",
+    "strategy": "G",
+    "pnl": 1017.8299517540217,
+    "ret_pct": 1.7489728074842708,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 24.12831241283125
+  },
+  {
+    "date": "2026-04-16",
+    "ticker": "ONFO",
+    "strategy": "L",
+    "pnl": 62485.45004938322,
+    "ret_pct": 9.811839356801919,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 66.41679160419791
+  },
+  {
+    "date": "2026-04-16",
+    "ticker": "ONFO",
+    "strategy": "G",
+    "pnl": 1153.8183210042107,
+    "ret_pct": 17.416706509725966,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 66.41679160419791
+  },
+  {
+    "date": "2026-04-16",
+    "ticker": "ZSPC",
+    "strategy": "G",
+    "pnl": 30.424766702728448,
+    "ret_pct": 3.815498954949504,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 24.12831241283125
+  },
+  {
+    "date": "2026-04-17",
+    "ticker": "EFOI",
+    "strategy": "L",
+    "pnl": 47931.615003450424,
+    "ret_pct": 6.854005099872889,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 157.41626794258374
+  },
+  {
+    "date": "2026-04-17",
+    "ticker": "PBM",
+    "strategy": "L",
+    "pnl": -48570.76042791485,
+    "ret_pct": -14.105593477217818,
+    "n_news": 10,
+    "has_catalyst": true,
+    "gap_pct": 67.29131175468484
+  },
+  {
+    "date": "2026-04-20",
+    "ticker": "ENVB",
+    "strategy": "G",
+    "pnl": 53904.21185484086,
+    "ret_pct": 7.715110772952995,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 130.76923076923075
+  },
+  {
+    "date": "2026-04-20",
+    "ticker": "PBM",
+    "strategy": "L",
+    "pnl": -69506.12793049007,
+    "ret_pct": -12.982324920318291,
+    "n_news": 3,
+    "has_catalyst": true,
+    "gap_pct": 72.56578947368422
+  },
+  {
+    "date": "2026-04-20",
+    "ticker": "WLDS",
+    "strategy": "L",
+    "pnl": -27393.665224005177,
+    "ret_pct": -13.008375543952022,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 68.87417218543045
+  },
+  {
+    "date": "2026-04-20",
+    "ticker": "ENVB",
+    "strategy": "G",
+    "pnl": 14245.85816884553,
+    "ret_pct": 1.8929164670627756,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 130.76923076923075
+  },
+  {
+    "date": "2026-04-21",
+    "ticker": "SPRC",
+    "strategy": "G",
+    "pnl": -3192.428167369304,
+    "ret_pct": -1.5943283601567035,
+    "n_news": 3,
+    "has_catalyst": false,
+    "gap_pct": 43.7352245862884
+  },
+  {
+    "date": "2026-04-21",
+    "ticker": "SPRC",
+    "strategy": "G",
+    "pnl": 11.627952682594696,
+    "ret_pct": 0.45528790574817407,
+    "n_news": 3,
+    "has_catalyst": false,
+    "gap_pct": 43.7352245862884
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "AUUD",
+    "strategy": "G",
+    "pnl": 61964.48316116957,
+    "ret_pct": 9.293468233493032,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 77.00258397932815
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "TRT",
+    "strategy": "G",
+    "pnl": -5449.39134012087,
+    "ret_pct": -2.230703980345991,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 33.171912832929785
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "TZOO",
+    "strategy": "G",
+    "pnl": 229.0671451925882,
+    "ret_pct": 0.1278239106856338,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 30.440587449933236
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "AUUD",
+    "strategy": "G",
+    "pnl": 58016.05591127905,
+    "ret_pct": 7.961391491955953,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 77.00258397932815
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "TRT",
+    "strategy": "G",
+    "pnl": -0.0919817278931987,
+    "ret_pct": -0.0030398291777413654,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 33.171912832929785
+  },
+  {
+    "date": "2026-04-23",
+    "ticker": "TZOO",
+    "strategy": "G",
+    "pnl": 55.06112285549261,
+    "ret_pct": 2.465375843639692,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 30.440587449933236
+  },
+  {
+    "date": "2026-04-28",
+    "ticker": "BIYA",
+    "strategy": "G",
+    "pnl": 99364.00023258897,
+    "ret_pct": 16.34359003771469,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 72.01540436456997
+  },
+  {
+    "date": "2026-04-28",
+    "ticker": "BIYA",
+    "strategy": "L",
+    "pnl": 35037.243311732425,
+    "ret_pct": 4.804380709735153,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 72.01540436456997
+  },
+  {
+    "date": "2026-04-28",
+    "ticker": "BIYA",
+    "strategy": "G",
+    "pnl": 1645.1228776115004,
+    "ret_pct": 17.419057881063175,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 72.01540436456997
+  },
+  {
+    "date": "2026-05-01",
+    "ticker": "CERS",
+    "strategy": "G",
+    "pnl": 12731.154938980937,
+    "ret_pct": 4.7329357675773185,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 32.51231527093597
+  },
+  {
+    "date": "2026-05-01",
+    "ticker": "CERS",
+    "strategy": "G",
+    "pnl": 249.51641756852132,
+    "ret_pct": 6.793595726223281,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 32.51231527093597
+  },
+  {
+    "date": "2026-05-05",
+    "ticker": "BLZE",
+    "strategy": "G",
+    "pnl": 48703.09687404148,
+    "ret_pct": 5.233542249957761,
+    "n_news": 10,
+    "has_catalyst": true,
+    "gap_pct": 60.129310344827594
+  },
+  {
+    "date": "2026-05-05",
+    "ticker": "BLZE",
+    "strategy": "G",
+    "pnl": -56544.23680263769,
+    "ret_pct": -5.77395392944517,
+    "n_news": 10,
+    "has_catalyst": true,
+    "gap_pct": 60.129310344827594
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "EVC",
+    "strategy": "G",
+    "pnl": -3403.9815703158383,
+    "ret_pct": -0.8164944919265749,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 63.05778894472361
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "GLWG",
+    "strategy": "G",
+    "pnl": -29895.09785983042,
+    "ret_pct": -10.536807769981099,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 34.19593345656192
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "AMDL",
+    "strategy": "G",
+    "pnl": 27368.084737674682,
+    "ret_pct": 3.6054988913709334,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 30.333899264289748
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "IFRX",
+    "strategy": "G",
+    "pnl": -1699.2295942862984,
+    "ret_pct": -1.2701210698548482,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 29.441624365482227
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "BLMN",
+    "strategy": "G",
+    "pnl": 1053.5387762997707,
+    "ret_pct": 0.6517502181008222,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 22.569444444444443
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "EVC",
+    "strategy": "G",
+    "pnl": -24.502936250418315,
+    "ret_pct": -0.46263394041501915,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 63.05778894472361
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "GLWG",
+    "strategy": "G",
+    "pnl": -40.929253726932075,
+    "ret_pct": -1.1880189183560315,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 34.19593345656192
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "AMDL",
+    "strategy": "G",
+    "pnl": -10094.554123796057,
+    "ret_pct": -1.061211349279118,
+    "n_news": 0,
+    "has_catalyst": false,
+    "gap_pct": 30.333899264289748
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "IFRX",
+    "strategy": "G",
+    "pnl": 14.48627873717328,
+    "ret_pct": 0.7873749330537454,
+    "n_news": 2,
+    "has_catalyst": true,
+    "gap_pct": 29.441624365482227
+  },
+  {
+    "date": "2026-05-06",
+    "ticker": "BLMN",
+    "strategy": "G",
+    "pnl": 53.62042053932828,
+    "ret_pct": 2.6266770894924316,
+    "n_news": 7,
+    "has_catalyst": true,
+    "gap_pct": 22.569444444444443
+  },
+  {
+    "date": "2026-05-08",
+    "ticker": "FLNC",
+    "strategy": "G",
+    "pnl": 20249.379062758526,
+    "ret_pct": 2.234819728135782,
+    "n_news": 11,
+    "has_catalyst": true,
+    "gap_pct": 25.32946758039009
+  },
+  {
+    "date": "2026-05-08",
+    "ticker": "AEHL",
+    "strategy": "L",
+    "pnl": 156602.4848173738,
+    "ret_pct": 26.924552512694056,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 94.09688174151795
+  },
+  {
+    "date": "2026-05-08",
+    "ticker": "FLNC",
+    "strategy": "G",
+    "pnl": -6751.247739949031,
+    "ret_pct": -0.7288128068408724,
+    "n_news": 11,
+    "has_catalyst": true,
+    "gap_pct": 25.32946758039009
+  },
+  {
+    "date": "2026-05-11",
+    "ticker": "JZXN",
+    "strategy": "G",
+    "pnl": 16693.71390053426,
+    "ret_pct": 8.860423411643213,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 37.56906077348067
+  },
+  {
+    "date": "2026-05-11",
+    "ticker": "JZXN",
+    "strategy": "G",
+    "pnl": 323.4881437985455,
+    "ret_pct": 10.955778911744908,
+    "n_news": 1,
+    "has_catalyst": true,
+    "gap_pct": 37.56906077348067
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "UBXG",
+    "strategy": "G",
+    "pnl": -6227.541307594423,
+    "ret_pct": -2.3992839506825736,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 31.941683233929748
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "VSTS",
+    "strategy": "G",
+    "pnl": -8676.295997602021,
+    "ret_pct": -5.920989791055894,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 26.66666666666665
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "HTCO",
+    "strategy": "G",
+    "pnl": -1018.0766867300626,
+    "ret_pct": -1.9899120695542543,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 24.822695035461006
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "QUBT",
+    "strategy": "G",
+    "pnl": 6791.980921925744,
+    "ret_pct": 0.6212916094064164,
+    "n_news": 10,
+    "has_catalyst": true,
+    "gap_pct": 24.754420432220037
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "UBXG",
+    "strategy": "G",
+    "pnl": -20.27850682508688,
+    "ret_pct": -0.3251575646064004,
+    "n_news": 2,
+    "has_catalyst": false,
+    "gap_pct": 31.941683233929748
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "VSTS",
+    "strategy": "G",
+    "pnl": -21.780412258388424,
+    "ret_pct": -1.20077486079824,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 26.66666666666665
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "HTCO",
+    "strategy": "G",
+    "pnl": 0.6892515435947644,
+    "ret_pct": 0.10748418622317393,
+    "n_news": 5,
+    "has_catalyst": true,
+    "gap_pct": 24.822695035461006
+  },
+  {
+    "date": "2026-05-12",
+    "ticker": "QUBT",
+    "strategy": "G",
+    "pnl": 6293.115271992749,
+    "ret_pct": 0.5721037970832005,
+    "n_news": 10,
+    "has_catalyst": true,
+    "gap_pct": 24.754420432220037
+  },
+  {
+    "date": "2026-05-14",
+    "ticker": "POET",
+    "strategy": "G",
+    "pnl": 97479.82570188818,
+    "ret_pct": 8.940435906203605,
+    "n_news": 6,
+    "has_catalyst": true,
+    "gap_pct": 21.155184411969387
+  },
+  {
+    "date": "2026-05-14",
+    "ticker": "POET",
+    "strategy": "G",
+    "pnl": 27267.510908533353,
+    "ret_pct": 2.295621782334558,
+    "n_news": 6,
+    "has_catalyst": true,
+    "gap_pct": 21.155184411969387
+  },
+  {
+    "date": "2026-05-15",
+    "ticker": "MRNO",
+    "strategy": "L",
+    "pnl": 10482.340228597372,
+    "ret_pct": 4.619854756078468,
+    "n_news": 1,
+    "has_catalyst": false,
+    "gap_pct": 71.46776406035664
+  },
+  {
+    "date": "2026-05-15",
+    "ticker": "SLE",
+    "strategy": "L",
+    "pnl": -29533.829212440934,
+    "ret_pct": -13.059152217594574,
+    "n_news": 4,
+    "has_catalyst": true,
+    "gap_pct": 63.636363636363626
+  }
+]

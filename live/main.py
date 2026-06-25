@@ -175,7 +175,11 @@ class _ETFormatter(logging.Formatter):
         return ct.strftime(datefmt or "%H:%M:%S")
 
 
+_FILE_HANDLER = None  # module-level so _rotate_log_for_new_day can swap it
+
+
 def setup_logging():
+    global _FILE_HANDLER
     today = datetime.now(ET).strftime("%Y-%m-%d")
     log_dir = "logs"
     import os
@@ -191,11 +195,37 @@ def setup_logging():
     fh = logging.FileHandler(f"{log_dir}/{today}_live.log", encoding="utf-8")
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(_ETFormatter(fmt, datefmt=datefmt))
+    _FILE_HANDLER = fh
 
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
     root.addHandler(console)
     root.addHandler(fh)
+    return logging.getLogger("live.main")
+
+
+def _rotate_log_for_new_day():
+    """Swap the FileHandler to today's log file. Fixes 2026-06-25 rollover bug
+    where all today's traffic was written to yesterday's named log file."""
+    global _FILE_HANDLER
+    if _FILE_HANDLER is None:
+        return
+    today = datetime.now(ET).strftime("%Y-%m-%d")
+    log_dir = "logs"
+    new_path = f"{log_dir}/{today}_live.log"
+    if getattr(_FILE_HANDLER, "baseFilename", "").endswith(f"{today}_live.log"):
+        return  # already rotated (idempotent on same-day calls)
+    fmt = "%(asctime)s ET [%(levelname)s] %(name)s: %(message)s"
+    datefmt = "%H:%M:%S"
+    new_fh = logging.FileHandler(new_path, encoding="utf-8")
+    new_fh.setLevel(logging.DEBUG)
+    new_fh.setFormatter(_ETFormatter(fmt, datefmt=datefmt))
+    root = logging.getLogger()
+    root.removeHandler(_FILE_HANDLER)
+    try: _FILE_HANDLER.close()
+    except Exception: pass
+    root.addHandler(new_fh)
+    _FILE_HANDLER = new_fh
 
     return logging.getLogger("live.main")
 
@@ -356,7 +386,20 @@ def _run_one_day(executor, args, log):
     log.info(f"Watchlist locked for {trading_day}: {len(candidates)} candidates")
 
     # Phase 2: Initialize combined engine
-    engine = CombinedEngine(executor)
+    # 2026-06-23: instantiate TradingStream for real-time fill notifications
+    # (replaces the 15s polling that lost 85 untracked fills on GITS today).
+    fill_stream = None
+    try:
+        from live.trading_stream import FillStream
+        from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+        fill_stream = FillStream(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
+        fill_stream.start_async()
+        log.info("FillStream: started — fills will be tracked via Alpaca TradingStream")
+    except Exception as e:
+        log.error(f"FillStream init failed, falling back to legacy 30s polling: {e}", exc_info=True)
+        fill_stream = None
+
+    engine = CombinedEngine(executor, fill_stream=fill_stream)
     engine.initialize_watchlist(candidates)
 
     # Recover any open positions from a previous session/crash
@@ -500,10 +543,22 @@ def _run_one_day(executor, args, log):
             if bars_resp.df.empty:
                 return
             df = bars_resp.df.reset_index()
+            # FIX 2026-06-24: skip PARTIAL bars (still in progress). Alpaca returns
+            # the in-progress 2-min slot's data even before it's complete, e.g. at
+            # 09:33:33 we get the 09:32-09:34 bar with only 1.5 min of data. Injecting
+            # this caused CCXI to fire G entry 30s BEFORE the bar closed, beating
+            # ABSI/WEN to the slot purely by REST iteration order (non-deterministic).
+            # Only inject bars whose period has fully ended.
             for sym in df["symbol"].unique():
                 tdf = df[df["symbol"] == sym].sort_values("timestamp")
                 for _, row in tdf.iterrows():
                     ts = row["timestamp"]
+                    # Convert ts to a tz-aware datetime if needed and check completion
+                    bar_end = ts + timedelta(minutes=2)
+                    if bar_end > now_et:
+                        # Bar still in progress — skip. Wait until next poll after slot ends.
+                        log.debug(f"REST poll: {sym} skipping partial bar @ {ts} (ends {bar_end} > now {now_et})")
+                        continue
                     last_seen = _last_poll_bar.get(sym)
                     if last_seen is not None and ts <= last_seen:
                         continue  # already processed
@@ -644,6 +699,7 @@ def run(args):
             log.info("Interrupted during overnight wait — shutting down.")
             return
 
+        _rotate_log_for_new_day()
         log.info("=" * 60)
         log.info(f"New trading day: {datetime.now(ET).strftime('%Y-%m-%d')}")
         log.info("=" * 60)

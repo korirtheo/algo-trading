@@ -1,0 +1,233 @@
+{
+  "no_trade_days": 194,
+  "test_a_1st_green": {
+    "label": "NEWS + 1st green",
+    "n": 707,
+    "total_pnl": 100683.81289722792,
+    "mean_pnl": 142.40991923228844,
+    "wr_pct": 73.4087694483734,
+    "pf": 21.660465038484567,
+    "exit_breakdown": {
+      "TRAIL": 702,
+      "TIME_STOP": 5
+    },
+    "n_unique_days": 159
+  },
+  "test_b_hod_break": {
+    "label": "NEWS + HOD break",
+    "n": 261,
+    "total_pnl": 60646.70624838126,
+    "mean_pnl": 232.36285918920024,
+    "wr_pct": 67.04980842911877,
+    "pf": 22.707949026417328,
+    "exit_breakdown": {
+      "TRAIL": 258,
+      "TIME_STOP": 3
+    },
+    "n_unique_days": 132
+  },
+  "sample_a_top10_pnl": [
+    {
+      "date": "2024-08-12",
+      "ticker": "DPRO",
+      "entry": 3.4525,
+      "exit": 4.4775,
+      "pnl": 2226.64735698769,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 1
+    },
+    {
+      "date": "2024-04-17",
+      "ticker": "INVO",
+      "entry": 2.49,
+      "exit": 2.8954500000000003,
+      "pnl": 1221.2349397590363,
+      "reason": "TRAIL",
+      "bars_held": 2,
+      "news_n": 5
+    },
+    {
+      "date": "2025-05-15",
+      "ticker": "GTI",
+      "entry": 12.462,
+      "exit": 14.328,
+      "pnl": 1123.0139624458352,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 4
+    },
+    {
+      "date": "2022-01-10",
+      "ticker": "BBLG",
+      "entry": 3.89,
+      "exit": 4.4576,
+      "pnl": 1094.3444730077122,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 3
+    },
+    {
+      "date": "2022-11-08",
+      "ticker": "ICCM",
+      "entry": 1.3425,
+      "exit": 1.52235,
+      "pnl": 1004.7486033519556,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 3
+    },
+    {
+      "date": "2025-06-27",
+      "ticker": "LCFY",
+      "entry": 10.8,
+      "exit": 12.158900000000001,
+      "pnl": 943.6805555555555,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 2
+    },
+    {
+      "date": "2022-09-21",
+      "ticker": "EVAX",
+      "entry": 3.0901,
+      "exit": 3.4724505,
+      "pnl": 928.0051616452537,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 1
+    },
+    {
+      "date": "2025-05-15",
+      "ticker": "EKSO",
+      "entry": 8.556,
+      "exit": 9.552,
+      "pnl": 873.0715287517536,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 2
+    },
+    {
+      "date": "2024-03-08",
+      "ticker": "SGD",
+      "entry": 23.43,
+      "exit": 26.15457,
+      "pnl": 872.1414852752881,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 1
+    },
+    {
+      "date": "2024-11-26",
+      "ticker": "TOYO",
+      "entry": 5.34,
+      "exit": 5.96005,
+      "pnl": 870.8567415730337,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 2
+    }
+  ],
+  "sample_b_top10_pnl": [
+    {
+      "date": "2022-11-22",
+      "ticker": "PALI",
+      "entry": 3.2,
+      "exit": 4.4277500000000005,
+      "pnl": 2877.539062500001,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 2
+    },
+    {
+      "date": "2024-08-12",
+      "ticker": "DPRO",
+      "entry": 3.725,
+      "exit": 4.970025,
+      "pnl": 2506.761744966442,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 1
+    },
+    {
+      "date": "2022-07-14",
+      "ticker": "SNTG",
+      "entry": 0.7,
+      "exit": 0.86565,
+      "pnl": 1774.8214285714296,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 2
+    },
+    {
+      "date": "2024-04-17",
+      "ticker": "INVO",
+      "entry": 2.36,
+      "exit": 2.8954500000000003,
+      "pnl": 1701.6419491525437,
+      "reason": "TRAIL",
+      "bars_held": 2,
+      "news_n": 5
+    },
+    {
+      "date": "2022-01-10",
+      "ticker": "BBLG",
+      "entry": 5.49,
+      "exit": 6.45755,
+      "pnl": 1321.789617486339,
+      "reason": "TRAIL",
+      "bars_held": 2,
+      "news_n": 3
+    },
+    {
+      "date": "2024-11-13",
+      "ticker": "BTCS",
+      "entry": 3.65,
+      "exit": 4.2586,
+      "pnl": 1250.5479452054806,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 3
+    },
+    {
+      "date": "2026-05-07",
+      "ticker": "ATRA",
+      "entry": 8.98,
+      "exit": 10.41765,
+      "pnl": 1200.70991091314,
+      "reason": "TRAIL",
+      "bars_held": 2,
+      "news_n": 3
+    },
+    {
+      "date": "2022-11-23",
+      "ticker": "COSM",
+      "entry": 0.508,
+      "exit": 0.58904,
+      "pnl": 1196.4566929133857,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 14
+    },
+    {
+      "date": "2024-11-13",
+      "ticker": "MVST",
+      "entry": 0.5389,
+      "exit": 0.621875,
+      "pnl": 1154.7828910744095,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 4
+    },
+    {
+      "date": "2024-11-13",
+      "ticker": "BTCT",
+      "entry": 23.0,
+      "exit": 26.4471,
+      "pnl": 1124.0543478260865,
+      "reason": "TRAIL",
+      "bars_held": 1,
+      "news_n": 13
+    }
+  ]
+}

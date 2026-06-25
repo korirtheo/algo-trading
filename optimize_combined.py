@@ -53,7 +53,7 @@ DATA_DIRS = [
 ]
 DATE_RANGE = ("2021-01-01", "2026-05-31")
 
-ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l"]
+ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
 
 
@@ -62,9 +62,14 @@ STRAT_KEYS = [s.upper() for s in ALL_STRATS]
 # ---------------------------------------------------------------------------
 def set_strategy_params(params):
     """Set all strategy globals on the tgc module."""
-    # Reset ALL min_gap to defaults (enable/disable may have set to 9999)
+    # Reset ALL min_gap to defaults (enable/disable may have set to 9999).
+    # G and L gap thresholds become TUNABLE (defaults preserved if param missing).
     tgc.H_MIN_GAP_PCT = 35.0
-    tgc.G_MIN_GAP_PCT = 30.0
+    tgc.G_MIN_GAP_PCT = float(params.get("g_min_gap_pct", 30.0))
+    # W11: 2nd-green + 2nd-new-high gates made tunable. Ablation 2026-06-22
+    # showed `2nd_new_high=False` lifts geomean 22.8x -> 27.7x across 2024-26.
+    tgc.G_REQUIRE_2ND_GREEN = bool(params.get("g_require_2nd_green", True))
+    tgc.G_REQUIRE_2ND_NEW_HIGH = bool(params.get("g_require_2nd_new_high", True))
     tgc.A_MIN_GAP_PCT = 15.0
     tgc.F_MIN_GAP_PCT = 10.0
     tgc.D_MIN_GAP_PCT = 10.0
@@ -82,7 +87,9 @@ def set_strategy_params(params):
     tgc.I_MIN_GAP_PCT = 10.0
     tgc.J_MIN_GAP_PCT = 10.0
     tgc.N_MIN_GAP_PCT = 10.0
-    tgc.L_MIN_GAP_PCT = 30.0
+    # L_MIN_GAP_PCT: was hardcoded 30%, ignoring l_min_gap from suggest_all_params.
+    # Now properly wired so the existing l_min_gap tunable actually controls entry.
+    tgc.L_MIN_GAP_PCT = float(params.get("l_min_gap", 30.0))
 
     # --- H (High Conviction) ---
     tgc.H_TARGET_PCT = params["h_target_pct"]
@@ -343,7 +350,21 @@ def set_strategy_params(params):
     tgc.L_TRAIL_ACTIVATE_PCT = params["l_trail_activate_pct"]
     tgc.L_TIME_LIMIT_MINUTES = params["l_time_limit_min"]
 
+    # --- Strategy X: Range Reversion (always applies — uses defaults if absent) ---
+    tgc.X_MIN_PULLBACK_PCT      = params.get("x_min_pullback_pct",      10.0)
+    tgc.X_MIN_RECOVERY_PCT      = params.get("x_min_recovery_pct",       3.0)
+    tgc.X_MIN_BARS_SINCE_PEAK   = params.get("x_min_bars_since_peak",    5)
+    tgc.X_TARGET_PCT_OF_PEAK    = params.get("x_target_pct_of_peak",    92.0)
+    tgc.X_STOP_PCT_BELOW_TROUGH = params.get("x_stop_pct_below_trough",  2.0)
+    tgc.X_TRAIL_PCT             = params.get("x_trail_pct",              5.0)
+    tgc.X_TRAIL_ACTIVATE_PCT    = params.get("x_trail_activate_pct",     5.0)
+    tgc.X_TIME_LIMIT_MINUTES    = params.get("x_time_limit_min",        60)
+    tgc.X_MIN_ENTRY_ROOM_PCT    = params.get("x_min_entry_room_pct",     4.0)
+    tgc.X_MIN_FIRST_LEG_GAIN_PCT = params.get("x_min_first_leg_gain_pct", 5.0)
+
     # --- Strategy enable/disable (Optuna decides which to include) ---
+    # For X (no MIN_GAP_PCT), the kill-switch flips X_MIN_FIRST_LEG_GAIN_PCT to 9999
+    # so no day can ever qualify as a valid first leg.
     _gap_keys = {
         "h": "H_MIN_GAP_PCT", "g": "G_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -352,6 +373,7 @@ def set_strategy_params(params):
         "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT", "e": "E_MIN_GAP_PCT",
         "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT", "n": "N_MIN_GAP_PCT",
         "l": "L_MIN_GAP_PCT",
+        "x": "X_MIN_FIRST_LEG_GAIN_PCT",
     }
     for s in ALL_STRATS:
         if s == "r":
@@ -362,7 +384,52 @@ def set_strategy_params(params):
                 setattr(tgc, _gap_keys[s], 9999.0)
 
     # --- Strategy priority ---
-    tgc.STRAT_PRIORITY = {s.upper(): params[f"priority_{s}"] for s in ALL_STRATS}
+    # Default priorities for any strategy missing from params (e.g., baseline
+    # config files that pre-date a new strategy addition).
+    _default_priority = {
+        "h": 0, "g": 1, "a": 2, "f": 3, "d": 4, "v": 5, "p": 6,
+        "m": 7, "r": 8, "w": 9, "o": 10, "b": 11, "k": 12,
+        "c": 13, "s": 14, "e": 15, "i": 16, "j": 17, "n": 18,
+        "l": 19, "x": 20,
+    }
+    tgc.STRAT_PRIORITY = {
+        s.upper(): params.get(f"priority_{s}", _default_priority[s])
+        for s in ALL_STRATS
+    }
+
+    # ---------------------------------------------------------------------
+    # PHASE 1A adaptive controls (added 2026-06-17)
+    # All default to 0 (no filter / use global) for backward compatibility:
+    # configs that don't have these keys behave exactly as before.
+    # ---------------------------------------------------------------------
+    tgc.MIN_PRICE = float(params.get("min_price", 0.0))
+    tgc.MAX_MODELED_SLIP_BP = float(params.get("max_modeled_slip_bp", 0.0))
+    tgc.MAX_CUM_DVOL_AT_ENTRY_M = float(params.get("max_cum_dvol_at_entry_m", 0.0))
+    tgc.MIN_ATR_PCT = float(params.get("min_atr_pct", 0.0))
+
+    # Per-strategy participation caps
+    for s in ALL_STRATS:
+        key = f"{s}_participation_cap"
+        setattr(tgc, f"{s.upper()}_PARTICIPATION_CAP",
+                float(params.get(key, 0.0)))
+
+    # Weighted favorability signals
+    tgc.W_NOT_WED        = float(params.get("w_not_wed", 0.0))
+    tgc.W_NOT_JUN_AUG    = float(params.get("w_not_jun_aug", 0.0))
+    tgc.W_DXY_UP         = float(params.get("w_dxy_up", 0.0))
+    tgc.W_BTC_FLAT       = float(params.get("w_btc_flat", 0.0))
+    tgc.W_VIX_MID        = float(params.get("w_vix_mid", 0.0))
+    tgc.W_IWM_MID        = float(params.get("w_iwm_mid", 0.0))
+    tgc.W_PM_DVOL_MID    = float(params.get("w_pm_dvol_mid", 0.0))
+    tgc.MIN_FAVORABILITY_THRESHOLD = float(params.get("min_favorability_threshold", 0.0))
+    tgc.BTC_FLAT_BANDWIDTH = float(params.get("btc_flat_bandwidth", 5.0))
+
+    # PIT news filter (added 2026-06-18) — drops watchlist picks lacking
+    # premarket news coverage. Defaults are "no filter" so configs without
+    # these keys behave exactly as before.
+    tgc.NEWS_FILTER_ENABLED = bool(params.get("enable_news_filter", False))
+    tgc.NEWS_MIN_ARTICLES = int(params.get("min_news_articles", 0))
+    tgc.NEWS_REQUIRE_CATALYST = bool(params.get("require_news_catalyst", False))
 
 
 # ---------------------------------------------------------------------------
@@ -379,10 +446,24 @@ def suggest_all_params(trial):
     params["h_trail_pct"] = trial.suggest_float("h_trail_pct", 0.0, 5.0, step=1.0)
     params["h_trail_activate_pct"] = trial.suggest_float("h_trail_activate_pct", 0.0, 8.0, step=2.0)
 
-    # === G: Big Gap Runner (5 params) ===
+    # === G: Big Gap Runner (6 params) ===
+    # g_min_gap_pct made TUNABLE (was hardcoded 30%). ChatGPT hypothesis: edge
+    # may concentrate in larger gaps (e.g., 50%+). Range 15-80% covers both
+    # below-default exploration and well above #254's effective threshold.
+    params["g_min_gap_pct"] = trial.suggest_float("g_min_gap_pct", 15.0, 80.0, step=5.0)
+    # W11: 2nd-candle structural gates made tunable.
+    # W12: g_require_2nd_green hardcoded True via env var (ablation proved it load-bearing).
+    import os as _os_g
+    if _os_g.environ.get("HARDCODE_2ND_GREEN", "") == "1":
+        params["g_require_2nd_green"] = True
+    else:
+        params["g_require_2nd_green"] = trial.suggest_categorical("g_require_2nd_green", [True, False])
+    params["g_require_2nd_new_high"] = trial.suggest_categorical("g_require_2nd_new_high", [True, False])
     params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
     params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
-    params["g_stop_pct"] = trial.suggest_float("g_stop_pct", 0.0, 12.0, step=2.0)
+    import os as _os_gs
+    _g_stop_lo = float(_os_gs.environ.get("G_STOP_MIN", "0.0"))
+    params["g_stop_pct"] = trial.suggest_float("g_stop_pct", _g_stop_lo, 12.0, step=2.0)
     params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
     params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
 
@@ -636,7 +717,11 @@ def suggest_all_params(trial):
     params["n_time_limit_min"] = trial.suggest_int("n_time_limit_min", 30, 120, step=10)
 
     # === L: Low Float Squeeze (19 params) ===
-    params["l_min_gap"] = trial.suggest_int("l_min_gap", 15, 50, step=5)
+    # l_min_gap range widened from 15-50 to 15-80 (2026-06-20) so TPE can explore
+    # the "edge concentrates in 50%+ gaps" hypothesis on the squeeze pattern too.
+    import os as _os_l
+    _l_lo = int(_os_l.environ.get("L_MIN_GAP_MIN", "15"))
+    params["l_min_gap"] = trial.suggest_int("l_min_gap", _l_lo, 80, step=5)
     params["l_max_float"] = trial.suggest_int("l_max_float", 5_000_000, 20_000_000, step=5_000_000)
     params["l_earliest_candle"] = trial.suggest_int("l_earliest_candle", 3, 15, step=3)
     params["l_latest_candle"] = trial.suggest_int("l_latest_candle", 60, 150, step=15)
@@ -656,16 +741,112 @@ def suggest_all_params(trial):
     params["l_trail_activate_pct"] = trial.suggest_float("l_trail_activate_pct", 1.0, 8.0, step=1.0)
     params["l_time_limit_min"] = trial.suggest_int("l_time_limit_min", 30, 120, step=10)
 
-    # === Strategy Enable/Disable (20 params) ===
-    for s in ALL_STRATS:
-        params[f"enable_{s}"] = trial.suggest_categorical(f"enable_{s}", [True, False])
+    # === Strategy X: Range Reversion (second-leg pattern) ===
+    params["x_min_pullback_pct"]      = trial.suggest_float("x_min_pullback_pct", 5.0, 30.0, step=2.5)
+    params["x_min_recovery_pct"]      = trial.suggest_float("x_min_recovery_pct", 1.0, 12.0, step=1.0)
+    params["x_min_bars_since_peak"]   = trial.suggest_int("x_min_bars_since_peak", 2, 20)
+    params["x_target_pct_of_peak"]    = trial.suggest_float("x_target_pct_of_peak", 75.0, 100.0, step=2.5)
+    params["x_stop_pct_below_trough"] = trial.suggest_float("x_stop_pct_below_trough", 0.5, 5.0, step=0.5)
+    params["x_trail_pct"]             = trial.suggest_float("x_trail_pct", 2.0, 12.0, step=1.0)
+    params["x_trail_activate_pct"]    = trial.suggest_float("x_trail_activate_pct", 1.0, 10.0, step=1.0)
+    params["x_time_limit_min"]        = trial.suggest_int("x_time_limit_min", 30, 240, step=15)
+    params["x_min_entry_room_pct"]    = trial.suggest_float("x_min_entry_room_pct", 2.0, 15.0, step=1.0)
+    params["x_min_first_leg_gain_pct"] = trial.suggest_float("x_min_first_leg_gain_pct", 3.0, 20.0, step=1.0)
+
+    # === Strategy Enable/Disable (21 params, including X) ===
+    # USER OVERRIDE 2026-06-20: FORCE_ENABLE_STRATS env var locks the enable
+    # bits to a fixed set (e.g., "g,l"). Used by W10+ specialist studies after
+    # ablation revealed G is the dominant alpha source.
+    import os as _os
+    _force_strats_env = _os.environ.get("FORCE_ENABLE_STRATS", "").strip()
+    if _force_strats_env:
+        _force_allowed = {s.strip().lower() for s in _force_strats_env.split(",") if s.strip()}
+        for s in ALL_STRATS:
+            params[f"enable_{s}"] = (s in _force_allowed)
+    else:
+        for s in ALL_STRATS:
+            params[f"enable_{s}"] = trial.suggest_categorical(f"enable_{s}", [True, False])
     enabled = [params[f"enable_{s}"] for s in ALL_STRATS]
     if not any(enabled):
         raise optuna.TrialPruned()
 
-    # === Strategy Priority (20 params) ===
+    # === Strategy Priority (21 params, including X) ===
     for s in ALL_STRATS:
-        params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 19)
+        params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 20)
+
+    # === PHASE 1A adaptive controls (added 2026-06-17, revised 2026-06-18) ===
+    # Gated via PHASE_1A_ENABLED env var so legacy studies can run unchanged.
+    # Each FILTER GROUP has a separate enable boolean so Optuna can choose
+    # to disable groups entirely (matches #124 baseline behavior). Without
+    # these gates, random startup combinations of filters produced 0 trades
+    # because favorability threshold could exceed max possible score.
+    import os as _os
+    if _os.environ.get("PHASE_1A_ENABLED", "0") == "1":
+        # 4 global filters, each with its own enable boolean.
+        # When disabled, the suggested value is ignored (set to 0 = no filter).
+        for fname, lo, hi, step in [
+            ("min_price",                0.0,   3.0,   0.25),
+            ("max_modeled_slip_bp",      20.0,  150.0, 10.0),
+            ("max_cum_dvol_at_entry_m",  5.0,   100.0, 5.0),
+            ("min_atr_pct",              0.5,   10.0,  0.5),
+        ]:
+            enabled = trial.suggest_categorical(f"enable_{fname}", [True, False])
+            if enabled:
+                params[fname] = trial.suggest_float(fname, lo, hi, step=step)
+            else:
+                params[fname] = 0.0
+
+        # 20 per-strategy participation caps. Toggleable as a single group.
+        per_strat_caps_enabled = trial.suggest_categorical(
+            "enable_per_strategy_caps", [True, False])
+        for s in ALL_STRATS:
+            if per_strat_caps_enabled:
+                params[f"{s}_participation_cap"] = trial.suggest_float(
+                    f"{s}_participation_cap", 0.02, 0.20, step=0.02)
+            else:
+                params[f"{s}_participation_cap"] = 0.0  # use global MAX_2MIN_PARTICIPATION
+
+        # Favorability gating. When disabled, threshold=0 means "never skip".
+        fav_enabled = trial.suggest_categorical(
+            "enable_favorability_gate", [True, False])
+        if fav_enabled:
+            # Threshold range tightened to 0.5-4.0 (max achievable score is
+            # ~7 with all weights at +1, so 4 is a meaningful but reachable bar).
+            params["w_not_wed"]      = trial.suggest_float("w_not_wed", -2.0, 4.0, step=0.5)
+            params["w_not_jun_aug"]  = trial.suggest_float("w_not_jun_aug", -2.0, 4.0, step=0.5)
+            params["w_dxy_up"]       = trial.suggest_float("w_dxy_up", -2.0, 4.0, step=0.5)
+            params["w_btc_flat"]     = trial.suggest_float("w_btc_flat", -2.0, 4.0, step=0.5)
+            params["w_vix_mid"]      = trial.suggest_float("w_vix_mid", -2.0, 4.0, step=0.5)
+            params["w_iwm_mid"]      = trial.suggest_float("w_iwm_mid", -2.0, 4.0, step=0.5)
+            params["w_pm_dvol_mid"]  = trial.suggest_float("w_pm_dvol_mid", -2.0, 4.0, step=0.5)
+            params["min_favorability_threshold"] = trial.suggest_float(
+                "min_favorability_threshold", 0.5, 4.0, step=0.5)
+            params["btc_flat_bandwidth"] = trial.suggest_float(
+                "btc_flat_bandwidth", 1.0, 15.0, step=1.0)
+        else:
+            params["w_not_wed"] = 0.0
+            params["w_not_jun_aug"] = 0.0
+            params["w_dxy_up"] = 0.0
+            params["w_btc_flat"] = 0.0
+            params["w_vix_mid"] = 0.0
+            params["w_iwm_mid"] = 0.0
+            params["w_pm_dvol_mid"] = 0.0
+            params["min_favorability_threshold"] = 0.0
+            params["btc_flat_bandwidth"] = 5.0
+
+    # === PHASE NEWS: point-in-time news filter as a tunable (2026-06-18) ===
+    # Gated by PHASE_NEWS_ENABLED env var so legacy studies are unaffected.
+    if _os.environ.get("PHASE_NEWS_ENABLED", "0") == "1":
+        params["enable_news_filter"] = trial.suggest_categorical(
+            "enable_news_filter", [True, False])
+        if params["enable_news_filter"]:
+            params["min_news_articles"] = trial.suggest_int(
+                "min_news_articles", 0, 5)
+            params["require_news_catalyst"] = trial.suggest_categorical(
+                "require_news_catalyst", [True, False])
+        else:
+            params["min_news_articles"] = 0
+            params["require_news_catalyst"] = False
 
     return params
 
@@ -747,6 +928,12 @@ def _build_param_snapshot():
         'W_MAX_RANGE_PCT', 'W_MAX_VWAP_DEV_PCT', 'W_MIN_GAP_PCT', 'W_MIN_MORNING_RUN',
         'W_REQUIRE_ABOVE_VWAP', 'W_STOP_PCT', 'W_TARGET_PCT', 'W_TRAIL_ACTIVATE_PCT',
         'W_TRAIL_PCT', 'W_VOL_SURGE_MULT', 'W_VOL_VS_MORNING_MULT',
+        'X_MIN_PULLBACK_PCT', 'X_MIN_RECOVERY_PCT', 'X_MIN_BARS_SINCE_PEAK',
+        'X_TARGET_PCT_OF_PEAK', 'X_STOP_PCT_BELOW_TROUGH', 'X_TRAIL_PCT',
+        'X_TRAIL_ACTIVATE_PCT', 'X_TIME_LIMIT_MINUTES', 'X_MIN_ENTRY_ROOM_PCT',
+        'X_MIN_FIRST_LEG_GAIN_PCT', 'X_FIRST_LEG_WINDOW_BARS',
+        'X_ENTRY_REQUIRE_GREEN', 'X_MIN_VOL_VS_AVG', 'X_VOL_AVG_BARS',
+        'X_MAX_ENTRY_HHMM',
     )
     return {n: g[n] for n in names}
 
@@ -759,13 +946,36 @@ def run_combined_backtest(daily_picks, all_dates, params_snapshot=None):
     cash = float(STARTING_CASH)
     unsettled = 0.0
     all_trades = []
+    daily_equity = [float(STARTING_CASH)]
 
     for d in all_dates:
         cash += unsettled
         unsettled = 0.0
+        equity_start = cash
 
         picks = daily_picks.get(d, [])
         cash_account = cash < MARGIN_THRESHOLD
+
+        # PHASE NEWS: drop picks lacking premarket news coverage (PIT — only
+        # articles published before 9:30 ET on day d count). No-op when the
+        # filter is disabled or thresholds are trivial.
+        if tgc.NEWS_FILTER_ENABLED and (tgc.NEWS_MIN_ARTICLES > 0 or tgc.NEWS_REQUIRE_CATALYST):
+            from news_filter import filter_picks as _news_filter
+            picks = _news_filter(
+                picks, d,
+                min_articles=tgc.NEWS_MIN_ARTICLES,
+                require_catalyst=tgc.NEWS_REQUIRE_CATALYST,
+            )
+
+        # PHASE 1A: day-level favorability gate. If macro is loaded and the
+        # weighted score is below MIN_FAVORABILITY_THRESHOLD, skip the day
+        # (no trades, cash carries forward unchanged).
+        if tgc.MIN_FAVORABILITY_THRESHOLD > 0 and tgc._MACRO_DATA:
+            _score, _ = tgc.compute_day_favorability(d, picks)
+            if _score is not None and _score < tgc.MIN_FAVORABILITY_THRESHOLD:
+                # Day gated out — record equity unchanged
+                daily_equity.append(cash + unsettled)
+                continue
 
         states, cash, unsettled, _ = tgc.simulate_day_combined(
             picks, cash, cash_account, params=params_snapshot
@@ -779,11 +989,15 @@ def run_combined_backtest(daily_picks, all_dates, params_snapshot=None):
                     "position_cost": st["position_cost"],
                 })
 
+        # Track end-of-day equity (cash + unsettled to capture in-progress settlement)
+        daily_equity.append(cash + unsettled)
+
     equity = cash + unsettled
 
     n = len(all_trades)
     if n == 0:
-        return {"n": 0, "pf": 0, "total_pnl": -9999, "equity": equity, "strats": {}}
+        return {"n": 0, "pf": 0, "total_pnl": -9999, "equity": equity,
+                "sharpe_pct": 0.0, "strats": {}}
 
     total_pnl = sum(t["pnl"] for t in all_trades)
     wins = [t["pnl"] for t in all_trades if t["pnl"] > 0]
@@ -792,6 +1006,31 @@ def run_combined_backtest(daily_picks, all_dates, params_snapshot=None):
     gross_loss = abs(sum(losses)) if losses else 1e-9
     pf = gross_win / gross_loss if gross_loss > 0 else 99
     wr = len(wins) / n * 100 if n > 0 else 0
+
+    # Compute Sharpe + Sortino on daily percentage returns (slippage-robust metrics).
+    # Sortino is the W18 metric: penalizes only DOWNSIDE variance (losses), not
+    # total variance. Better fit than Sharpe for asymmetric strategies where
+    # the BIG winners (50%+ pumps) shouldn't be penalized as "variance".
+    import numpy as _np
+    eq = _np.asarray(daily_equity, dtype=float)
+    prev = eq[:-1]
+    curr = eq[1:]
+    mask = prev > 0
+    sortino_pct = 0.0
+    if mask.sum() > 1:
+        ret = _np.where(mask, (curr - prev) / _np.where(prev == 0, 1, prev), 0)
+        std = float(ret.std())
+        sharpe_pct = float(ret.mean() / std * (252 ** 0.5)) if std > 0 else 0.0
+        # Downside deviation: std of returns BELOW the MAR (here MAR=0)
+        downside_returns = ret[ret < 0]
+        if len(downside_returns) > 1:
+            d_std = float(downside_returns.std())
+            sortino_pct = float(ret.mean() / d_std * (252 ** 0.5)) if d_std > 0 else 0.0
+        elif ret.mean() > 0:
+            # No losing days at all — Sortino is technically infinite. Cap at a large finite.
+            sortino_pct = 99.0
+    else:
+        sharpe_pct = 0.0
 
     strats = {}
     for t in all_trades:
@@ -807,14 +1046,304 @@ def run_combined_backtest(daily_picks, all_dates, params_snapshot=None):
         "n": n, "pf": pf, "wr": wr,
         "total_pnl": total_pnl,
         "equity": equity,
+        "sharpe_pct": sharpe_pct,
+        "sortino_pct": sortino_pct,
         "strats": strats,
     }
+
+
+# ---------------------------------------------------------------------------
+# Cross-validation backtest — runs the simulator INDEPENDENTLY per year with
+# fresh $25K starting cash. Eliminates compounding distortion that masks
+# per-year regime fragility from TPE.
+#
+# Empirical W7 finding (2026-06-19): min_year_pf correlates 0.638 with
+# forward 2026 PnL vs the legacy objective's 0.281. Compounded backtest
+# hides 2023's true cost; per-year reset makes it visible to TPE.
+# ---------------------------------------------------------------------------
+def run_combined_backtest_cv(daily_picks, all_dates, params_snapshot=None):
+    """Returns dict keyed by year:
+       { '2022': {'n':N, 'pf':PF, 'pnl':PNL, 'equity':EQ}, ... }
+    Each year backtested independently with fresh STARTING_CASH.
+    """
+    from collections import defaultdict
+    by_year = defaultdict(list)
+    for d in all_dates:
+        by_year[d[:4]].append(d)
+
+    per_year = {}
+    for year in sorted(by_year):
+        cash = float(STARTING_CASH)
+        unsettled = 0.0
+        trades = []
+        for d in sorted(by_year[year]):
+            cash += unsettled
+            unsettled = 0.0
+
+            picks = daily_picks.get(d, [])
+            cash_account = cash < MARGIN_THRESHOLD
+
+            if tgc.NEWS_FILTER_ENABLED and (tgc.NEWS_MIN_ARTICLES > 0 or tgc.NEWS_REQUIRE_CATALYST):
+                from news_filter import filter_picks as _news_filter
+                picks = _news_filter(
+                    picks, d,
+                    min_articles=tgc.NEWS_MIN_ARTICLES,
+                    require_catalyst=tgc.NEWS_REQUIRE_CATALYST,
+                )
+
+            if tgc.MIN_FAVORABILITY_THRESHOLD > 0 and tgc._MACRO_DATA:
+                _s, _ = tgc.compute_day_favorability(d, picks)
+                if _s is not None and _s < tgc.MIN_FAVORABILITY_THRESHOLD:
+                    continue
+
+            if not picks:
+                continue
+
+            states, cash, unsettled, _ = tgc.simulate_day_combined(
+                picks, cash, cash_account, params=params_snapshot
+            )
+            for st in states:
+                if st["exit_reason"] is not None:
+                    trades.append({"pnl": st["pnl"],
+                                   "position_cost": st["position_cost"]})
+
+        equity = cash + unsettled
+        if not trades:
+            per_year[year] = {"n": 0, "pf": 0.0, "pnl": 0.0, "equity": equity}
+            continue
+        pnl = sum(t["pnl"] for t in trades)
+        wins = sum(t["pnl"] for t in trades if t["pnl"] > 0)
+        losses = abs(sum(t["pnl"] for t in trades if t["pnl"] <= 0))
+        pf = wins / losses if losses > 1e-9 else 99.0
+        per_year[year] = {"n": len(trades), "pf": pf, "pnl": pnl, "equity": equity}
+
+    return per_year
 
 
 # ---------------------------------------------------------------------------
 # Optuna objective
 # ---------------------------------------------------------------------------
 _param_lock = __import__("threading").RLock()
+
+# Module-level flags for slippage-aware + Sharpe-aware objective.
+# Default OFF for backward compatibility with existing studies.
+# Walk-forward harness or main() can set these to True before calling objective.
+USE_SHARPE_OBJECTIVE = False        # True => score = total_pnl * min(sharpe_pct, 4.0)
+                                     # False => legacy score = total_pnl * min(pf, 3.0)
+ENABLE_2MIN_SLIPPAGE = False         # True => set tgc.USE_2MIN_SLIPPAGE before each trial
+USE_CV_OBJECTIVE = False             # True => per-year-reset CV:
+                                     # score = min(year_pnl * min(year_pf, 3.0) across all years)
+                                     # Each year starts at fresh STARTING_CASH so per-year
+                                     # performance is visible to TPE (not masked by compounding).
+
+
+def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_list):
+    """Sortino-based multi-window validation objective.
+
+    Score per window: val_pnl × min(val_sortino, 4.0)
+    Aggregate: min(per_window_score) — punishes worst-window overfit
+    Sortino penalizes ONLY downside variance (losses), not the big winners,
+    which is the right shape for asymmetric pump strategies. Solves the
+    W16/W17 trap where no-stop / loose-gap trials had high val_pnl but
+    catastrophic DD that Sharpe didn't catch (and PF too leniently penalized).
+    """
+    params = suggest_all_params(trial)
+    with _param_lock:
+        set_strategy_params(params)
+        if ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_2MIN_SLIPPAGE = True
+        snapshot = _build_param_snapshot()
+
+    def _safe(x, default=-9.9e12):
+        import math
+        try: x = float(x)
+        except (TypeError, ValueError): return default
+        if math.isnan(x) or math.isinf(x): return default
+        return max(-9.9e12, min(9.9e12, x))
+
+    train_result = run_combined_backtest(daily_picks, train_dates, params_snapshot=snapshot)
+    if train_result["n"] < 100:
+        return -9999
+    if train_result["pf"] < 0.5:
+        return -9999
+
+    per_win_scores = []
+    for label, win_dates in val_windows_list:
+        r = run_combined_backtest(daily_picks, win_dates, params_snapshot=snapshot)
+        if r["n"] < 5:
+            return -9999
+        pnl_safe = _safe(r["total_pnl"], -1e12)
+        sortino_safe = _safe(r.get("sortino_pct", 0), 0)
+        # Cap Sortino at 4.0 (like PF) to prevent runaway scores when downside
+        # std is tiny but non-zero on calm val windows.
+        win_score = pnl_safe * min(max(sortino_safe, 0.0), 4.0)
+        per_win_scores.append(win_score)
+
+        trial.set_user_attr(f"{label}_n", r["n"])
+        trial.set_user_attr(f"{label}_pnl", round(pnl_safe, 2))
+        trial.set_user_attr(f"{label}_pf", round(_safe(r["pf"]), 3))
+        trial.set_user_attr(f"{label}_wr", round(_safe(r["wr"]), 1))
+        trial.set_user_attr(f"{label}_sortino", round(sortino_safe, 3))
+        trial.set_user_attr(f"{label}_sharpe", round(_safe(r.get("sharpe_pct", 0)), 3))
+        trial.set_user_attr(f"{label}_equity", round(_safe(r["equity"]), 2))
+        trial.set_user_attr(f"{label}_score", round(_safe(win_score), 2))
+
+    # Training diagnostics (not optimized for, just observed)
+    trial.set_user_attr("train_n", train_result["n"])
+    trial.set_user_attr("train_pnl", round(_safe(train_result["total_pnl"]), 2))
+    trial.set_user_attr("train_pf", round(_safe(train_result["pf"]), 3))
+    trial.set_user_attr("train_wr", round(_safe(train_result["wr"]), 1))
+    trial.set_user_attr("train_sortino", round(_safe(train_result.get("sortino_pct", 0)), 3))
+    trial.set_user_attr("train_equity", round(_safe(train_result["equity"]), 2))
+
+    enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
+    prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
+    prio_str = ">".join(s for s, _ in sorted(prio.items(), key=lambda x: x[1]))
+    trial.set_user_attr("priority", prio_str)
+    trial.set_user_attr("enabled", ",".join(enabled_strats))
+
+    min_score = min(per_win_scores)
+    trial.set_user_attr("min_val_score", round(_safe(min_score), 2))
+    trial.set_user_attr("total_pnl", round(_safe(min_score), 2))
+    trial.set_user_attr("pf", round(_safe(train_result["pf"]), 3))
+    trial.set_user_attr("wr", round(_safe(train_result["wr"]), 1))
+    trial.set_user_attr("n", train_result["n"])
+    trial.set_user_attr("equity", 0)
+    return _safe(min_score, -9999)
+
+
+def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
+    """Multi-window walk-forward validation objective.
+
+    val_windows_list = [(label, [date_strs]), ...]  — one or more val periods.
+    Objective = min(per_window val_pnl * min(val_pf, 3))
+    A trial must score POSITIVELY on EVERY window to pass — punishes
+    regime-specific overfit (the W16 trap: 38-day window had no DD event,
+    so no-stop config looked free).
+    """
+    params = suggest_all_params(trial)
+    with _param_lock:
+        set_strategy_params(params)
+        if ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_2MIN_SLIPPAGE = True
+        snapshot = _build_param_snapshot()
+
+    def _safe(x, default=-9.9e12):
+        import math
+        try: x = float(x)
+        except (TypeError, ValueError): return default
+        if math.isnan(x) or math.isinf(x): return default
+        return max(-9.9e12, min(9.9e12, x))
+
+    train_result = run_combined_backtest(daily_picks, train_dates, params_snapshot=snapshot)
+    if train_result["n"] < 100:
+        return -9999
+    if train_result["pf"] < 0.5:
+        return -9999
+
+    per_win_scores = []
+    for label, win_dates in val_windows_list:
+        r = run_combined_backtest(daily_picks, win_dates, params_snapshot=snapshot)
+        if r["n"] < 5:
+            return -9999  # any window with insufficient activity fails the trial
+        pnl_safe = _safe(r["total_pnl"], -1e12)
+        pf_safe = _safe(r["pf"], 0)
+        win_score = pnl_safe * min(pf_safe, 3.0)
+        per_win_scores.append(win_score)
+
+        trial.set_user_attr(f"{label}_n", r["n"])
+        trial.set_user_attr(f"{label}_pnl", round(pnl_safe, 2))
+        trial.set_user_attr(f"{label}_pf", round(pf_safe, 3))
+        trial.set_user_attr(f"{label}_wr", round(_safe(r["wr"]), 1))
+        trial.set_user_attr(f"{label}_equity", round(_safe(r["equity"]), 2))
+        trial.set_user_attr(f"{label}_score", round(_safe(win_score), 2))
+
+    # Diagnostics
+    trial.set_user_attr("train_n", train_result["n"])
+    trial.set_user_attr("train_pnl", round(_safe(train_result["total_pnl"]), 2))
+    trial.set_user_attr("train_pf", round(_safe(train_result["pf"]), 3))
+    trial.set_user_attr("train_wr", round(_safe(train_result["wr"]), 1))
+    trial.set_user_attr("train_equity", round(_safe(train_result["equity"]), 2))
+
+    enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
+    prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
+    prio_str = ">".join(s for s, _ in sorted(prio.items(), key=lambda x: x[1]))
+    trial.set_user_attr("priority", prio_str)
+    trial.set_user_attr("enabled", ",".join(enabled_strats))
+
+    # min across windows is the objective: a single bad window tanks the trial
+    min_score = min(per_win_scores)
+    trial.set_user_attr("min_val_score", round(_safe(min_score), 2))
+    trial.set_user_attr("n", sum(_safe(0) for _ in per_win_scores))  # not meaningful but expected by dump
+    trial.set_user_attr("total_pnl", round(_safe(min_score), 2))
+    trial.set_user_attr("pf", round(_safe(train_result["pf"]), 3))
+    trial.set_user_attr("wr", round(_safe(train_result["wr"]), 1))
+    trial.set_user_attr("equity", 0)
+    return _safe(min_score, -9999)
+
+
+def objective_val(trial, daily_picks, train_dates, val_dates):
+    """Validation-aware objective.
+
+    Runs training backtest (just for activity gate + diagnostics), then a
+    SEPARATE backtest starting fresh from $25K on the validation window.
+    The objective Optuna sees is the VALIDATION score (val_pnl * min(val_pf, 3)).
+
+    This naturally selects against training-period overfit: a trial that
+    compounds aggressively on training but tanks on val gets a low score.
+    The true blind OOS window (everything after val-end) stays untouched
+    during optimization — used only for final forward-test verification.
+    """
+    params = suggest_all_params(trial)
+    with _param_lock:
+        set_strategy_params(params)
+        if ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_2MIN_SLIPPAGE = True
+        snapshot = _build_param_snapshot()
+
+    def _safe(x, default=-9.9e12):
+        import math
+        try: x = float(x)
+        except (TypeError, ValueError): return default
+        if math.isnan(x) or math.isinf(x): return default
+        return max(-9.9e12, min(9.9e12, x))
+
+    train_result = run_combined_backtest(daily_picks, train_dates, params_snapshot=snapshot)
+    if train_result["n"] < 100:
+        return -9999
+    if train_result["pf"] < 0.5:
+        return -9999
+
+    val_result = run_combined_backtest(daily_picks, val_dates, params_snapshot=snapshot)
+    if val_result["n"] < 5:
+        return -9999
+
+    # Persist both train and val metrics
+    for prefix, r in (("train_", train_result), ("val_", val_result)):
+        trial.set_user_attr(f"{prefix}n", r["n"])
+        trial.set_user_attr(f"{prefix}pnl", round(_safe(r["total_pnl"]), 2))
+        trial.set_user_attr(f"{prefix}pf", round(_safe(r["pf"]), 3))
+        trial.set_user_attr(f"{prefix}wr", round(_safe(r["wr"]), 1))
+        trial.set_user_attr(f"{prefix}equity", round(_safe(r["equity"]), 2))
+        trial.set_user_attr(f"{prefix}sharpe", round(_safe(r.get("sharpe_pct", 0)), 3))
+
+    # Aliases so dump_best_params still works
+    trial.set_user_attr("total_pnl", round(_safe(val_result["total_pnl"]), 2))
+    trial.set_user_attr("pf", round(_safe(val_result["pf"]), 3))
+    trial.set_user_attr("wr", round(_safe(val_result["wr"]), 1))
+    trial.set_user_attr("n", val_result["n"])
+    trial.set_user_attr("equity", round(_safe(val_result["equity"]), 2))
+
+    enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
+    prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
+    prio_str = ">".join(s for s, _ in sorted(prio.items(), key=lambda x: x[1]))
+    trial.set_user_attr("priority", prio_str)
+    trial.set_user_attr("enabled", ",".join(enabled_strats))
+
+    val_pnl_safe = _safe(val_result["total_pnl"], -1e12)
+    val_pf_safe = _safe(val_result["pf"], 0)
+    score = val_pnl_safe * min(val_pf_safe, 3.0)
+    return _safe(score, -9999)
 
 
 def objective(trial, daily_picks, all_dates):
@@ -829,12 +1358,110 @@ def objective(trial, daily_picks, all_dates):
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
+        if ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
+
+    # ----------------------------------------------------------------------
+    # CV PATH — per-year-reset cross-validation.
+    # Default: score = min(year_pnl * min(year_pf, 3.0)) across all years.
+    #
+    # Variant selection via env var W9_VARIANT:
+    #   (unset)             -> default: min(year_pnl * min(year_pf, 3))
+    #                          punishes WORST year. May find boring strategies.
+    #   activity_weighted   -> default * (geomean(year_n) / 100)
+    #                          rewards trials that actually fire across all years.
+    #                          Fix when default produces avoidance-overfit (boring).
+    #   hybrid_sum_minpf2   -> sum_pnl * min_pf^2
+    #                          keeps total-PnL signal; weights consistency squared.
+    #                          Fix when default rejects too many active trials.
+    # ----------------------------------------------------------------------
+    if USE_CV_OBJECTIVE:
+        per_year = run_combined_backtest_cv(daily_picks, all_dates,
+                                             params_snapshot=snapshot)
+        years = sorted(per_year.keys())
+        if not years:
+            return -9999
+
+        def _safe(x, default=-9.9e12):
+            import math
+            try: x = float(x)
+            except (TypeError, ValueError): return default
+            if math.isnan(x) or math.isinf(x): return default
+            return max(-9.9e12, min(9.9e12, x))
+
+        # Per-year minimum activity: trial must trade meaningfully in every
+        # year, else it's overfit to a single regime by avoidance.
+        import os as _os
+        variant = _os.environ.get("W9_VARIANT", "default")
+        # Tighter floor under hybrid (which doesn't directly reward activity)
+        MIN_TRADES_PER_YEAR = 15 if variant == "hybrid_sum_minpf2" else 20
+        if any(per_year[y]["n"] < MIN_TRADES_PER_YEAR for y in years):
+            return -9999
+
+        pnls = [per_year[y]["pnl"] for y in years]
+        pfs = [per_year[y]["pf"] for y in years]
+        ns = [per_year[y]["n"] for y in years]
+
+        # Compute base score = min(year_pnl × min(year_pf, 3.0))
+        per_year_scores = [
+            per_year[y]["pnl"] * min(per_year[y]["pf"], 3.0)
+            for y in years
+        ]
+        base_score = min(per_year_scores)
+
+        if variant == "activity_weighted":
+            # Multiply by geomean(year_n)/100 — rewards trade activity.
+            # /100 keeps scale sane: 100 trades/year is the reference.
+            import numpy as _np
+            geo_n = float(_np.prod([max(n, 1) for n in ns]) ** (1.0 / len(ns)))
+            activity_mult = geo_n / 100.0
+            score = _safe(base_score * activity_mult, -9999)
+        elif variant == "geomean_year_score":
+            # ChatGPT-suggested: geomean of yearly scores instead of min.
+            # Pure min() ignores strong years -> TPE just barely-clears the floor.
+            # Geomean still punishes weak years (log-scale) but rewards big winners,
+            # so a strategy with [10k, 4k, 500k, 600k] beats [5k, 5k, 5k, 5k].
+            # Any year with <=0 score -> hard penalty (preserves positivity gate).
+            import numpy as _np
+            yearly_scores = per_year_scores  # list of pnl_y * min(pf_y, 3)
+            if any(s <= 0 for s in yearly_scores):
+                # Negative or zero year -> can't take geomean; preserve sign by
+                # falling back to min penalty (-large but proportional to worst)
+                score = _safe(min(yearly_scores), -9999)
+            else:
+                geomean = float(_np.prod(yearly_scores) ** (1.0 / len(yearly_scores)))
+                score = _safe(geomean, -9999)
+        elif variant == "hybrid_sum_minpf2":
+            # sum_pnl × min_pf² — keeps total PnL signal, weights consistency hard.
+            min_pf = min(pfs)
+            sum_pnl = sum(pnls)
+            score = _safe(sum_pnl * (min_pf ** 2), -9999)
+        else:
+            score = _safe(base_score, -9999)
+
+        # Persist per-year breakdown as user_attrs for inspection
+        for y in years:
+            r = per_year[y]
+            trial.set_user_attr(f"pnl_{y}", round(_safe(r["pnl"], 0), 0))
+            trial.set_user_attr(f"pf_{y}",  round(_safe(r["pf"], 0), 3))
+            trial.set_user_attr(f"n_{y}",   r["n"])
+        trial.set_user_attr("min_pnl",        round(_safe(min(pnls), 0), 0))
+        trial.set_user_attr("min_pf",         round(_safe(min(pfs), 0), 3))
+        trial.set_user_attr("min_year_score", round(_safe(base_score, 0), 0))
+        trial.set_user_attr("sum_pnl",        round(_safe(sum(pnls), 0), 0))
+        trial.set_user_attr("mean_pnl",       round(_safe(sum(pnls)/len(pnls), 0), 0))
+        trial.set_user_attr("total_pnl",      round(_safe(sum(pnls), 0), 0))
+        trial.set_user_attr("n",              sum(ns))
+        trial.set_user_attr("objective_variant", variant)
+        return score
 
     result = run_combined_backtest(daily_picks, all_dates, params_snapshot=snapshot)
 
     n = result["n"]
-    if n < 30:
+    # Min trade count: prevents Optuna from finding "got lucky on 5 trades" configs.
+    # Bumped from 30 to 100 after shape-filtered runs showed thin-trade winners.
+    if n < 100:
         return -9999
 
     pf = result["pf"]
@@ -842,6 +1469,7 @@ def objective(trial, daily_picks, all_dates):
         return -9999
 
     total_pnl = result["total_pnl"]
+    sharpe_pct = result.get("sharpe_pct", 0.0)
 
     # Sanitize numeric values for SQLite/JSON storage.
     # Under dynamic slippage, bad-params trials can produce NaN/Inf equities
@@ -861,12 +1489,14 @@ def objective(trial, daily_picks, all_dates):
 
     pf_safe = _safe(pf, 0)
     total_pnl_safe = _safe(total_pnl, -1e12)
+    sharpe_safe = _safe(sharpe_pct, 0)
 
     trial.set_user_attr("n", n)
     trial.set_user_attr("pf", round(pf_safe, 3))
     trial.set_user_attr("wr", round(_safe(result["wr"], 0), 1))
     trial.set_user_attr("total_pnl", round(total_pnl_safe, 2))
     trial.set_user_attr("equity", round(_safe(result["equity"], -1e12), 2))
+    trial.set_user_attr("sharpe_pct", round(sharpe_safe, 3))
 
     enabled_strats = [s for s in STRAT_KEYS if params.get(f"enable_{s.lower()}", True)]
     prio = {s: params[f"priority_{s.lower()}"] for s in enabled_strats}
@@ -881,7 +1511,12 @@ def objective(trial, daily_picks, all_dates):
         wr_s = v["wins"] / v["n"] * 100 if v["n"] > 0 else 0
         trial.set_user_attr(f"{s}_wr", round(_safe(wr_s, 0), 1))
 
-    score = total_pnl_safe * min(pf_safe, 3.0)
+    if USE_SHARPE_OBJECTIVE:
+        # Sharpe on % returns, capped at 4.0. Rewards consistent compounders;
+        # bad-Sharpe trials still get scored (just lower) so TPE can map terrain.
+        score = total_pnl_safe * min(max(sharpe_safe, 0.0), 4.0)
+    else:
+        score = total_pnl_safe * min(pf_safe, 3.0)
     return _safe(score, -9999)
 
 
@@ -931,6 +1566,50 @@ def dump_best_params(trial, elapsed_min=None):
 # ---------------------------------------------------------------------------
 def make_callback(start_time):
     best_score = [float("-inf")]
+
+    def _compute_pearsons(study):
+        """Compute train<->val + val<->val Pearsons across completed trials.
+
+        Returns dict with keys: 'train_val', 'val1_val2', 'val1_val3', 'val2_val3'
+        Each value is float or None (if pair not available).
+
+        train<->val: weak overfit detector — catches training-memorization but NOT
+        regime-shift overfit (W16 had +0.86 here yet failed Mar-Jun blind OOS).
+        val<->val (multi-window only): REAL regime-consistency detector. If trials'
+        rankings disagree across val regimes, no robust basin exists. The min()
+        objective punishes regime-divergent trials but won't manufacture a
+        non-existent robust solution.
+        """
+        train_vals = []; val_main = []
+        v1=[]; v2=[]; v3=[]
+        for t in study.trials:
+            if t.state != optuna.trial.TrialState.COMPLETE: continue
+            ua = t.user_attrs
+            tr = ua.get("train_pnl")
+            vl = ua.get("val_pnl") or ua.get("val1_pnl")
+            try:
+                if tr is not None and vl is not None:
+                    trf = float(tr); vlf = float(vl)
+                    if trf == trf and vlf == vlf:
+                        train_vals.append(trf); val_main.append(vlf)
+                if ua.get("val1_pnl") is not None: v1.append(float(ua["val1_pnl"]))
+                if ua.get("val2_pnl") is not None: v2.append(float(ua["val2_pnl"]))
+                if ua.get("val3_pnl") is not None: v3.append(float(ua["val3_pnl"]))
+            except (ValueError, TypeError): continue
+        import numpy as _np
+        def _p(a, b):
+            n = min(len(a), len(b))
+            if n < 10: return None
+            try:
+                r = float(_np.corrcoef(a[:n], b[:n])[0,1])
+                return r if r == r else None
+            except Exception: return None
+        return {
+            "train_val": _p(train_vals, val_main),
+            "val1_val2": _p(v1, v2), "val1_val3": _p(v1, v3), "val2_val3": _p(v2, v3),
+            "n_trials": len(train_vals),
+        }
+
     def callback(study, trial):
         elapsed = time.time() - start_time
         n_complete = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
@@ -959,8 +1638,23 @@ def make_callback(start_time):
 
         if n_complete % 10 == 0:
             rate = n_complete / elapsed if elapsed > 0 else 0
+            pearson_str = ""
+            if n_complete % 50 == 0:
+                pearsons = _compute_pearsons(study)
+                parts = []
+                if pearsons["train_val"] is not None:
+                    parts.append(f"tv={pearsons['train_val']:+.2f}")
+                # For multi-window: weakest val<->val pair is the regime-overfit metric
+                vv_pairs = [(k, v) for k, v in pearsons.items() if k.startswith("val") and v is not None]
+                if vv_pairs:
+                    weakest = min(vv_pairs, key=lambda x: x[1])
+                    parts.append(f"weak({weakest[0]})={weakest[1]:+.2f}")
+                if parts:
+                    pearson_str = f" | Pearson[{' '.join(parts)}]"
+                study.set_user_attr("rolling_pearsons", {k: round(v, 4) if v is not None else None for k, v in pearsons.items()})
+                study.set_user_attr("rolling_pearson_at_trial", n_complete)
             print(f"  Trial {n_complete} | {elapsed/60:.1f}m elapsed | {rate:.2f} trials/s | "
-                  f"Best: {best_score[0]:,.0f}")
+                  f"Best: {best_score[0]:,.0f}{pearson_str}")
     return callback
 
 
@@ -981,6 +1675,37 @@ def main():
                         help="Enable liquidity-aware slippage (base + sqrt-participation impact)")
     parser.add_argument("--slip-impact-k", type=float, default=None,
                         help="Override SLIP_IMPACT_K (default 3.0)")
+    parser.add_argument("--n-jobs", type=int, default=None,
+                        help="Threads per process (default: cpu_count//2). Use 1 when "
+                             "running multiple processes via FORCE_ENABLE_STRATS pattern.")
+    parser.add_argument("--startup-trials", type=int, default=200,
+                        help="TPESampler n_startup_trials (default: 200; use 4x dimensions)")
+    parser.add_argument("--date-start", default=None,
+                        help="Override DATE_RANGE start (e.g., 2023-03-01 for 3yr recent window)")
+    parser.add_argument("--date-end", default=None,
+                        help="Override DATE_RANGE end (e.g., 2025-12-31 to hold 2026 OOS)")
+    parser.add_argument("--val-start", default=None,
+                        help="Validation window start (e.g., 2026-01-01). When set, "
+                             "objective becomes val_pnl*min(val_pf,3). Train period = "
+                             "[date-start..date-end] excluding [val-start..val-end].")
+    parser.add_argument("--val-end", default=None,
+                        help="Validation window end (e.g., 2026-02-28)")
+    parser.add_argument("--val-windows", default=None,
+                        help="Multi-window walk-forward val. Comma-separated "
+                             "'start:end,start:end,...' pairs. Objective = "
+                             "min(per-window score). Each val window evaluated fresh "
+                             "from $25K. Train = date-range MINUS any val window day.")
+    parser.add_argument("--use-sortino", action="store_true",
+                        help="Use Sortino-weighted objective (penalizes downside var only) "
+                             "instead of PF-weighted. Recommended with multi-window val.")
+    parser.add_argument("--g-stop-min", type=float, default=None,
+                        help="Minimum g_stop_pct in search space (e.g. 5). Kills the "
+                             "no-stop overfit attractor (W16 trap).")
+    parser.add_argument("--no-2g-tunable", action="store_true",
+                        help="Hardcode g_require_2nd_green=True instead of tuning it")
+    parser.add_argument("--l-min-gap-min", type=int, default=None,
+                        help="Override lower bound of l_min_gap search (default 15). "
+                             "Use 45 to skip the overfit l_gap=30 basin.")
     parser.add_argument("--db", default="optuna_combined_v8.db",
                         help="SQLite path for the study (default: optuna_combined_v8.db)")
     parser.add_argument("--study", default="combined_v8_20strats_2024_2026",
@@ -1058,7 +1783,10 @@ def main():
 
     print("\nLoading data...")
     all_dates, daily_picks = load_all_picks(DATA_DIRS)
-    all_dates = [d for d in all_dates if DATE_RANGE[0] <= d <= DATE_RANGE[1]]
+    _date_start = args.date_start if args.date_start else DATE_RANGE[0]
+    _date_end = args.date_end if args.date_end else DATE_RANGE[1]
+    all_dates = [d for d in all_dates if _date_start <= d <= _date_end]
+    print(f"  Training date range: {_date_start} to {_date_end} ({len(all_dates)} days)")
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
 
     # Optional regime filter — keeps only days where today's pre-market scan
@@ -1071,40 +1799,41 @@ def main():
               f"kept ({100*len(filtered)/max(1,len(all_dates)):.1f}%)")
         all_dates = filtered
         daily_picks = {d: daily_picks[d] for d in all_dates}
-    # Pre-set SQLite WAL mode ONCE before Optuna's connection pool spawns
-    # parallel threads. WAL is a per-database setting (not per-connection), so
-    # setting it once is enough; subsequent connections inherit it.
-    # WAL allows concurrent reads while a writer holds the lock, dramatically
-    # cutting "database is locked" failures with n_jobs > 1.
-    import sqlite3
-    _bootstrap_conn = sqlite3.connect(db_path, timeout=60)
-    try:
-        _bootstrap_conn.execute("PRAGMA journal_mode=WAL")
-        _bootstrap_conn.execute("PRAGMA synchronous=NORMAL")
-        _bootstrap_conn.commit()
-    finally:
-        _bootstrap_conn.close()
+    # Postgres support: if --db starts with postgresql://, skip SQLite bootstrap.
+    is_postgres = db_path.startswith("postgresql://") or db_path.startswith("postgres://")
+    if is_postgres:
+        rdb = optuna.storages.RDBStorage(url=db_path)
+    else:
+        # Pre-set SQLite WAL mode ONCE before Optuna's connection pool spawns
+        # parallel threads. WAL is a per-database setting (not per-connection), so
+        # setting it once is enough; subsequent connections inherit it.
+        import sqlite3
+        _bootstrap_conn = sqlite3.connect(db_path, timeout=60)
+        try:
+            _bootstrap_conn.execute("PRAGMA journal_mode=WAL")
+            _bootstrap_conn.execute("PRAGMA synchronous=NORMAL")
+            _bootstrap_conn.commit()
+        finally:
+            _bootstrap_conn.close()
 
-    # Each Optuna connection still needs a generous busy_timeout for the
-    # remaining contention cases (multiple writers queueing).
-    from sqlalchemy import event
-    rdb = optuna.storages.RDBStorage(
-        url=f"sqlite:///{db_path}",
-        engine_kwargs={"connect_args": {"timeout": 120}},
-    )
+        from sqlalchemy import event
+        rdb = optuna.storages.RDBStorage(
+            url=f"sqlite:///{db_path}",
+            engine_kwargs={"connect_args": {"timeout": 120}},
+        )
 
-    @event.listens_for(rdb.engine, "connect")
-    def _set_busy_timeout(dbapi_conn, _):
-        cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA busy_timeout=120000")
-        cur.close()
+        @event.listens_for(rdb.engine, "connect")
+        def _set_busy_timeout(dbapi_conn, _):
+            cur = dbapi_conn.cursor()
+            cur.execute("PRAGMA busy_timeout=120000")
+            cur.close()
 
     study = optuna.create_study(
         direction="maximize",
         study_name=study_name,
         storage=rdb,
         load_if_exists=True,
-        sampler=TPESampler(n_startup_trials=200),
+        sampler=TPESampler(n_startup_trials=args.startup_trials),
     )
 
     n_existing = len(study.trials)
@@ -1124,10 +1853,46 @@ def main():
     print(f"\n  Starting optimization ({n_trials} trials)...\n")
     start_time = time.time()
 
-    n_jobs = max(1, multiprocessing.cpu_count() // 2)
-    print(f"  Using {n_jobs} parallel workers\n")
+    n_jobs = args.n_jobs if args.n_jobs is not None else max(1, multiprocessing.cpu_count() // 2)
+    print(f"  Using n_jobs={n_jobs} (threads per process)\n")
+
+    # Validation-aware dispatch
+    if args.val_windows:
+        # Multi-window walk-forward
+        win_specs = [w.strip() for w in args.val_windows.split(",") if w.strip()]
+        val_windows_list = []
+        all_val_days = set()
+        for i, spec in enumerate(win_specs):
+            s, e = spec.split(":")
+            win_days = sorted([d for d in all_dates if s <= d <= e])
+            label = f"val{i+1}"
+            val_windows_list.append((label, win_days))
+            all_val_days.update(win_days)
+            print(f"  {label}: {s} to {e} ({len(win_days)} days)")
+        train_dates = sorted([d for d in all_dates if d not in all_val_days])
+        print(f"  Training window:   {len(train_dates)} days (date-range minus all val days)")
+        print(f"  Objective: min(val_score) across {len(val_windows_list)} windows — TPE punishes worst-window overfit\n")
+        if not train_dates or not all(w[1] for w in val_windows_list):
+            print("ERROR: empty train or val window."); sys.exit(1)
+        if args.use_sortino:
+            print(f"  Objective variant: Sortino-weighted (penalizes downside variance only)\n")
+            objective_fn = lambda trial: objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_list)
+        else:
+            objective_fn = lambda trial: objective_val_multi(trial, daily_picks, train_dates, val_windows_list)
+    elif args.val_start and args.val_end:
+        val_dates = sorted([d for d in all_dates if args.val_start <= d <= args.val_end])
+        train_dates = sorted([d for d in all_dates if d < args.val_start or d > args.val_end])
+        print(f"  Validation window: {args.val_start} to {args.val_end} ({len(val_dates)} days)")
+        print(f"  Training window:   {len(train_dates)} days (date-range minus val window)")
+        print(f"  Objective: val_pnl * min(val_pf, 3) — TPE selects for generalization\n")
+        if not val_dates or not train_dates:
+            print(f"ERROR: empty train or val window."); sys.exit(1)
+        objective_fn = lambda trial: objective_val(trial, daily_picks, train_dates, val_dates)
+    else:
+        objective_fn = lambda trial: objective(trial, daily_picks, all_dates)
+
     study.optimize(
-        lambda trial: objective(trial, daily_picks, all_dates),
+        objective_fn,
         n_trials=n_trials,
         n_jobs=n_jobs,
         callbacks=[make_callback(start_time)],

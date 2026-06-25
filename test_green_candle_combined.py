@@ -79,6 +79,217 @@ SLIP_BASE_SPREAD = 0.05
 SLIP_PRICE_COEFF = 0.5
 SLIP_IMPACT_K = 3.0
 REGIME_AMP = 0.0  # opt-in regime amplifier
+# When USE_2MIN_SLIPPAGE is True, the impact denominator is the most recent
+# 2-min bar's dollar volume (Close*Volume) instead of cumulative dollar volume.
+# This more honestly models real-world fill impact since only recent depth is
+# actually available, not all volume since premarket. Also enables the per-2-min
+# participation cap (MAX_2MIN_PARTICIPATION) on entry sizing.
+USE_2MIN_SLIPPAGE = False
+MAX_2MIN_PARTICIPATION = 0.15  # cap position at 15% of last 2-min $vol when above flag is True
+
+# --- MULTI-WINDOW EFFECTIVE LIQUIDITY (supersedes USE_2MIN_SLIPPAGE when True) ---
+# Liquidity is a *flow*. A single 2-min window can fool you if it's an isolated spike
+# or an isolated lull. Take the max across three smoothed windows for a robust
+# "effective liquidity right now" measure:
+#
+#   V_eff = max( v_2min, 0.5 * v_6min, 0.25 * v_10min )
+#
+# Volatility multiplier (optional): when the recent range is large, real impact is
+# worse than volume alone suggests because everyone's algos are interacting.
+#   v_eff_adj = v_eff / (1 + min(recent_range_pct / VOL_FACTOR_SCALE, 1.0))
+#
+# Stacked caps: position size = min of
+#   - alpha signal size
+#   - 5% of cumulative dollar volume                  (sanity ceiling, rarely binds)
+#   - MAX_REGIME_PARTICIPATION * v_10min              (regime cap)
+#   - MAX_2MIN_PARTICIPATION   * v_eff_adj            (execution cap, usually binds)
+USE_MULTIWINDOW_SLIPPAGE = False
+WINDOW_BARS_LOCAL = 3            # 3 bars = ~6 minutes (mid-range window)
+WINDOW_BARS_REGIME = 5           # 5 bars = ~10 minutes (regime window)
+MULTIWIN_LOCAL_WEIGHT = 0.5      # weight of 6-min window
+MULTIWIN_REGIME_WEIGHT = 0.25    # weight of 10-min window
+USE_VOLATILITY_ADJUSTMENT = True # divide v_eff by (1 + range_pct/VOL_FACTOR_SCALE)
+VOL_FACTOR_SCALE = 5.0           # 10% recent range -> 2x vol factor (capped at 2x)
+MAX_REGIME_PARTICIPATION = 0.08  # 8% of 10-min vol regime cap
+
+
+# --- NEWS SIZE MODULATOR (added 2026-06-22) ---
+# Default OFF. When enabled, scales position size based on # of PIT articles
+# for the ticker on the trade date. The 2026 ablation showed half-sizing the
+# "overcrowded" (10+ articles) bucket cut DD from -30% -> -13% with +8% lift.
+# Other bucket modulations (skip-no-news, half-no-catalyst) HURT compounding.
+NEWS_MODULATOR_ENABLED = False
+NEWS_OVERCROWDED_THRESHOLD = 10  # n_articles >= this triggers reduction
+NEWS_OVERCROWDED_MULT = 0.5      # scale trade size by this when overcrowded
+
+
+# --- PHASE 1A ADAPTIVE CONTROLS (added 2026-06-17) ---
+# All default to 0 (= "no filter, use legacy global behavior") so existing
+# configs (#124, #432, trial_6) load unchanged. Optuna populates these in
+# the W5+ search to add filters and per-strategy capping.
+#
+# Backward compatibility: if `params` arg to simulate_day_combined doesn't
+# contain a key, set_strategy_params leaves the module global at default 0
+# and behavior matches pre-Phase-1A exactly.
+
+# Global day-level filters
+MIN_PRICE = 0.0                      # skip strategy entries on stocks below this price
+MAX_MODELED_SLIP_BP = 0.0            # skip if modeled entry slippage > this many bp (0 = no cap)
+MAX_CUM_DVOL_AT_ENTRY_M = 0.0        # skip if cumulative $-vol since open > this many $M (0 = no cap)
+MIN_ATR_PCT = 0.0                    # require pre-entry ATR >= this % (0 = no requirement)
+
+# Per-strategy participation caps — 0 means "fall back to MAX_2MIN_PARTICIPATION"
+H_PARTICIPATION_CAP = 0.0
+G_PARTICIPATION_CAP = 0.0
+A_PARTICIPATION_CAP = 0.0
+F_PARTICIPATION_CAP = 0.0
+D_PARTICIPATION_CAP = 0.0
+V_PARTICIPATION_CAP = 0.0
+P_PARTICIPATION_CAP = 0.0
+M_PARTICIPATION_CAP = 0.0
+R_PARTICIPATION_CAP = 0.0
+W_PARTICIPATION_CAP = 0.0
+O_PARTICIPATION_CAP = 0.0
+B_PARTICIPATION_CAP = 0.0
+K_PARTICIPATION_CAP = 0.0
+C_PARTICIPATION_CAP = 0.0
+S_PARTICIPATION_CAP = 0.0
+E_PARTICIPATION_CAP = 0.0
+I_PARTICIPATION_CAP = 0.0
+J_PARTICIPATION_CAP = 0.0
+N_PARTICIPATION_CAP = 0.0
+L_PARTICIPATION_CAP = 0.0
+X_PARTICIPATION_CAP = 0.0
+
+# Point-in-time news filter (drop picks lacking enough premarket news coverage)
+NEWS_FILTER_ENABLED = False          # master toggle
+NEWS_MIN_ARTICLES = 0                # require >= this many articles before 9:30 ET
+NEWS_REQUIRE_CATALYST = False        # require at least one non-scanner-roundup article
+
+# Per-trade leverage. 1.0 = cash-only (current default). 2.0 = Reg-T 2x margin
+# (intraday). cash_box[0] is allowed to go negative under this scheme — the
+# negative balance represents borrowed funds and is repaid as positions close.
+# Slippage already scales with participation, so 2x positions get sqrt(2)x more
+# slippage automatically — no extra adjustment needed.
+MARGIN_MULTIPLIER = 1.0
+
+# Weighted day-favorability gating
+# Each weight is the "credit" the day gets when the corresponding signal is true.
+# Weights can be negative (signal inverts) or zero (signal ignored).
+# Default 0 weights + 0 threshold = "no gating" (matches pre-1A behavior).
+W_NOT_WED = 0.0                  # weight when DOW != Wednesday
+W_NOT_JUN_AUG = 0.0              # weight when month not in (6, 8)
+W_DXY_UP = 0.0                   # weight when prior-day DXY_1d > 0
+W_BTC_FLAT = 0.0                 # weight when |BTC_5d| < BTC_FLAT_BANDWIDTH
+W_VIX_MID = 0.0                  # weight when VIX in middle tercile (precomputed)
+W_IWM_MID = 0.0                  # weight when IWM_close in middle tercile (precomputed)
+W_PM_DVOL_MID = 0.0              # weight when median pm_$vol in middle tercile (today vs distribution)
+MIN_FAVORABILITY_THRESHOLD = 0.0 # skip day if weighted favorability score < this
+BTC_FLAT_BANDWIDTH = 5.0         # |BTC_5d| < this (in pct) counts as "flat"
+
+# Macro lookup — populated lazily by load_macro_data().
+# Keys are YYYY-MM-DD strings, values are dicts of feature values.
+_MACRO_DATA = {}
+_VIX_TERCILE_BOUNDS = (0.0, 0.0)   # (low, high) — set after macro load
+_IWM_TERCILE_BOUNDS = (0.0, 0.0)
+
+
+def load_macro_data(csv_path):
+    """Load daily macro features (VIX, DXY, BTC, IWM, etc.) from a CSV.
+
+    Expected columns: date, VIX_close, VIX_1d, DXY_close, DXY_1d, BTC_close,
+                      BTC_5d, IWM_close (matches predictive_features.csv).
+
+    Once loaded, simulate_day_combined can score each day's favorability
+    using the W_* weights. If never loaded, favorability gating is bypassed
+    (every day passes regardless of MIN_FAVORABILITY_THRESHOLD).
+    """
+    global _MACRO_DATA, _VIX_TERCILE_BOUNDS, _IWM_TERCILE_BOUNDS
+    import csv as _csv
+    import os as _os
+    if not _os.path.exists(csv_path):
+        return 0
+    _MACRO_DATA = {}
+    vix_vals = []
+    iwm_vals = []
+    with open(csv_path, newline="") as f:
+        for r in _csv.DictReader(f):
+            d = r.get("date", "")
+            if not d:
+                continue
+            row = {}
+            for k in ("VIX_close", "VIX_1d", "VIX_5d", "DXY_close", "DXY_1d",
+                      "BTC_close", "BTC_5d", "IWM_close", "median_pm_dollar_vol"):
+                v = r.get(k, "")
+                try:
+                    row[k] = float(v) if v not in ("", None) else None
+                except Exception:
+                    row[k] = None
+            _MACRO_DATA[d] = row
+            if row.get("VIX_close") is not None:
+                vix_vals.append(row["VIX_close"])
+            if row.get("IWM_close") is not None:
+                iwm_vals.append(row["IWM_close"])
+    if vix_vals:
+        vix_sorted = sorted(vix_vals)
+        n = len(vix_sorted)
+        _VIX_TERCILE_BOUNDS = (vix_sorted[n // 3], vix_sorted[2 * n // 3])
+    if iwm_vals:
+        iwm_sorted = sorted(iwm_vals)
+        n = len(iwm_sorted)
+        _IWM_TERCILE_BOUNDS = (iwm_sorted[n // 3], iwm_sorted[2 * n // 3])
+    return len(_MACRO_DATA)
+
+
+def compute_day_favorability(date_str, picks):
+    """Compute weighted favorability score for date_str + today's picks.
+
+    Returns (score, signals_dict). If macro data isn't loaded, returns
+    (None, {}) and the caller should treat that as 'always trade'.
+    """
+    if not _MACRO_DATA:
+        return None, {}
+    from datetime import datetime as _dt
+    try:
+        d = _dt.strptime(date_str, "%Y-%m-%d")
+        dow = d.strftime("%A")
+        month = d.month
+    except Exception:
+        return None, {}
+    macro = _MACRO_DATA.get(date_str, {})
+    if not macro:
+        return None, {}
+
+    # Compute today's pm_dollar_vol from picks for the median-bucket signal
+    pm_dvols = [(p.get("pm_volume", 0) or 0) * (p.get("prev_close", 0) or 0)
+                for p in (picks or [])]
+    median_pm_dvol_today = sorted(pm_dvols)[len(pm_dvols) // 2] if pm_dvols else 0
+
+    # Binary signals
+    sig = {
+        "not_wed": (dow != "Wednesday"),
+        "not_jun_aug": (month not in (6, 8)),
+        "dxy_up": ((macro.get("DXY_1d") or 0) > 0),
+        "btc_flat": (abs(macro.get("BTC_5d") or 0) < BTC_FLAT_BANDWIDTH),
+        "vix_mid": (_VIX_TERCILE_BOUNDS[0] <= (macro.get("VIX_close") or 0)
+                    <= _VIX_TERCILE_BOUNDS[1]),
+        "iwm_mid": (_IWM_TERCILE_BOUNDS[0] <= (macro.get("IWM_close") or 0)
+                    <= _IWM_TERCILE_BOUNDS[1]),
+        # PM $vol mid bucket — based on historical median distribution from macro CSV
+        "pm_dvol_mid": False,  # filled below if macro had the historical bucket info
+    }
+
+    # Weighted sum
+    score = (
+        W_NOT_WED       * (1.0 if sig["not_wed"]      else 0.0) +
+        W_NOT_JUN_AUG   * (1.0 if sig["not_jun_aug"]  else 0.0) +
+        W_DXY_UP        * (1.0 if sig["dxy_up"]       else 0.0) +
+        W_BTC_FLAT      * (1.0 if sig["btc_flat"]     else 0.0) +
+        W_VIX_MID       * (1.0 if sig["vix_mid"]      else 0.0) +
+        W_IWM_MID       * (1.0 if sig["iwm_mid"]      else 0.0) +
+        W_PM_DVOL_MID   * (1.0 if sig["pm_dvol_mid"]  else 0.0)
+    )
+    return score, sig
 
 
 def compute_slippage_pct(price, position_dollars, cum_dollar_volume, regime_factor=20.0):
@@ -101,17 +312,91 @@ def compute_slippage_pct(price, position_dollars, cum_dollar_volume, regime_fact
     return (base_spread + impact) * regime_mult
 
 
+def _last_2min_dollar_vol(mh, ts, fill_price=None):
+    """Dollar volume in the most recent 2-min bar at or before ts.
+
+    Uses Close * Volume of the most recent bar. If fill_price is provided,
+    use that as a more conservative current-price proxy (avoids look-ahead
+    when the current bar is still forming in live use).
+    """
+    pre = mh.loc[mh.index <= ts]
+    if len(pre) == 0:
+        return 0.0
+    last = pre.tail(1)
+    px = float(fill_price) if fill_price else float(last["Close"].iloc[0])
+    return px * float(last["Volume"].iloc[0])
+
+
+def _multi_window_effective_volume(mh, ts, fill_price=None):
+    """Multi-window effective dollar volume with optional volatility adjustment.
+
+    Returns (v_eff_adj, v_2min, v_local, v_regime) — the volatility-adjusted
+    effective volume plus the raw window volumes for diagnostics / regime caps.
+
+    Implements:
+      V_eff      = max(v_2min, 0.5*v_local, 0.25*v_regime)
+      V_eff_adj  = V_eff / (1 + min(recent_range_pct/VOL_FACTOR_SCALE, 1.0))
+
+    Falls back gracefully when there aren't enough bars yet (early in the day).
+    """
+    pre = mh.loc[mh.index <= ts]
+    n = len(pre)
+    if n == 0:
+        return 0.0, 0.0, 0.0, 0.0
+
+    # Dollar volume per bar = Close * Volume
+    pre_close = pre["Close"]
+    pre_vol = pre["Volume"]
+
+    # Window slices — use fewer bars if data is short
+    last_1 = pre.tail(1)
+    last_local = pre.tail(min(n, WINDOW_BARS_LOCAL))
+    last_regime = pre.tail(min(n, WINDOW_BARS_REGIME))
+
+    px = float(fill_price) if fill_price else float(last_1["Close"].iloc[0])
+
+    v_2min = px * float(last_1["Volume"].iloc[0])
+    v_local = float((last_local["Close"] * last_local["Volume"]).sum())
+    v_regime = float((last_regime["Close"] * last_regime["Volume"]).sum())
+
+    v_eff = max(
+        v_2min,
+        MULTIWIN_LOCAL_WEIGHT * v_local,
+        MULTIWIN_REGIME_WEIGHT * v_regime,
+    )
+
+    if USE_VOLATILITY_ADJUSTMENT and px > 0 and n >= 2:
+        # Recent range as % of price across the regime window
+        rng_hi = float(last_regime["High"].max())
+        rng_lo = float(last_regime["Low"].min())
+        if rng_hi > 0 and rng_lo > 0:
+            range_pct = (rng_hi - rng_lo) / px * 100.0
+            vol_factor = 1.0 + min(range_pct / VOL_FACTOR_SCALE, 1.0)
+            v_eff_adj = v_eff / vol_factor
+        else:
+            v_eff_adj = v_eff
+    else:
+        v_eff_adj = v_eff
+
+    return v_eff_adj, v_2min, v_local, v_regime
+
+
 def _exit_slip_pct(price, shares_being_sold, st, ts, regime_factor=20.0):
     """Compute slippage % for an exit fill on this state at this timestamp."""
     if not USE_DYNAMIC_SLIPPAGE:
         return SLIPPAGE_PCT
     pos_dollars = shares_being_sold * price
-    pre = st["mh"].loc[st["mh"].index <= ts]
-    if len(pre) > 0:
-        cum_dollar_vol = float((pre["Volume"] * pre["Close"]).sum())
+    if USE_MULTIWINDOW_SLIPPAGE:
+        dvol, _, _, _ = _multi_window_effective_volume(st["mh"], ts, price)
+    elif USE_2MIN_SLIPPAGE:
+        dvol = _last_2min_dollar_vol(st["mh"], ts, price)
     else:
-        cum_dollar_vol = 0.0
-    return compute_slippage_pct(price, pos_dollars, cum_dollar_vol, regime_factor)
+        pre = st["mh"].loc[st["mh"].index <= ts]
+        if len(pre) > 0:
+            dvol = float((pre["Volume"] * pre["Close"]).sum())
+        else:
+            dvol = 0.0
+    return compute_slippage_pct(price, pos_dollars, dvol, regime_factor)
 
 
 def _entry_slip_pct(fill_price, trade_size, dollar_vol, regime_factor=20.0):
@@ -295,6 +580,26 @@ L_TRAIL_PCT = 1.0               # Tight trailing stop %
 L_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing early at +2%
 L_TIME_LIMIT_MINUTES = 70       # Time limit in minutes
 
+# --- STRATEGY X CONFIG: Range Reversion (re-entry / second-leg pattern) ---
+# Targets the pullback-then-bounce pattern that follows ~65% of first-leg gap-ups.
+# Empirically (2024 scan, 3,572 ticker-days): 2,333 had >=10% pullback + >=5%
+# recovery, median 16% upside, median second-peak = 92% of first-leg peak.
+X_FIRST_LEG_WINDOW_BARS = 15     # bars 0..15 (first ~30 min) define "first leg"
+X_MIN_FIRST_LEG_GAIN_PCT = 5.0   # first-leg high must be >= this above open
+X_MIN_PULLBACK_PCT = 10.0        # then price must drop >= this from first-leg high
+X_MIN_RECOVERY_PCT = 3.0         # then bounce >= this from intraday low to trigger
+X_MIN_BARS_SINCE_PEAK = 5        # >=5 bars (~10 min) must have passed since peak
+X_ENTRY_REQUIRE_GREEN = True     # entry bar must be green (close > open)
+X_TARGET_PCT_OF_PEAK = 92.0      # exit at 92% of first-leg peak (empirical median)
+X_STOP_PCT_BELOW_TROUGH = 2.0    # stop = trough * (1 - X_STOP_PCT_BELOW_TROUGH/100)
+X_TRAIL_PCT = 5.0                # trail %
+X_TRAIL_ACTIVATE_PCT = 5.0       # activate trail at +5% above entry
+X_TIME_LIMIT_MINUTES = 60        # 60 min hold (mid-day fades slower than open)
+X_MIN_VOL_VS_AVG = 1.0           # entry bar volume >= 1.0x rolling avg
+X_VOL_AVG_BARS = 5               # rolling avg window for volume check
+X_MAX_ENTRY_HHMM = "14:30"       # don't enter past 14:30 ET (need 60 min before EOD)
+X_MIN_ENTRY_ROOM_PCT = 4.0       # require >= this % room between entry and target
+
 # --- STRATEGY O CONFIG: Opening Range Breakout ---
 O_MIN_GAP_PCT = 10.0
 O_RANGE_CANDLES = 5              # candles to form opening range (5 = 10 min)
@@ -426,9 +731,9 @@ STRAT_PRIORITY = {
     "H": 0, "G": 1, "A": 2, "F": 3, "D": 4, "V": 5, "P": 6,
     "M": 7, "R": 8, "W": 9,
     "O": 10, "B": 11, "K": 12, "C": 13, "S": 14, "E": 15,
-    "I": 16, "J": 17, "N": 18, "L": 19
+    "I": 16, "J": 17, "N": 18, "L": 19, "X": 20
 }
-STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L"]
+STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L","X"]
 
 
 
@@ -617,6 +922,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             'W_MAX_RANGE_PCT', 'W_MAX_VWAP_DEV_PCT', 'W_MIN_GAP_PCT', 'W_MIN_MORNING_RUN',
             'W_REQUIRE_ABOVE_VWAP', 'W_STOP_PCT', 'W_TARGET_PCT', 'W_TRAIL_ACTIVATE_PCT',
             'W_TRAIL_PCT', 'W_VOL_SURGE_MULT', 'W_VOL_VS_MORNING_MULT',
+            'X_MIN_PULLBACK_PCT', 'X_MIN_RECOVERY_PCT', 'X_MIN_BARS_SINCE_PEAK',
+            'X_TARGET_PCT_OF_PEAK', 'X_STOP_PCT_BELOW_TROUGH', 'X_TRAIL_PCT',
+            'X_TRAIL_ACTIVATE_PCT', 'X_TIME_LIMIT_MINUTES', 'X_MIN_ENTRY_ROOM_PCT',
+            'X_MIN_FIRST_LEG_GAIN_PCT', 'X_FIRST_LEG_WINDOW_BARS',
+            'X_ENTRY_REQUIRE_GREEN', 'X_MIN_VOL_VS_AVG', 'X_VOL_AVG_BARS',
+            'X_MAX_ENTRY_HHMM',
         )}
 
     # Unpack snapshot to locals — these shadow module globals throughout the function body.
@@ -742,6 +1053,21 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     W_TRAIL_ACTIVATE_PCT = params['W_TRAIL_ACTIVATE_PCT']; W_TRAIL_PCT = params['W_TRAIL_PCT']
     W_VOL_SURGE_MULT = params['W_VOL_SURGE_MULT']
     W_VOL_VS_MORNING_MULT = params['W_VOL_VS_MORNING_MULT']
+    X_MIN_PULLBACK_PCT = params['X_MIN_PULLBACK_PCT']
+    X_MIN_RECOVERY_PCT = params['X_MIN_RECOVERY_PCT']
+    X_MIN_BARS_SINCE_PEAK = params['X_MIN_BARS_SINCE_PEAK']
+    X_TARGET_PCT_OF_PEAK = params['X_TARGET_PCT_OF_PEAK']
+    X_STOP_PCT_BELOW_TROUGH = params['X_STOP_PCT_BELOW_TROUGH']
+    X_TRAIL_PCT = params['X_TRAIL_PCT']
+    X_TRAIL_ACTIVATE_PCT = params['X_TRAIL_ACTIVATE_PCT']
+    X_TIME_LIMIT_MINUTES = params['X_TIME_LIMIT_MINUTES']
+    X_MIN_ENTRY_ROOM_PCT = params['X_MIN_ENTRY_ROOM_PCT']
+    X_MIN_FIRST_LEG_GAIN_PCT = params['X_MIN_FIRST_LEG_GAIN_PCT']
+    X_FIRST_LEG_WINDOW_BARS = params['X_FIRST_LEG_WINDOW_BARS']
+    X_ENTRY_REQUIRE_GREEN = params['X_ENTRY_REQUIRE_GREEN']
+    X_MIN_VOL_VS_AVG = params['X_MIN_VOL_VS_AVG']
+    X_VOL_AVG_BARS = params['X_VOL_AVG_BARS']
+    X_MAX_ENTRY_HHMM = params['X_MAX_ENTRY_HHMM']
 
     cash_box = [float(cash)]
     unsettled_box = [0.0]
@@ -760,6 +1086,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         if mh is not None and len(mh) > 0:
             all_timestamps.update(mh.index.tolist())
     all_timestamps = sorted(all_timestamps)
+
+    # Derive trade date once for news-modulator lookups.
+    _trade_date_str = None
+    if all_timestamps:
+        _ts0 = all_timestamps[0]
+        try:
+            from zoneinfo import ZoneInfo as _ZI
+            _trade_date_str = _ts0.astimezone(_ZI("America/New_York")).strftime("%Y-%m-%d")
+        except Exception:
+            _trade_date_str = str(_ts0)[:10]
 
     if not all_timestamps:
         return [], cash_box[0], unsettled_box[0], []
@@ -957,6 +1293,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             "n_trailing_active": False,
             "n_partial_taken": False,
             "n_partial_proceeds": 0.0,
+            # State — X (Range Reversion — second-leg pattern)
+            "x_eligible": False,             # True after first-leg window closes with valid pattern
+            "x_open_price": 0.0,             # open price for first-leg gain reference
+            "x_first_leg_peak_high": 0.0,    # highest price in first X_FIRST_LEG_WINDOW_BARS bars
+            "x_first_leg_peak_idx": 0,       # bar index where first-leg peak occurred
+            "x_trough_low": 0.0,             # lowest price since first-leg peak
+            "x_trough_idx": 0,               # bar index where trough occurred
+            "x_recent_volumes": [],          # rolling window for X_VOL_AVG_BARS volume check
+            "x_target_price": 0.0,           # cached target (set on entry)
+            "x_stop_price": 0.0,             # cached stop (set on entry)
+            "x_highest_since_entry": 0.0,
+            "x_trailing_active": False,
             # State — H/G/A/F trail tracking
             "hgaf_trail_stop": 0.0,
             # Position
@@ -1022,6 +1370,60 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             # Prevent original state from also detecting L (avoid double entries)
             st["l_eligible"] = False
     states.extend(l_only_states)
+
+    # Create dedicated X-only states (Range Reversion — second-leg pattern).
+    # X detects pullback+recovery directly from price/volume history; it does
+    # NOT require any prior strategy to have traded. One x_only state per pick,
+    # all non-X strategies disabled on it.
+    x_only_states = []
+    for st in states:
+        if (st.get("l_only") or st.get("o_only") or st.get("b_only")
+                or st.get("e_only")):
+            continue
+        x_st = dict(st)  # shallow copy — shares mh/vwap (read-only)
+        x_st["x_only"] = True
+        # Disable all other strategies on this state
+        for k in ("d_eligible", "v_eligible", "m_eligible", "p_eligible",
+                  "w_eligible", "is_r_candidate", "r_eligible",
+                  "o_eligible", "b_eligible", "e_eligible",
+                  "k_eligible", "c_eligible", "s_eligible",
+                  "i_eligible", "j_eligible", "n_eligible", "l_eligible"):
+            x_st[k] = False
+        x_st["r_pullback_seen"] = False
+        # Reset per-instance signal/entry state
+        x_st["signal"] = False
+        x_st["signal_price"] = None
+        x_st["strategy"] = None
+        x_st["candle_count"] = 0
+        x_st["first_candle_ok"] = False
+        x_st["first_candle_body_pct"] = 0.0
+        x_st["done"] = False
+        x_st["entry_price"] = None
+        x_st["entry_time"] = None
+        x_st["exit_price"] = None
+        x_st["exit_time"] = None
+        x_st["exit_reason"] = None
+        x_st["shares"] = 0
+        x_st["position_cost"] = 0.0
+        x_st["pnl"] = 0.0
+        x_st["vol_capped"] = False
+        # Fresh mutable lists (avoid cross-state mutation)
+        x_st["d_recent_closes"] = []
+        x_st["p_recent_closes"] = []
+        x_st["x_recent_volumes"] = []
+        # Reset X-specific tracking
+        x_st["x_eligible"] = False
+        x_st["x_open_price"] = 0.0
+        x_st["x_first_leg_peak_high"] = 0.0
+        x_st["x_first_leg_peak_idx"] = 0
+        x_st["x_trough_low"] = 0.0
+        x_st["x_trough_idx"] = 0
+        x_st["x_target_price"] = 0.0
+        x_st["x_stop_price"] = 0.0
+        x_st["x_highest_since_entry"] = 0.0
+        x_st["x_trailing_active"] = False
+        x_only_states.append(x_st)
+    states.extend(x_only_states)
 
     # Create dedicated O-only states (ORB works regardless of candle 1 color)
     o_only_states = []
@@ -1492,6 +1894,42 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 6. Time stop
                     if minutes_in_trade >= L_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY X: Range Reversion (target = 92% of first-leg peak) =====
+                if st["strategy"] == "X":
+                    if c_high > st["x_highest_since_entry"]:
+                        st["x_highest_since_entry"] = c_high
+
+                    # 1. Trailing stop (if active)
+                    if st["x_trailing_active"]:
+                        trail_stop = (st["x_highest_since_entry"]
+                                      * (1 - X_TRAIL_PCT / 100))
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+                    else:
+                        # 2. Hard stop below trough (set at entry time)
+                        if st["x_stop_price"] > 0 and c_low <= st["x_stop_price"]:
+                            _close_position(st, st["x_stop_price"], "STOP", ts)
+                            continue
+
+                    # 3. Activate trailing stop after +X_TRAIL_ACTIVATE_PCT
+                    if not st["x_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= X_TRAIL_ACTIVATE_PCT:
+                            st["x_trailing_active"] = True
+
+                    # 4. Target = X_TARGET_PCT_OF_PEAK of first-leg peak
+                    if st["x_target_price"] > 0 and c_high >= st["x_target_price"]:
+                        _close_position(st, st["x_target_price"], "TARGET", ts)
+                        continue
+
+                    # 5. Time stop
+                    if minutes_in_trade >= X_TIME_LIMIT_MINUTES:
                         _close_position(st, c_close, "TIME_STOP", ts)
                         continue
 
@@ -2367,6 +2805,96 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         # Still track HOD even when not breaking
                         pass
 
+                # --- X: Range Reversion (second-leg pattern) ---
+                # Only fires on x_only states. Tracks first-leg peak in first
+                # X_FIRST_LEG_WINDOW_BARS bars, then watches for pullback >=
+                # X_MIN_PULLBACK_PCT, then recovery >= X_MIN_RECOVERY_PCT with
+                # green bar + volume confirm. Target = X_TARGET_PCT_OF_PEAK of
+                # the first-leg peak.
+                if st.get("x_only") and not st["signal"]:
+                    # Maintain rolling volume window for entry confirmation
+                    try:
+                        cur_vol = float(candle["Volume"])
+                    except Exception:
+                        cur_vol = 0.0
+                    st["x_recent_volumes"].append(cur_vol)
+                    if len(st["x_recent_volumes"]) > X_VOL_AVG_BARS + 1:
+                        st["x_recent_volumes"].pop(0)
+
+                    # Establish open on first bar
+                    if st["candle_count"] == 1:
+                        st["x_open_price"] = c_open
+
+                    # Phase A: first-leg peak tracking (first 15 bars ≈ 30 min)
+                    if st["candle_count"] <= X_FIRST_LEG_WINDOW_BARS:
+                        if c_high > st["x_first_leg_peak_high"]:
+                            st["x_first_leg_peak_high"] = c_high
+                            st["x_first_leg_peak_idx"] = st["candle_count"]
+
+                    # When first-leg window closes, validate pattern is eligible
+                    elif not st["x_eligible"]:
+                        op = st["x_open_price"] or c_open
+                        if op > 0 and st["x_first_leg_peak_high"] > 0:
+                            first_leg_gain_pct = (
+                                st["x_first_leg_peak_high"] - op) / op * 100
+                            if (first_leg_gain_pct >= X_MIN_FIRST_LEG_GAIN_PCT
+                                    and st["x_first_leg_peak_idx"] > 0):
+                                st["x_eligible"] = True
+                                st["x_trough_low"] = c_low
+                                st["x_trough_idx"] = st["candle_count"]
+
+                    # Phase B: trough tracking + entry detection after eligibility
+                    if st["x_eligible"]:
+                        # Update trough if new low
+                        if c_low < st["x_trough_low"] or st["x_trough_low"] == 0:
+                            st["x_trough_low"] = c_low
+                            st["x_trough_idx"] = st["candle_count"]
+
+                        # Time-of-day cutoff
+                        try:
+                            ts_et_x = ts.astimezone(ET_TZ)
+                            hhmm_now = (f"{ts_et_x.hour:02d}:"
+                                        f"{ts_et_x.minute:02d}")
+                        except Exception:
+                            hhmm_now = "00:00"
+                        if hhmm_now > X_MAX_ENTRY_HHMM:
+                            continue
+
+                        peak = st["x_first_leg_peak_high"]
+                        trough = st["x_trough_low"]
+                        if peak > 0 and trough > 0 and c_close > 0:
+                            pullback_pct = (peak - trough) / peak * 100
+                            recovery_pct = (
+                                c_close - trough) / trough * 100
+                            bars_since_peak = (
+                                st["candle_count"] - st["x_first_leg_peak_idx"])
+                            is_green = ((not X_ENTRY_REQUIRE_GREEN)
+                                        or (c_close > c_open))
+                            n_avg = max(1, len(st["x_recent_volumes"]) - 1)
+                            vol_avg = (
+                                sum(st["x_recent_volumes"][:-1]) / n_avg
+                                if len(st["x_recent_volumes"]) > 1 else 0)
+                            vol_ok = (vol_avg <= 0
+                                      or cur_vol >= vol_avg * X_MIN_VOL_VS_AVG)
+
+                            # Pre-compute target so we can require c_close < target
+                            # (no point entering above the target — guaranteed loss)
+                            tentative_target = peak * X_TARGET_PCT_OF_PEAK / 100
+                            entry_room = (tentative_target - c_close) / c_close * 100
+
+                            if (pullback_pct >= X_MIN_PULLBACK_PCT
+                                    and bars_since_peak >= X_MIN_BARS_SINCE_PEAK
+                                    and recovery_pct >= X_MIN_RECOVERY_PCT
+                                    and is_green and vol_ok
+                                    and entry_room >= X_MIN_ENTRY_ROOM_PCT):
+                                st["x_target_price"] = tentative_target
+                                st["x_stop_price"] = (
+                                    trough * (1 - X_STOP_PCT_BELOW_TROUGH / 100))
+                                st["strategy"] = "X"
+                                st["signal"] = True
+                                st["signal_price"] = c_close
+                                entry_candidates.append(st)
+
         # --- PASS 2: Capital allocation (single pool) ---
         entry_candidates.sort(key=lambda s: (STRAT_PRIORITY.get(s["strategy"], 99), -s["first_candle_body_pct"]))
 
@@ -2385,23 +2913,89 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             if mins_to_close <= EOD_EXIT_MINUTES:
                 continue
 
-            # Check cash
+            # Check cash (positive cash required — under margin, only the
+            # non-borrowed portion is reusable for new entries)
             if cash_box[0] < 100:
                 skipped_this_ts.append(st["strategy"])
                 continue
-            trade_size = cash_box[0]  # FULL_BALANCE_SIZING
+            # FULL_BALANCE_SIZING — with MARGIN_MULTIPLIER > 1, trade_size
+            # scales accordingly; cash_box[0] -= trade_size below lets the
+            # balance go negative (= margin debt) which is repaid on exit.
+            _news_mult = 1.0
+            if NEWS_MODULATOR_ENABLED and _trade_date_str and st.get("ticker"):
+                try:
+                    import news_filter as _nf
+                    _n_art, _ = _nf.count_pit(st["ticker"], _trade_date_str)
+                    if _n_art >= NEWS_OVERCROWDED_THRESHOLD:
+                        _news_mult = NEWS_OVERCROWDED_MULT
+                        st["news_modulated"] = True
+                        st["news_n_articles"] = _n_art
+                except Exception:
+                    pass
+            trade_size = cash_box[0] * MARGIN_MULTIPLIER * _news_mult
 
             fill_price = st["signal_price"]
             if fill_price is None or fill_price <= 0:
                 continue
 
+            # --- PHASE 1A FILTERS (added 2026-06-17) ---
+            # Default 0 values mean "no filter", matching pre-1A behavior.
+            # MIN_PRICE: skip cheap stocks (loss-pattern analysis: sub-$1 = -1.67% avg)
+            if MIN_PRICE > 0 and fill_price < MIN_PRICE:
+                continue
+            # MIN_ATR_PCT: require pre-entry volatility (calm stocks losing -1.50% avg)
+            if MIN_ATR_PCT > 0:
+                pre_atr = st["mh"].loc[st["mh"].index < ts]
+                if len(pre_atr) < 3:
+                    continue
+                pre_atr_tail = pre_atr.tail(10)
+                prev_close = pre_atr_tail["Close"].shift(1)
+                tr1 = pre_atr_tail["High"] - pre_atr_tail["Low"]
+                tr2 = (pre_atr_tail["High"] - prev_close).abs()
+                tr3 = (pre_atr_tail["Low"] - prev_close).abs()
+                import pandas as _pd
+                _atr = _pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).mean()
+                last_close = float(pre_atr_tail["Close"].iloc[-1])
+                _atr_pct = (_atr / last_close * 100) if last_close > 0 else 0
+                if _atr_pct < MIN_ATR_PCT:
+                    continue
+
             # Volume cap: total exposure on this ticker <= VOL_CAP_PCT of dollar vol.
-            # Uses shares * current_price (fill_price) for accurate market-value exposure.
+            # Multiple stacked caps when USE_MULTIWINDOW_SLIPPAGE / USE_2MIN_SLIPPAGE
+            # are enabled — the binding cap wins. Slippage impact uses the same
+            # effective-liquidity denominator that bound the position size.
+            dollar_vol = 0.0
+            dollar_vol_2min = 0.0
+            v_eff_adj = 0.0
+            v_regime = 0.0
             if VOL_CAP_PCT > 0:
                 pre_entry = st["mh"].loc[st["mh"].index <= ts]
                 vol_shares = pre_entry["Volume"].sum() if len(pre_entry) > 0 else 0
                 dollar_vol = fill_price * vol_shares
+                # Cap 1: 5% of cumulative (legacy sanity ceiling)
                 vol_limit = dollar_vol * (VOL_CAP_PCT / 100)
+
+                if USE_MULTIWINDOW_SLIPPAGE:
+                    v_eff_adj, dollar_vol_2min, _v_local, v_regime = \
+                        _multi_window_effective_volume(st["mh"], ts, fill_price)
+                    # Cap 2: regime cap (8% of 10-min)
+                    if MAX_REGIME_PARTICIPATION > 0:
+                        vol_limit = min(vol_limit, v_regime * MAX_REGIME_PARTICIPATION)
+                    # Cap 3: execution cap (15% of V_eff_adj — usually binding)
+                    # PHASE 1A: per-strategy cap overrides global if set (>0)
+                    _strat_cap_attr = f"{st['strategy']}_PARTICIPATION_CAP"
+                    _strat_cap = globals().get(_strat_cap_attr, 0.0)
+                    _exec_cap = _strat_cap if _strat_cap > 0 else MAX_2MIN_PARTICIPATION
+                    if _exec_cap > 0 and v_eff_adj > 0:
+                        vol_limit = min(vol_limit, v_eff_adj * _exec_cap)
+                    # PHASE 1A: cumulative $-vol-at-entry cap (skip overcrowded entries)
+                    if MAX_CUM_DVOL_AT_ENTRY_M > 0:
+                        if dollar_vol > MAX_CUM_DVOL_AT_ENTRY_M * 1_000_000:
+                            continue
+                elif USE_2MIN_SLIPPAGE and MAX_2MIN_PARTICIPATION > 0:
+                    dollar_vol_2min = _last_2min_dollar_vol(st["mh"], ts, fill_price)
+                    vol_limit = min(vol_limit, dollar_vol_2min * MAX_2MIN_PARTICIPATION)
+
                 # Subtract CURRENT market-value exposure on this ticker across ALL active states
                 existing_exposure = 0.0
                 for s in states:
@@ -2416,8 +3010,21 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 if trade_size < 50:
                     continue
 
-            # dollar_vol computed above for the vol-cap check; reuse for slippage impact
-            _slip_in = _entry_slip_pct(fill_price, trade_size, dollar_vol if VOL_CAP_PCT > 0 else 0)
+            # Pick the slippage-impact denominator that matches the binding liquidity model.
+            if USE_MULTIWINDOW_SLIPPAGE:
+                if v_eff_adj == 0.0:
+                    v_eff_adj, _, _, _ = _multi_window_effective_volume(st["mh"], ts, fill_price)
+                slip_dollar_vol = v_eff_adj
+            elif USE_2MIN_SLIPPAGE:
+                if dollar_vol_2min == 0.0:
+                    dollar_vol_2min = _last_2min_dollar_vol(st["mh"], ts, fill_price)
+                slip_dollar_vol = dollar_vol_2min
+            else:
+                slip_dollar_vol = dollar_vol if VOL_CAP_PCT > 0 else 0
+            _slip_in = _entry_slip_pct(fill_price, trade_size, slip_dollar_vol)
+            # PHASE 1A: skip if modeled slippage exceeds threshold (in bp)
+            if MAX_MODELED_SLIP_BP > 0 and (_slip_in * 100) > MAX_MODELED_SLIP_BP:
+                continue
             entry_price = fill_price * (1 + _slip_in / 100)
             st["entry_price"] = entry_price
             st["entry_time"] = ts
@@ -2441,6 +3048,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 st["w_highest_since_entry"] = entry_price
             elif st["strategy"] == "L":
                 st["l_highest_since_entry"] = entry_price
+            elif st["strategy"] == "X":
+                st["x_highest_since_entry"] = entry_price
 
         # Log selection decisions when strategies were skipped
         if filled_this_ts and skipped_this_ts:

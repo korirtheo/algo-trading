@@ -1,0 +1,1585 @@
+{
+  "trial_number": 428,
+  "train_score": 93575623.8224704,
+  "params": {
+    "a_stop_pct": 2.0,
+    "a_target_pct": 7.0,
+    "a_time_limit_min": 9,
+    "a_trail_activate_pct": 6.0,
+    "a_trail_pct": 0.0,
+    "b_max_dip_pct": 2.0,
+    "b_max_entry_candle": 15,
+    "b_min_gap": 14,
+    "b_min_reclaim_vol_mult": 2.0,
+    "b_partial_sell_pct": 50.0,
+    "b_stop_pct": 4.0,
+    "b_target1_pct": 4.0,
+    "b_target2_pct": 6.0,
+    "b_time_limit_min": 10,
+    "b_trail_activate_pct": 4.0,
+    "b_trail_pct": 3.0,
+    "c_breakout_vol_mult": 1.5,
+    "c_max_base_candles": 6,
+    "c_max_base_range_pct": 5.0,
+    "c_max_entry_candle": 60,
+    "c_min_base_candles": 2,
+    "c_min_gap": 18,
+    "c_min_spike_pct": 4.0,
+    "c_partial_sell_pct": 50.0,
+    "c_stop_pct": 2.0,
+    "c_target1_pct": 5.0,
+    "c_target2_pct": 11.0,
+    "c_time_limit_min": 70,
+    "c_trail_activate_pct": 4.0,
+    "c_trail_pct": 2.0,
+    "d_dip_pct": 12,
+    "d_entry_mode": "5candle",
+    "d_max_entry_candle": 40,
+    "d_min_gap": 16,
+    "d_min_spike_pct": 11,
+    "d_partial_sell_pct": 25.0,
+    "d_spike_window": 10,
+    "d_stop_pct": 9.0,
+    "d_target1_pct": 9.0,
+    "d_target2_pct": 23.0,
+    "d_time_limit_min": 30,
+    "d_trail_activate_pct": 2.0,
+    "d_trail_pct": 2.0,
+    "e_max_entry_candle": 7,
+    "e_min_gap": 24,
+    "e_min_pm_vol_mult": 4.0,
+    "e_partial_sell_pct": 25.0,
+    "e_stop_pct": 3.0,
+    "e_target1_pct": 10.0,
+    "e_target2_pct": 12.0,
+    "e_time_limit_min": 20,
+    "e_trail_activate_pct": 4.0,
+    "e_trail_pct": 3.0,
+    "f_stop_pct": 0.0,
+    "f_target_pct": 8.0,
+    "f_time_limit_min": 9,
+    "f_trail_activate_pct": 6.0,
+    "f_trail_pct": 4.0,
+    "g_min_gap_pct": 15.0,
+    "g_require_2nd_green": true,
+    "g_require_2nd_new_high": false,
+    "g_stop_pct": 0.0,
+    "g_target_pct": 20.0,
+    "g_time_limit_min": 6,
+    "g_trail_activate_pct": 0.0,
+    "g_trail_pct": 1.0,
+    "h_stop_pct": 12.0,
+    "h_target_pct": 22.0,
+    "h_time_limit_min": 15,
+    "h_trail_activate_pct": 8.0,
+    "h_trail_pct": 2.0,
+    "i_breakout_vol_mult": 2.0,
+    "i_max_entry_candle": 40,
+    "i_min_gap": 12,
+    "i_partial_sell_pct": 50.0,
+    "i_stop_pct": 6.0,
+    "i_target1_pct": 10.0,
+    "i_target2_pct": 12.0,
+    "i_time_limit_min": 60,
+    "i_trail_activate_pct": 4.0,
+    "i_trail_pct": 1.0,
+    "j_max_entry_candle": 90,
+    "j_min_gap": 20,
+    "j_partial_sell_pct": 50.0,
+    "j_stop_pct": 8.0,
+    "j_target1_pct": 10.0,
+    "j_target2_pct": 16.0,
+    "j_time_limit_min": 40,
+    "j_trail_activate_pct": 5.0,
+    "j_trail_pct": 2.0,
+    "j_vwap_proximity_pct": 4.5,
+    "k_bounce_vol_mult": 2.0,
+    "k_max_entry_candle": 60,
+    "k_min_gap": 10,
+    "k_min_run_pct": 9.0,
+    "k_partial_sell_pct": 25.0,
+    "k_pullback_pct": 3.0,
+    "k_pullback_vol_ratio": 1.0,
+    "k_run_window": 11,
+    "k_stop_pct": 2.0,
+    "k_target1_pct": 11.0,
+    "k_target2_pct": 13.0,
+    "k_time_limit_min": 30,
+    "k_trail_activate_pct": 3.0,
+    "k_trail_pct": 1.0,
+    "l_earliest_candle": 12,
+    "l_latest_candle": 90,
+    "l_max_float": 15000000,
+    "l_min_gap": 60,
+    "l_min_price_accel_pct": 1.0,
+    "l_partial_sell_pct": 25.0,
+    "l_stop_pct": 14.0,
+    "l_tier1_float": 2000000,
+    "l_tier1_target1_pct": 50.0,
+    "l_tier1_target2_pct": 30.0,
+    "l_tier2_float": 4000000,
+    "l_tier2_target1_pct": 12.0,
+    "l_tier2_target2_pct": 30.0,
+    "l_tier3_target1_pct": 11.0,
+    "l_tier3_target2_pct": 30.0,
+    "l_time_limit_min": 120,
+    "l_trail_activate_pct": 1.0,
+    "l_trail_pct": 4.0,
+    "l_vol_surge_mult": 2.5,
+    "m_consolidation_len": 30,
+    "m_max_entry_candle": 140,
+    "m_max_range_pct": 11.0,
+    "m_min_gap": 22,
+    "m_morning_candles": 30,
+    "m_morning_spike_pct": 15.0,
+    "m_partial_sell_pct": 75.0,
+    "m_range_start_candle": 80,
+    "m_stop_pct": 15.0,
+    "m_target1_pct": 8.0,
+    "m_time_limit_min": 30,
+    "m_trail_activate_pct": 4.0,
+    "m_trail_pct": 2.0,
+    "m_vol_ratio": 0.8,
+    "n_max_entry_candle": 75,
+    "n_min_gap": 18,
+    "n_min_hod_age": 15,
+    "n_partial_sell_pct": 50.0,
+    "n_pullback_from_hod_pct": 2.0,
+    "n_stop_pct": 8.0,
+    "n_target1_pct": 10.0,
+    "n_target2_pct": 18.0,
+    "n_time_limit_min": 70,
+    "n_trail_activate_pct": 6.0,
+    "n_trail_pct": 3.0,
+    "o_breakout_vol_mult": 3.0,
+    "o_max_entry_candle": 15,
+    "o_min_gap": 8,
+    "o_partial_sell_pct": 50.0,
+    "o_range_candles": 10,
+    "o_stop_pct": 8.0,
+    "o_target1_pct": 14.0,
+    "o_target2_pct": 20.0,
+    "o_time_limit_min": 50,
+    "o_trail_activate_pct": 2.0,
+    "o_trail_pct": 3.0,
+    "p_confirm_above": 3,
+    "p_confirm_window": 8,
+    "p_max_entry_candle": 90,
+    "p_min_gap": 16,
+    "p_partial_sell_pct": 0.0,
+    "p_pullback_pct": 6.0,
+    "p_pullback_timeout": 15,
+    "p_stop_pct": 10.0,
+    "p_target1_pct": 10.0,
+    "p_time_limit_min": 140,
+    "p_trail_activate_pct": 4.0,
+    "p_trail_pct": 3.0,
+    "priority_a": 7,
+    "priority_b": 19,
+    "priority_c": 1,
+    "priority_d": 18,
+    "priority_e": 13,
+    "priority_f": 17,
+    "priority_g": 10,
+    "priority_h": 13,
+    "priority_i": 1,
+    "priority_j": 13,
+    "priority_k": 15,
+    "priority_l": 17,
+    "priority_m": 1,
+    "priority_n": 15,
+    "priority_o": 2,
+    "priority_p": 15,
+    "priority_r": 13,
+    "priority_s": 4,
+    "priority_v": 4,
+    "priority_w": 8,
+    "priority_x": 11,
+    "r_bounce_ref": "d2_open",
+    "r_d2_pullback_pct": 11.0,
+    "r_day1_min_gap": 40,
+    "r_max_entry_candle": 40,
+    "r_pullback_window": 50,
+    "r_stop_pct": 8.0,
+    "r_target1_pct": 4.0,
+    "r_time_limit_min": 180,
+    "r_trail_activate_pct": 2.0,
+    "r_trail_pct": 9.0,
+    "s_breakout_vol_mult": 2.5,
+    "s_hod_tolerance_pct": 1.4,
+    "s_max_entry_candle": 120,
+    "s_min_gap": 24,
+    "s_min_hod_tests": 3,
+    "s_partial_sell_pct": 75.0,
+    "s_rejection_pct": 2.5,
+    "s_stop_pct": 5.0,
+    "s_target1_pct": 11.0,
+    "s_target2_pct": 19.0,
+    "s_time_limit_min": 30,
+    "s_trail_activate_pct": 5.0,
+    "s_trail_pct": 3.0,
+    "v_max_entry_candle": 100,
+    "v_min_below_candles": 15,
+    "v_min_below_pct": 2,
+    "v_min_gap": 8,
+    "v_partial_sell_pct": 25.0,
+    "v_stop_pct": 12.0,
+    "v_target1_pct": 10.0,
+    "v_target2_pct": 24.0,
+    "v_time_limit_min": 70,
+    "v_trail_activate_pct": 3.0,
+    "v_trail_pct": 6.0,
+    "v_vol_spike_ratio": 3.5,
+    "w_consol_start": 40,
+    "w_earliest_candle": 170,
+    "w_latest_candle": 190,
+    "w_max_hod_breaks": 1,
+    "w_max_range_pct": 11.0,
+    "w_max_vwap_dev_pct": 3.0,
+    "w_min_gap": 18,
+    "w_min_morning_run": 5.0,
+    "w_stop_pct": 6.0,
+    "w_target_pct": 9.0,
+    "w_trail_activate_pct": 3.0,
+    "w_trail_pct": 2.0,
+    "w_vol_surge_mult": 3.5,
+    "w_vol_vs_morning_mult": 0.15000000000000002,
+    "x_min_bars_since_peak": 20,
+    "x_min_entry_room_pct": 14.0,
+    "x_min_first_leg_gain_pct": 4.0,
+    "x_min_pullback_pct": 10.0,
+    "x_min_recovery_pct": 10.0,
+    "x_stop_pct_below_trough": 3.5,
+    "x_target_pct_of_peak": 82.5,
+    "x_time_limit_min": 105,
+    "x_trail_activate_pct": 5.0,
+    "x_trail_pct": 7.0
+  },
+  "forward_pnl": 517671.4434659957,
+  "n_trades": 220,
+  "wr": 60.0,
+  "pf": 2.423317681063,
+  "max_dd_pct": -36.058652963996984,
+  "trades": [
+    {
+      "date": "2026-03-17",
+      "ticker": "LNAI",
+      "pnl": 1863.943421344422,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-17",
+      "ticker": "LNAI",
+      "pnl": 472.54184889934186,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "LBGJ",
+      "pnl": 1679.648362083797,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "AIM",
+      "pnl": 336.25307833120314,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "ARTL",
+      "pnl": 1464.7146000574721,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "LITX",
+      "pnl": -88.56426694341644,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "LBGJ",
+      "pnl": 5268.276611326262,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "AIM",
+      "pnl": 1424.9606888936396,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "ARTL",
+      "pnl": 1763.9824274962011,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-18",
+      "ticker": "LITX",
+      "pnl": 312.67220346909016,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-20",
+      "ticker": "CURV",
+      "pnl": 274.3327651831305,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-20",
+      "ticker": "CURV",
+      "pnl": 6.5204817801137125,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-23",
+      "ticker": "AHMA",
+      "pnl": 3049.7459879388334,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-23",
+      "ticker": "AIFF",
+      "pnl": 5196.190158392528,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-23",
+      "ticker": "AHMA",
+      "pnl": 1169.4529082610024,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-23",
+      "ticker": "AIFF",
+      "pnl": -538.1311324525668,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "RMSG",
+      "pnl": 1081.170688063372,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "ARMG",
+      "pnl": -2444.3754711468646,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "PAYS",
+      "pnl": -423.7840898684299,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "RMSG",
+      "pnl": 800.0265193229934,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "ARMG",
+      "pnl": -802.6290793923472,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-25",
+      "ticker": "PAYS",
+      "pnl": -329.5678292836019,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-26",
+      "ticker": "AIFF",
+      "pnl": 1019.4157369527748,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-26",
+      "ticker": "ANNA",
+      "pnl": 1329.4041564842264,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-26",
+      "ticker": "AIFF",
+      "pnl": 788.8960015049743,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-26",
+      "ticker": "ANNA",
+      "pnl": -670.1682683268446,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-27",
+      "ticker": "ARTL",
+      "pnl": 9255.54824409962,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-27",
+      "ticker": "VSA",
+      "pnl": 6447.637186796201,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-27",
+      "ticker": "ARTL",
+      "pnl": 2842.3043396608846,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-27",
+      "ticker": "VSA",
+      "pnl": 2350.532224720948,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-30",
+      "ticker": "SGML",
+      "pnl": 1645.2317825749196,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-30",
+      "ticker": "SGML",
+      "pnl": 517.1086072110193,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "KIDZ",
+      "pnl": 5839.148372306372,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "VRAX",
+      "pnl": -12663.821132340498,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "ARTL",
+      "pnl": 970.9797498839616,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "KIDZ",
+      "pnl": 1907.1812654427922,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "VRAX",
+      "pnl": 66.17982290768123,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-03-31",
+      "ticker": "ARTL",
+      "pnl": 22.650047241238894,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-01",
+      "ticker": "GABr",
+      "pnl": 93.73257252183112,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-01",
+      "ticker": "RENX",
+      "pnl": 10349.304402136026,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-01",
+      "ticker": "GABr",
+      "pnl": 6.973261409819656,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-01",
+      "ticker": "RENX",
+      "pnl": -2194.0525297545537,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-06",
+      "ticker": "DEFT",
+      "pnl": -258.41122114129394,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-06",
+      "ticker": "PRFX",
+      "pnl": -537.2300405533169,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-06",
+      "ticker": "DEFT",
+      "pnl": 8.576065865146006,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-06",
+      "ticker": "PRFX",
+      "pnl": -0.6802494784439546,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "RDGT",
+      "pnl": 14274.987530565457,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "MIGI",
+      "pnl": -5520.509833323958,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "KPRX",
+      "pnl": -2796.4371860844694,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "RDGT",
+      "pnl": 7607.484084654308,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "MIGI",
+      "pnl": -402.52901515238773,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-07",
+      "ticker": "KPRX",
+      "pnl": -1765.5347402196203,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-09",
+      "ticker": "ONCO",
+      "pnl": -104.55652476879186,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-09",
+      "ticker": "YMT",
+      "pnl": 8674.89526531098,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-09",
+      "ticker": "ONCO",
+      "pnl": 378.420104128556,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-09",
+      "ticker": "YMT",
+      "pnl": 286.108052472724,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-13",
+      "ticker": "RMSG",
+      "pnl": 18235.41807689835,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-13",
+      "ticker": "RMSG",
+      "pnl": 890.9428697959811,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-14",
+      "ticker": "SEGG",
+      "pnl": 4743.241278140718,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-14",
+      "ticker": "WGRX",
+      "pnl": -846.8745995401223,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-14",
+      "ticker": "SEGG",
+      "pnl": 106.25063453572272,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-14",
+      "ticker": "WGRX",
+      "pnl": -23.860659000064288,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-15",
+      "ticker": "AGAE",
+      "pnl": 2426.0804277073476,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-15",
+      "ticker": "AGAE",
+      "pnl": -19725.96709590347,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-16",
+      "ticker": "ONFO",
+      "pnl": 19557.800157675578,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-16",
+      "ticker": "ZSPC",
+      "pnl": 1017.8299517540217,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-16",
+      "ticker": "ONFO",
+      "pnl": 3639.9541213961784,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-16",
+      "ticker": "ZSPC",
+      "pnl": 30.424766702728448,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "CRMX",
+      "pnl": 956.8214012167882,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "CRML",
+      "pnl": 204.55874633661006,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "BZAI",
+      "pnl": -2357.5469925076613,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "CRMX",
+      "pnl": 36.91627646018719,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "CRML",
+      "pnl": 1678.3998497940338,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-17",
+      "ticker": "BZAI",
+      "pnl": -3213.8968660773244,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-20",
+      "ticker": "ENVB",
+      "pnl": 10528.390391801178,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-20",
+      "ticker": "JTAI",
+      "pnl": -1703.6026320231467,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-20",
+      "ticker": "ENVB",
+      "pnl": 3558.4347329160955,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-20",
+      "ticker": "JTAI",
+      "pnl": 1.9155512283359712,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-21",
+      "ticker": "SPRC",
+      "pnl": -1622.3227230148914,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-21",
+      "ticker": "SPRC",
+      "pnl": 172.2847398558224,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "AUUD",
+      "pnl": 14143.55844135335,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "TRT",
+      "pnl": 93.1049003846856,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "TZOO",
+      "pnl": 413.20219047533465,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "AUUD",
+      "pnl": 13369.066892340372,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "TRT",
+      "pnl": -691.5167517205264,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-23",
+      "ticker": "TZOO",
+      "pnl": -3231.3677651788894,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-24",
+      "ticker": "ARMG",
+      "pnl": 4671.112504628691,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-24",
+      "ticker": "ARMG",
+      "pnl": -4953.392926500819,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-28",
+      "ticker": "BIYA",
+      "pnl": 29550.94668447823,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-04-28",
+      "ticker": "POM",
+      "pnl": -43.56249231001539,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-28",
+      "ticker": "BIYA",
+      "pnl": 1277.548055228981,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-28",
+      "ticker": "POM",
+      "pnl": -0.012363976842223678,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-29",
+      "ticker": "PRCH",
+      "pnl": 3473.7172971280816,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-29",
+      "ticker": "PRCH",
+      "pnl": 216.20425783566316,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-30",
+      "ticker": "AKAN",
+      "pnl": -9471.427693546459,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-04-30",
+      "ticker": "BIYA",
+      "pnl": 421.6405341702193,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-30",
+      "ticker": "AKAN",
+      "pnl": -2518.6560344059544,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-04-30",
+      "ticker": "BIYA",
+      "pnl": -12240.88679202422,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-01",
+      "ticker": "CERS",
+      "pnl": 8811.798737488833,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-01",
+      "ticker": "CERS",
+      "pnl": -14416.94992084513,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-04",
+      "ticker": "GBTG",
+      "pnl": -1681.5427637438697,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-04",
+      "ticker": "ELBM",
+      "pnl": -1124.5980659648703,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-04",
+      "ticker": "GBTG",
+      "pnl": -2001.544001560629,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-04",
+      "ticker": "ELBM",
+      "pnl": -16.805164033113044,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-05",
+      "ticker": "BLZE",
+      "pnl": -1883.8277392614982,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-05",
+      "ticker": "BLZE",
+      "pnl": 159.06337455962785,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "EVC",
+      "pnl": -2242.4863182742265,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "GLWG",
+      "pnl": -9193.285206190863,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "AMDL",
+      "pnl": -759.9129817925859,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "IFRX",
+      "pnl": -2756.6861276547133,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "BLMN",
+      "pnl": 1073.5142396579613,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "EVC",
+      "pnl": -4851.824070309871,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "GLWG",
+      "pnl": -7.266501049535236,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "AMDL",
+      "pnl": 904.68974791863,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "IFRX",
+      "pnl": -7263.5496760573005,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-06",
+      "ticker": "BLMN",
+      "pnl": -8491.67726390573,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-08",
+      "ticker": "FLNC",
+      "pnl": 3639.4040948380134,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-08",
+      "ticker": "RKLX",
+      "pnl": -1769.1345881375892,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-08",
+      "ticker": "FLNC",
+      "pnl": 9.494209526586928,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-08",
+      "ticker": "RKLX",
+      "pnl": 1564.0071049129037,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-11",
+      "ticker": "JZXN",
+      "pnl": 11773.3646076289,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-11",
+      "ticker": "JZXN",
+      "pnl": 1086.3608479635732,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "UBXG",
+      "pnl": -2535.647981804097,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "VSTS",
+      "pnl": -2363.3609513726697,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "HTCO",
+      "pnl": 1762.693837264349,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "QUBT",
+      "pnl": 1735.5951744742051,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "UBXG",
+      "pnl": 10762.851421298168,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "VSTS",
+      "pnl": -1.937550182859468,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "HTCO",
+      "pnl": 32.81765201337453,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-12",
+      "ticker": "QUBT",
+      "pnl": 1691.0220468542539,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-13",
+      "ticker": "OCG",
+      "pnl": 2339.8574091362243,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-13",
+      "ticker": "VELO",
+      "pnl": 12558.514989164221,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-13",
+      "ticker": "OCG",
+      "pnl": 1596.804436048522,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-13",
+      "ticker": "VELO",
+      "pnl": 2092.5142866359092,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-14",
+      "ticker": "POET",
+      "pnl": 16160.926708618354,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-14",
+      "ticker": "POET",
+      "pnl": 5269.847200320306,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-15",
+      "ticker": "STAK",
+      "pnl": -70.92945174498391,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-15",
+      "ticker": "STAK",
+      "pnl": -0.10074623420119622,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "pnl": 8845.894940638711,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NIVF",
+      "pnl": 19261.00200858165,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "pnl": -155.69173254843918,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "RGTX",
+      "pnl": -3447.669265651639,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "INFQ",
+      "pnl": 1352.1627153204172,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "QUCY",
+      "pnl": -3218.761121681775,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NCPL",
+      "pnl": -462.02985123156395,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "pnl": 7277.062534648372,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NIVF",
+      "pnl": 2662.375827370939,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "pnl": -1352.297702292126,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "RGTX",
+      "pnl": -215.12512221487123,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "INFQ",
+      "pnl": 1106.0894076840195,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "QUCY",
+      "pnl": -444.4513534508005,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NCPL",
+      "pnl": 0.4081435487548788,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "PCLA",
+      "pnl": 8425.685333049216,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "KIDZ",
+      "pnl": 78.91323937757534,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "PCLA",
+      "pnl": 161.06642330454406,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "KIDZ",
+      "pnl": -715.4409157523405,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "NCRA",
+      "pnl": 15973.180129462271,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "pnl": -92.77968252106439,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "pnl": -14.443263545396803,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "pnl": -1073.5580067163537,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "FUTG",
+      "pnl": -3709.1418568726513,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "NCRA",
+      "pnl": -453.8958715570334,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "pnl": 8.927411127256164,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "pnl": -14038.880775448022,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "pnl": 3.102930034330484,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "FUTG",
+      "pnl": -10455.732224237232,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "pnl": -7012.038334357421,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "pnl": -4.787603172745094,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "UMAC",
+      "pnl": 9944.10670888517,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "UMAC",
+      "pnl": 3014.8093555357773,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "OLOX",
+      "pnl": 2443.696186358342,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTN",
+      "pnl": -4697.5836853562505,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "OLOX",
+      "pnl": -1569.1812792816781,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTN",
+      "pnl": -4042.2119481391856,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "LASE",
+      "pnl": 2793.567506822277,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "KUST",
+      "pnl": -8652.472563838026,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "PMI",
+      "pnl": -2068.6155798051623,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "LASE",
+      "pnl": -3453.9200625803787,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "KUST",
+      "pnl": -106.83894601817155,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "PMI",
+      "pnl": -4.142534730804073,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "pnl": 39204.65006356538,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "pnl": 11813.898878002743,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "CMND",
+      "pnl": 9781.163398935169,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "CMND",
+      "pnl": 153.8978483818678,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CHAI",
+      "pnl": 10380.899221515225,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AZI",
+      "pnl": 29980.375761332747,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AHMA",
+      "pnl": -117441.33385902434,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "pnl": 19858.80117763691,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "MTEN",
+      "pnl": -3142.4305778699054,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "DAIC",
+      "pnl": 4825.750177663096,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CHAI",
+      "pnl": -6060.8309303529095,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AZI",
+      "pnl": 28543.227938631695,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AHMA",
+      "pnl": 43381.107856340415,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "pnl": 296.0029119217545,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "MTEN",
+      "pnl": -4.91766083283801,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "DAIC",
+      "pnl": 86.98647906969757,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "VSME",
+      "pnl": 32366.587423785997,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "QH",
+      "pnl": -4963.600386850281,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "SMCZ",
+      "pnl": -1341.7141927881457,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "AZI",
+      "pnl": 80.40103774456657,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "VSME",
+      "pnl": -505.786528474011,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "QH",
+      "pnl": -55.43332227956182,
+      "exit_reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "SMCZ",
+      "pnl": 1.1374274094167731,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "AZI",
+      "pnl": 16.997095934903996,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "pnl": 28221.020735501836,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "pnl": 48053.41039442987,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "pnl": 35330.99793928329,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "pnl": 503.6486840237267,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "pnl": 9397.350361215882,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "CYPH",
+      "pnl": -395.2331454718187,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "pnl": 205.46791700548147,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "CYPH",
+      "pnl": 0.6170169412754376,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "SLBT",
+      "pnl": 42711.99147292151,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "OBAI",
+      "pnl": 77287.75029207586,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "pnl": 429.71895141240384,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "NIVF",
+      "pnl": -654.630768240313,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "SLBT",
+      "pnl": 369.19192823082994,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "OBAI",
+      "pnl": 1437.3918485078539,
+      "exit_reason": "TARGET"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "pnl": 18.50085579050119,
+      "exit_reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "NIVF",
+      "pnl": -61.04319395647053,
+      "exit_reason": "TRAIL"
+    }
+  ]
+}

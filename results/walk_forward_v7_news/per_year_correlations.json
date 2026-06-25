@@ -1,0 +1,61 @@
+{
+  "n_trials": 30,
+  "correlations_with_2026_pnl": {
+    "sum_train_pnl": {
+      "pearson": 0.37622384519995705,
+      "spearman": 0.2756395995550612
+    },
+    "min_train_pnl": {
+      "pearson": 0.3864294051114643,
+      "spearman": 0.28587319243604004
+    },
+    "max_train_pnl": {
+      "pearson": 0.30735572557269286,
+      "spearman": 0.19510567296996661
+    },
+    "mean_train_pnl": {
+      "pearson": 0.37622384519995705,
+      "spearman": 0.2756395995550612
+    },
+    "min_train_pf": {
+      "pearson": 0.6384194986775173,
+      "spearman": 0.567964404894327
+    },
+    "mean_train_pf": {
+      "pearson": 0.25945774039809905,
+      "spearman": -0.20355951056729701
+    },
+    "std_train_pnl": {
+      "pearson": 0.2968717297655858,
+      "spearman": 0.1350389321468298
+    },
+    "cv_train_pnl": {
+      "pearson": -0.2518607104250175,
+      "spearman": -0.28720800889877635
+    },
+    "geomean_train_pnl": {
+      "pearson": 0.5196240526435104,
+      "spearman": 0.30945494994438266
+    },
+    "p25_train_pnl": {
+      "pearson": 0.5474703212338237,
+      "spearman": 0.18264738598442715
+    },
+    "min_train_n": {
+      "pearson": 0.6028337538665877,
+      "spearman": 0.20266963292547271
+    },
+    "train_score": {
+      "pearson": 0.28088906482251885,
+      "spearman": 0.20800889877641823
+    },
+    "train_pnl_attr": {
+      "pearson": 0.20823532439667108,
+      "spearman": 0.14838709677419354
+    },
+    "train_pf_attr": {
+      "pearson": 0.2948325729059446,
+      "spearman": 0.185761957730812
+    }
+  }
+}

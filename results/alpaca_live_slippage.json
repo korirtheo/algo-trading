@@ -1,0 +1,98 @@
+[
+  {
+    "symbol": "BFLY",
+    "side": "sell",
+    "type": "market",
+    "qty": 889.0,
+    "filled_avg_price": 8.39,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 18:06:23.310912+00:00",
+    "filled_at": "2026-06-18 18:06:24.510089+00:00",
+    "is_bracket_child": false
+  },
+  {
+    "symbol": "BFLY",
+    "side": "buy",
+    "type": "market",
+    "qty": 889.0,
+    "filled_avg_price": 8.42,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 18:06:00.667986+00:00",
+    "filled_at": "2026-06-18 18:06:04.261300+00:00",
+    "is_bracket_child": true
+  },
+  {
+    "symbol": "CRVO",
+    "side": "sell",
+    "type": "market",
+    "qty": 931.0,
+    "filled_avg_price": 6.6,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 16:08:00.620846+00:00",
+    "filled_at": "2026-06-18 16:08:01.618812+00:00",
+    "is_bracket_child": false
+  },
+  {
+    "symbol": "CRVO",
+    "side": "sell",
+    "type": "market",
+    "qty": 39.0,
+    "filled_avg_price": 7.012564,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 16:06:01.199359+00:00",
+    "filled_at": "2026-06-18 16:06:05.366661+00:00",
+    "is_bracket_child": false
+  },
+  {
+    "symbol": "CRVO",
+    "side": "sell",
+    "type": "market",
+    "qty": 13.0,
+    "filled_avg_price": 7.410769,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 16:04:01.468315+00:00",
+    "filled_at": "2026-06-18 16:04:03.066783+00:00",
+    "is_bracket_child": false
+  },
+  {
+    "symbol": "CRVO",
+    "side": "sell",
+    "type": "market",
+    "qty": 39.0,
+    "filled_avg_price": 7.534102,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 16:02:28.088271+00:00",
+    "filled_at": "2026-06-18 16:02:30.630705+00:00",
+    "is_bracket_child": false
+  },
+  {
+    "symbol": "CRVO",
+    "side": "buy",
+    "type": "market",
+    "qty": 1022.0,
+    "filled_avg_price": 7.661967,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 16:02:01.208867+00:00",
+    "filled_at": "2026-06-18 16:02:02.727017+00:00",
+    "is_bracket_child": true
+  },
+  {
+    "symbol": "APWC",
+    "side": "buy",
+    "type": "market",
+    "qty": 57.0,
+    "filled_avg_price": 2.042105,
+    "ref_price": null,
+    "slippage_bp": null,
+    "submitted_at": "2026-06-18 13:33:34.809181+00:00",
+    "filled_at": "2026-06-18 13:34:44.474005+00:00",
+    "is_bracket_child": true
+  }
+]

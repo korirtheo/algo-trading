@@ -1,0 +1,62 @@
+{
+  "#124 W3 deployed | baseline": {
+    "final": 47534.04964283345,
+    "pnl": 22534.04964283345,
+    "multiple": 1.9013619857133381,
+    "max_dd_pct": -57.92164258955515,
+    "max_dd_dollar": -37718.46933722762,
+    "n_trades": 196,
+    "n_picks_dropped": 0,
+    "worst_trade": -7881.706475973413
+  },
+  "#124 W3 deployed | A_past_year_required": {
+    "final": 23190.788226980898,
+    "pnl": -1809.211773019102,
+    "multiple": 0.927631529079236,
+    "max_dd_pct": -71.75841401358382,
+    "max_dd_dollar": -41083.88270490701,
+    "n_trades": 136,
+    "n_picks_dropped": 182,
+    "worst_trade": -5936.683899171163
+  },
+  "#124 W3 deployed | B_drop_stale_only": {
+    "final": 24015.13469195755,
+    "pnl": -984.8653080424483,
+    "multiple": 0.9606053876783021,
+    "max_dd_pct": -70.7444691761907,
+    "max_dd_dollar": -40503.36833120835,
+    "n_trades": 149,
+    "n_picks_dropped": 116,
+    "worst_trade": -5936.683899171163
+  },
+  "#254 W7 (current) | baseline": {
+    "final": 224552.66548068894,
+    "pnl": 199552.66548068894,
+    "multiple": 8.982106619227558,
+    "max_dd_pct": -26.709748959811563,
+    "max_dd_dollar": -49487.51849461219,
+    "n_trades": 215,
+    "n_picks_dropped": 0,
+    "worst_trade": -31929.43489570165
+  },
+  "#254 W7 (current) | A_past_year_required": {
+    "final": 160827.555879809,
+    "pnl": 135827.555879809,
+    "multiple": 6.43310223519236,
+    "max_dd_pct": -27.924290049416932,
+    "max_dd_dollar": -39593.13629435119,
+    "n_trades": 179,
+    "n_picks_dropped": 182,
+    "worst_trade": -24184.008808092738
+  },
+  "#254 W7 (current) | B_drop_stale_only": {
+    "final": 242310.99042188778,
+    "pnl": 217310.99042188778,
+    "multiple": 9.692439616875511,
+    "max_dd_pct": -15.004700114307642,
+    "max_dd_dollar": -42776.527061743196,
+    "n_trades": 196,
+    "n_picks_dropped": 116,
+    "worst_trade": -30040.64712308353
+  }
+}
