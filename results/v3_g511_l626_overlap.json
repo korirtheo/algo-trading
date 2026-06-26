@@ -1,0 +1,13 @@
+{
+  "g_unique": 166,
+  "l_unique": 169,
+  "overlap": 53,
+  "only_g": 113,
+  "only_l": 116,
+  "overlap_pct_of_g": 31.9,
+  "overlap_pct_of_l": 31.4,
+  "both_days": 76,
+  "same_day_same_ticker": 40,
+  "g_pnl_from_shared": 1671094.972499951,
+  "l_pnl_from_shared": 243542.55392947164
+}

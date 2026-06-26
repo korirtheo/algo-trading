@@ -16,6 +16,7 @@ import logging
 import os
 import threading
 import time
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -137,6 +138,23 @@ class CombinedEngine:
     def __init__(self, executor, params_path=None, fill_stream=None):
         self.executor = executor
         self.params = load_trial_params(params_path)
+        # v3 overlay: read from the config's v3_overlay section
+        self.v3_params = {}
+        self.v3_active_trade = None
+        try:
+            _vp = params_path or PARAMS_PATH
+            with open(_vp) as _f:
+                _raw = json.load(_f)
+            if isinstance(_raw, dict) and "v3_overlay" in _raw:
+                self.v3_params = _raw["v3_overlay"]
+                if self.v3_params.get("enabled", False):
+                    log.info("v3 OVERLAY enabled: target=%.0f%% stop=%.0f%% time=%dmin trail=%.1f%%",
+                             self.v3_params.get("target_pct", 0),
+                             self.v3_params.get("stop_pct", 0),
+                             self.v3_params.get("time_limit_min", 0),
+                             self.v3_params.get("trail_pct", 0))
+        except Exception as e:
+            log.debug("No v3 overlay in config: %s", e)
         self.bar_data = {}      # ticker -> list of (timestamp, OHLCV dict)
         self.picks = []         # list of pick dicts (scanner output)
         self.last_states = {}   # ticker -> last known state from simulate (for entry/exit detection)
@@ -173,6 +191,7 @@ class CombinedEngine:
         self.daily_pnl = 0.0
         self.trades_today = []
         self.halt_states.clear()
+        self.v3_active_trade = None
 
         self.picks = []
         for cand in candidates:
@@ -404,6 +423,12 @@ class CombinedEngine:
                     self.position_entry.pop(ticker_pos, None)
                     self.active_position = None
 
+        # --- v3 overlay exit check ---
+        if (self.v3_params.get("enabled", False)
+                and self.active_position is not None
+                and self.position_entry.get(self.active_position, {}).get("strategy") == "V3"):
+            self._manage_v3_exit(symbol, bar)
+
         # Store all sub-states per ticker for diagnostics
         per_ticker = {}
         for st in states:
@@ -589,6 +614,242 @@ class CombinedEngine:
                             self.position_entry[ticker]["shares"] = actual_shares - actual_sold
 
             self.last_states[ticker] = dict(st)
+
+        # --- v3 overlay entry check ---
+        if (self.v3_params.get("enabled", False)
+                and self.active_position is None
+                and picks_with_data):
+            self._check_v3_entry(picks_with_data)
+
+    # ------------------------------------------------------------------ #
+    #  v3 OVERLAY (R-O any-green after G hold expires)                  #
+    #  Entry: first green candle after G's last hold on the same ticker  #
+    #  Exit: target=57%, stop=30%, time=27min, trail=0.5% act=0%        #
+    # ------------------------------------------------------------------ #
+
+    def _v3_candidate_for_ticker(self, mh, day_open, g_holds_list):
+        """Find first any-green candle after G hold expires.
+
+        Args:
+            mh: DataFrame of market-hour candles
+            day_open: first candle's Open price
+            g_holds_list: list of (entry_time, exit_time) for G trades on this ticker
+        Returns:
+            (entry_timestamp, entry_price, remaining_bars) or None
+        """
+        if mh is None or len(mh) < 2:
+            return None
+        bar0_red = float(mh.iloc[0]["Close"]) <= day_open
+        scan = 1
+        if not bar0_red and g_holds_list:
+            ge = max(x for _, x in g_holds_list)
+            ns = None
+            for i in range(1, len(mh)):
+                if mh.index[i] > ge:
+                    ns = i
+                    break
+            if ns is None:
+                return None
+            scan = ns
+        for i in range(scan, len(mh)):
+            if float(mh.iloc[i]["Close"]) > day_open:
+                ba = mh.iloc[i + 1:]
+                if len(ba) == 0:
+                    return None
+                return (mh.index[i], float(mh.iloc[i]["Close"]), ba)
+        return None
+
+    def _manage_v3_exit(self, symbol, bar):
+        """Check v3 active trade for exit conditions on each bar.
+
+        Exits: target hit, stop hit, trailing stop, time limit.
+        Passes correct v3 bracket params so the safety net has the right values.
+        """
+        ticker = self.active_position
+        entry_info = self.position_entry.get(ticker, {})
+        entry_price = entry_info.get("entry_price")
+        if entry_price is None or entry_price <= 0:
+            return
+
+        entry_time = entry_info.get("entry_time")
+        if entry_time is None:
+            return
+
+        # Convert entry_time to naive datetime for comparison
+        if hasattr(entry_time, "to_pydatetime"):
+            et_dt = entry_time.to_pydatetime().replace(tzinfo=None)
+        elif isinstance(entry_time, str):
+            et_dt = datetime.fromisoformat(entry_time.replace("Z", "+00:00")).replace(tzinfo=None)
+        else:
+            et_dt = entry_time if not hasattr(entry_time, "tzinfo") or entry_time.tzinfo is None \
+                else entry_time.replace(tzinfo=None)
+
+        current = float(bar["Close"])
+        high = float(bar["High"])
+        low = float(bar["Low"])
+        bar_ts = bar["timestamp"]
+        if hasattr(bar_ts, "to_pydatetime"):
+            bt_dt = bar_ts.to_pydatetime().replace(tzinfo=None)
+        elif isinstance(bar_ts, str):
+            bt_dt = datetime.fromisoformat(bar_ts.replace("Z", "+00:00")).replace(tzinfo=None)
+        else:
+            bt_dt = bar_ts if not hasattr(bar_ts, "tzinfo") or bar_ts.tzinfo is None \
+                else bar_ts.replace(tzinfo=None)
+
+        tp = self.v3_params.get("target_pct", 57.0)
+        sp = self.v3_params.get("stop_pct", 30.0)
+        tl = self.v3_params.get("time_limit_min", 27)
+        trp = self.v3_params.get("trail_pct", 0.5)
+        tap = self.v3_params.get("trail_activate_pct", 0.0)
+
+        target_price = entry_price * (1 + tp / 100)
+        stop_price = entry_price * (1 - sp / 100)
+
+        # Trail tracking
+        v3t = self.v3_active_trade
+        peak = entry_price
+        trailing_stop = None
+        if v3t:
+            peak = v3t.get("peak", entry_price)
+            trailing_stop = v3t.get("trailing_stop")
+
+        # Update peak if current high exceeds it
+        if high > peak:
+            peak = high
+            if (peak / entry_price - 1) * 100 >= tap:
+                trailing_stop = peak * (1 - trp / 100)
+
+        self.v3_active_trade = {"peak": peak, "trailing_stop": trailing_stop,
+                                "entry_price": entry_price, "entry_time": entry_time}
+
+        # Check exit conditions
+        exit_reason = None
+        if high >= target_price:
+            exit_reason = "V3_TARGET"
+            exit_price = target_price
+        elif low <= stop_price:
+            exit_reason = "V3_STOP"
+            exit_price = stop_price
+        elif trailing_stop is not None and low <= trailing_stop:
+            exit_reason = "V3_TRAIL"
+            exit_price = trailing_stop
+        elif tl > 0:
+            elapsed = (bt_dt - et_dt).total_seconds() / 60
+            if elapsed >= tl:
+                exit_reason = "V3_TIME"
+                exit_price = current
+
+        if exit_reason:
+            log.info("V3 EXIT %s (%s): entry=$%.3f exit=$%.3f", ticker, exit_reason, entry_price, exit_price)
+            order = self.executor.sell(
+                ticker, reason=exit_reason,
+                signal_price=exit_price,
+                cumulative_dollar_volume=self._cum_dollar_vol(ticker),
+                strategy="V3",
+            )
+            if order:
+                with self._pending_lock:
+                    self.pending_orders[str(order.id)] = {
+                        "ticker": ticker, "strategy": "V3",
+                        "signal_price": exit_price, "signal_time": bar["timestamp"],
+                        "side": "sell", "exit_reason": exit_reason,
+                        "pre_sell_shares": entry_info.get("shares", 0),
+                        "is_partial": False,
+                    }
+                if self.fill_stream is not None:
+                    self.fill_stream.register(order.id, self._on_sell_fill)
+                    log.info("V3 SELL %s (%s): order %s placed, awaiting stream fill",
+                             ticker, exit_reason, order.id)
+                else:
+                    # Legacy synchronous exit
+                    self.active_position = None
+                    pnl = (exit_price - entry_price) * entry_info.get("shares", 0)
+                    self.daily_pnl += pnl
+                    trade = {
+                        "ticker": ticker, "strategy": "V3",
+                        "entry_price": entry_price, "exit_price": exit_price,
+                        "pnl": pnl, "reason": exit_reason,
+                        "entry_time": entry_time, "exit_time": bar["timestamp"],
+                    }
+                    self.trades_today.append(trade)
+                    _append_trade(trade)
+            else:
+                log.warning("V3 SELL REJECTED %s: order returned None", ticker)
+
+    def _check_v3_entry(self, picks_with_data):
+        """Check for v3 overlay entry: first any-green after G holds expire.
+
+        Scans all picks, picks the first ticker with a v3 candidate.
+        Single-position so only enters if active_position is None (caller checks).
+        Passes v3 bracket params so the safety net uses v3's own stop/target.
+        """
+        # Build G hold end times from the current day's simulated states
+        g_holds = defaultdict(list)
+        for ticker, st_list in self.all_states.items():
+            for st in st_list:
+                if st.get("strategy") == "G" and st.get("entry_time") and st.get("exit_time"):
+                    g_holds[ticker].append((st["entry_time"], st["exit_time"]))
+
+        cash = self.executor.get_buying_power()
+        pos_pct = self.v3_params.get("position_pct", 30.0)
+
+        for pick in picks_with_data:
+            mh = pick.get("market_hour_candles")
+            if mh is None or len(mh) < 2:
+                continue
+            ticker = pick["ticker"]
+            day_open = float(mh.iloc[0]["Open"])
+            ghol = g_holds.get(ticker, [])
+
+            cand = self._v3_candidate_for_ticker(mh, day_open, ghol)
+            if cand is None:
+                continue
+
+            ets, fp, ba = cand
+            trade_size = cash * (pos_pct / 100)
+            cum_dvol = self._cum_dollar_vol(ticker)
+
+            # Use v3 bracket params so the safety net stops at v3's own values
+            v3_stop = self.v3_params.get("stop_pct", 30.0)
+            v3_target = self.v3_params.get("target_pct", 57.0)
+
+            order = self.executor.buy(
+                ticker, trade_size, fp,
+                cumulative_dollar_volume=cum_dvol,
+                strategy="V3",
+                bracket_stop_pct=v3_stop,
+                bracket_target_pct=v3_target,
+            )
+            if order:
+                self.active_position = ticker
+                if ticker not in self.position_entry:
+                    self.position_entry[ticker] = {
+                        "entry_price": fp,
+                        "shares": 0,
+                        "cost": trade_size,
+                        "strategy": "V3",
+                        "entry_time": ets,
+                    }
+                with self._pending_lock:
+                    self.pending_orders[str(order.id)] = {
+                        "ticker": ticker, "strategy": "V3",
+                        "signal_price": fp, "signal_time": ets,
+                        "side": "buy", "requested_cost": trade_size,
+                    }
+                self.v3_active_trade = {
+                    "peak": fp, "trailing_stop": None,
+                    "entry_price": fp, "entry_time": ets,
+                }
+                if self.fill_stream is not None:
+                    self.fill_stream.register(order.id, self._on_buy_fill)
+                    log.info("V3 ENTRY %s: price=$%.3f size=$%.0f order=%s",
+                             ticker, fp, trade_size, order.id)
+                    self._schedule_safety_poll(order.id, ticker, "buy", fp, ets, "V3")
+                else:
+                    self._poll_buy_fill_inline(order, ticker, "V3", fp, ets)
+                return  # single position — only one v3 entry per day
+            else:
+                log.debug("V3 ENTRY %s rejected by executor (vol cap or equity cap)", ticker)
 
     def _on_bar_halt(self, symbol, bar):
         """Halt-resume strategy bar handler. Runs independently of

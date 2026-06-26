@@ -2,7 +2,7 @@
 
 > **Living document**: append new study results, forward tests, and findings here.
 > Safe to paste to ChatGPT for review. Keep entries in chronological order under each section.
-> Last updated: 2026-06-20 EAT
+> Last updated: 2026-06-26 EAT
 
 ---
 
@@ -900,6 +900,37 @@ Every "different timing/trigger" variant we've tested for the gap-up microcap si
 - **The 4-strategy joint search is 13× slower than 2-strategy.** W13 (G+L) ran at 12 trials/min. W14 (G+L+B+V+S+N) ran at 0.91 trials/min (13× slower) — but only 4 strategies vs 2 = 2× theoretical. The extra 6.5× comes from per-state cache misses + priority resolution + Postgres write contention. Dropping S+N (broken at defaults anyway) gave 3.59 trials/min for W14b. **Lesson**: budget time for multi-strat studies by trial volume PLUS per-trial slowdown.
 
 - **The wide-forward harness's Pearson is the noise filter we needed.** W13 wide-forward (top-50 + random-50 from middle) showed Pearson 0.828 train→forward and 21% of trials beating hybrid. Without that, we'd be flying blind on whether the top-by-train basin is a real edge or a single overfit point. **Lesson**: never deploy a "top-by-train" trial without forward-testing a sample, AND a random-sample for sanity.
+
+## Deploy update: v3 base + G #511 + L #626 (2026-06-26)
+
+- **Config deployed**: `config/trial_v3_base_g511_l626_combined.json`
+- **Base**: v3 #393 multi-window (2022+W21b trained) — provides priorities + slippage frame
+- **G source**: W21b #511 (target=62, stop=25, time=12, trail=0.5, min_gap=15, 2nd_green, no 2nd_new_high)
+- **L source**: l_only_w21b #626 (wide-forward rank #1: **+$408K standalone** on 2026 Mar-Jun, 73% WR, 3.21 PF)
+- **Backtest full 2026 YTD** (compounded $25K start, vol caps active):
+  - **v3+G511+L626**: **+$4,950,517 (199×), DD -27.2%**
+  - **#511 baseline**: +$3,503,903 (141×), DD -19.4%
+  - **Δ: +41.3% net PnL** (DD -40% worse)
+- **G**: 376 trades, +$3.51M, 70.5% WR (vs +$3.74M / 71.8% on #511 — slight dip from v3 frame)
+- **L**: 237 trades, **+$1.44M**, 61.6% WR (vs −$237K / 75.6% on #511 — L was a **net drag** on #511)
+- **Key L difference**: min_gap=20 (vs 45) catches more trades; tier2_target2=50% (vs 35%) lets winners run; time=50min (vs 110min) cuts losers faster; vol_surge=1.0 (vs 1.0 — unchanged)
+- **Overlap**: 53 shared tickers (32% of each). G-heavy overlap names (VSME +$294K combined, PPCB +$285K, ONFO +$200K). Single bad conflict: MNTS −$261K combined (L held too long)
+- **Replaces**: `config/trial_w21b_511_deploy.json` (deployed 2026-06-24, replaced 2026-06-26)
+
+## Deploy update 2: v3 #576 R-O overlay added (2026-06-26)
+
+- **Config deployed**: `config/trial_g511_l626_v3_overlay.json`
+- **v3 overlay**: trial #576 from `ro_v3_train_w21b` — any-green entry (first green candle after G's hold expires on same ticker), target=57, stop=30, time=27, trail=0.5
+- **Requires**: engine_combined.py with v3 overlay support (`_check_v3_entry`, `_manage_v3_exit`, `_v3_candidate_for_ticker`) + executor.py bracket-override params
+- **Backtest full 2026 YTD** (compounded $25K start, vol caps active):
+  - **G511+L626 + v3 overlay**: **+$6,646,995 (267×), DD -25.4%**
+  - **Prior combined (no v3)**: +$4,950,517 (199×), DD -27.2%
+  - **Δ: +$1.70M (+34.3%) net PnL, DD improved** (−25.4% vs −27.2%)
+- **v3 trade stats**: 1002 trades, **+$1.33M**, 35.5% WR (low WR but high reward-to-risk)
+- **G**: 376 trades, +$3.76M, 71.3% WR (slight benefit from v3's cash addition)
+- **L**: 237 trades, +$1.56M, 61.6% WR
+- **DD improvement**: v3's additional trades smooth the equity curve — more frequent small winners offset G+L's concentrated drawdown periods
+- **Replaces**: `config/trial_v3_base_g511_l626_combined.json` (deployed earlier 2026-06-26)
 
 ### Data caveat (important for forward-test comparisons)
 All 2026 forward numbers in this report use the existing 2026 picks pkls. These have **empty entries for 2026-05-21 through 2026-06-16** (the picks builder produced empty lists even though daily_top_gainers.csv and intraday data exist for those dates). So "forward 2026" effectively measures **2026-01-05 through 2026-05-15**, not the full year. When the picks pipeline is rebuilt, all forward numbers should be re-measured for the full ~98 days.

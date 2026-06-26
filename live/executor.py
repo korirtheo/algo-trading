@@ -234,7 +234,8 @@ class OrderExecutor:
             return False
 
     def buy(self, ticker, dollar_amount, current_price,
-            cumulative_dollar_volume=0, strategy=None):
+            cumulative_dollar_volume=0, strategy=None,
+            bracket_stop_pct=None, bracket_target_pct=None):
         """Place a market buy order.
 
         Args:
@@ -322,9 +323,11 @@ class OrderExecutor:
         # fails to call sell() (network drop, crash, halt-resume gap, etc.).
         # Stop % is derived from the strategy's Optuna-tuned X_STOP_PCT,
         # buffered so engine fires first under normal conditions.
-        bracket_stop_pct = _resolve_bracket_stop_pct(strategy)
+        # Optional overrides (e.g. v3 overlay) bypass strategy resolution.
+        bracket_stop_pct = bracket_stop_pct if bracket_stop_pct is not None else _resolve_bracket_stop_pct(strategy)
         bracket_stop = round(current_price * (1 - bracket_stop_pct / 100), 2)
-        bracket_target = round(current_price * (1 + LIVE_BRACKET_TARGET_PCT / 100), 2)
+        bracket_target_pct = bracket_target_pct if bracket_target_pct is not None else LIVE_BRACKET_TARGET_PCT
+        bracket_target = round(current_price * (1 + bracket_target_pct / 100), 2)
 
         # 2026-06-24 FIX: use marketable LIMIT order (capped slippage) when
         # LIVE_BUY_LIMIT_BUFFER_PCT > 0. CCXI today filled +153bp above signal —
