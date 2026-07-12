@@ -141,6 +141,7 @@ class CombinedEngine:
         # v3 overlay: read from the config's v3_overlay section
         self.v3_params = {}
         self.v3_active_trade = None
+        self._v3_allocated_today = 0.0
         try:
             _vp = params_path or PARAMS_PATH
             with open(_vp) as _f:
@@ -159,7 +160,7 @@ class CombinedEngine:
         self.picks = []         # list of pick dicts (scanner output)
         self.last_states = {}   # ticker -> last known state from simulate (for entry/exit detection)
         self.all_states = {}    # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
-        self.active_position = None  # ticker currently in position
+        self.active_positions = set()  # set of tickers currently in position
         self.position_entry = {}     # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
         self.trades_today = _load_today_trades()
@@ -186,12 +187,13 @@ class CombinedEngine:
         self.bar_data.clear()
         self.last_states.clear()
         self.all_states.clear()
-        self.active_position = None
+        self.active_positions.clear()
         self.position_entry.clear()
         self.daily_pnl = 0.0
         self.trades_today = []
         self.halt_states.clear()
         self.v3_active_trade = None
+        self._v3_allocated_today = 0.0
 
         self.picks = []
         for cand in candidates:
@@ -354,79 +356,17 @@ class CombinedEngine:
 
         # FIX 2026-06-24: comprehensive per-bar reconciliation with Alpaca.
         # Fixes 4 bugs from 2026-06-24 CCXI incident:
-        #   1) pop key ordering — was popping None after clearing active_position
+        #   1) pop key ordering — was popping None after clearing active
         #   2) KeyError silently swallowed when position_entry missing the ticker dict
         #   3) active_position stuck forever if Alpaca says no-position but internal empty
         #   4) no fallback to rehydrate position_entry from Alpaca when stream miss the fill
-        if self.active_position is not None:
-            ticker_pos = self.active_position  # snapshot — don't read after mutation
-            try:
-                actual_pos = self.executor.client.get_open_position(ticker_pos)
-                actual_qty = float(actual_pos.qty)
-                internal = self.position_entry.get(ticker_pos, {})
-                internal_qty = float(internal.get("shares", 0))
-                if abs(actual_qty - internal_qty) >= 1.0:
-                    log.warning("RECONCILE %s: internal=%.0f, Alpaca=%.0f → fixing",
-                                ticker_pos, internal_qty, actual_qty)
-                    if actual_qty < 1:
-                        # Position closed externally (bracket child, etc.)
-                        log.info("RECONCILE %s: position closed externally — clearing", ticker_pos)
-                        self.position_entry.pop(ticker_pos, None)  # pop BEFORE clearing active
-                        self.active_position = None
-                    else:
-                        # Position open at Alpaca but internal record missing or wrong.
-                        # Stream fill notification likely missed (TradingStream race).
-                        # Rehydrate position_entry from Alpaca + pending_orders metadata.
-                        if ticker_pos not in self.position_entry or not internal:
-                            try:
-                                actual_avg = float(getattr(actual_pos, "avg_entry_price", 0)) \
-                                             or float(actual_pos.cost_basis) / max(actual_qty, 1)
-                            except (AttributeError, ValueError, ZeroDivisionError, TypeError):
-                                actual_avg = 0.0
-                            # Recover strategy + entry_time from pending_orders if we still have it
-                            with self._pending_lock:
-                                pending_match = next(
-                                    (p for p in self.pending_orders.values()
-                                     if p.get("ticker") == ticker_pos and p.get("side") == "buy"),
-                                    None,
-                                )
-                            strategy = (pending_match or {}).get("strategy", "G")
-                            entry_time = (pending_match or {}).get("signal_time", ts)
-                            self.position_entry[ticker_pos] = {
-                                "entry_price": actual_avg,
-                                "shares": actual_qty,
-                                "cost": actual_qty * actual_avg,
-                                "strategy": strategy,
-                                "entry_time": entry_time,
-                            }
-                            log.info("RECONCILE %s: rehydrated from Alpaca — strategy=%s "
-                                     "qty=%.0f avg=$%.3f entry_time=%s",
-                                     ticker_pos, strategy, actual_qty, actual_avg, entry_time)
-                        else:
-                            self.position_entry[ticker_pos]["shares"] = actual_qty
-            except Exception:
-                # No position at Alpaca. Before clearing active_position, check if there
-                # are PENDING BUY orders for this ticker — a held/pending_new bracket has
-                # not yet created an Alpaca position. Clearing here would let the next
-                # bar fire a duplicate signal (2026-06-25 KUST: 3 brackets placed for
-                # one signal, exhausted buying power before any filled).
-                with self._pending_lock:
-                    has_pending_buy = any(
-                        p.get("ticker") == ticker_pos and p.get("side") == "buy"
-                        for p in self.pending_orders.values()
-                    )
-                if has_pending_buy:
-                    log.debug("RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
-                              ticker_pos)
-                else:
-                    log.warning("RECONCILE %s: no position at Alpaca → clearing active_position", ticker_pos)
-                    self.position_entry.pop(ticker_pos, None)
-                    self.active_position = None
+        if symbol in self.active_positions:
+            self._reconcile_position(symbol, ts)
 
         # --- v3 overlay exit check ---
         if (self.v3_params.get("enabled", False)
-                and self.active_position is not None
-                and self.position_entry.get(self.active_position, {}).get("strategy") == "V3"):
+                and symbol in self.active_positions
+                and self.position_entry.get(symbol, {}).get("strategy") == "V3"):
             self._manage_v3_exit(symbol, bar)
 
         # Store all sub-states per ticker for diagnostics
@@ -447,7 +387,7 @@ class CombinedEngine:
             # state (e.g. L's parallel evaluation of SAGT) triggers phantom
             # partial-sells when its shares value differs from prev. The
             # SAGT 30% phantom sell at 14:35 today is the symptom.
-            if (ticker == self.active_position
+            if (ticker in self.active_positions
                     and self.position_entry.get(ticker, {}).get("strategy")
                     and st.get("strategy")
                     and st["strategy"] != self.position_entry[ticker]["strategy"]):
@@ -455,67 +395,66 @@ class CombinedEngine:
 
             # New entry detected
             if st.get("entry_price") is not None and (prev is None or prev.get("entry_price") is None):
-                if self.active_position is None:
-                    entry_price = st["entry_price"]
-                    strategy = st.get("strategy", "?")
-                    trade_size = st.get("position_cost", cash)
-                    cum_dollar = self._cum_dollar_vol(ticker)
+                if ticker in self.active_positions:
+                    log.debug("SIGNAL %s skipped — already in this ticker", ticker)
+                    continue
+                entry_price = st["entry_price"]
+                strategy = st.get("strategy", "?")
+                trade_size = st.get("position_cost", cash)
+                cum_dollar = self._cum_dollar_vol(ticker)
 
-                    log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_$vol=$%.0f",
-                             ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_dollar)
+                log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_$vol=$%.0f",
+                         ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_dollar)
 
-                    order = self.executor.buy(ticker, trade_size, entry_price,
-                                             cumulative_dollar_volume=cum_dollar,
-                                             strategy=strategy)
-                    if order:
-                        # 2026-06-23 FIX: previously polled for 15s and gave up — caused
-                        # 85 untracked duplicate fills on GITS today (microcap fills took
-                        # >15s; each "give up" triggered a NEW signal).
-                        # New: claim the slot IMMEDIATELY (active_position + pending_orders),
-                        # register fill callback with TradingStream, return control.
-                        # Next bar's signal sees active_position != None and skips.
-                        # Stream callback resolves position_entry with actual filled qty/avg
-                        # when the fill arrives — could be 2s or 30s, no longer matters.
-                        self.active_position = ticker
-                        # 2026-06-24 FIX: bootstrap position_entry IMMEDIATELY (using
-                        # signal_price as entry estimate, shares=0 placeholder). The
-                        # CCXI 2026-06-24 incident showed that the TradingStream fill
-                        # callback can silently miss, leaving position_entry empty for
-                        # the entire trade. Without strategy/entry_time, TIME_STOP can't
-                        # fire, and RECONCILE can't rehydrate (no internal record to update).
-                        # With this bootstrap, RECONCILE will see internal_qty=0 < Alpaca
-                        # actual_qty, hit the "rehydrate" path, and self-heal on the next bar.
-                        if ticker not in self.position_entry:
-                            self.position_entry[ticker] = {
-                                "entry_price": entry_price,
-                                "shares": 0,  # placeholder — RECONCILE/stream fills this in
-                                "cost": trade_size,
-                                "strategy": strategy,
-                                "entry_time": ts,
-                            }
-                        with self._pending_lock:
-                            self.pending_orders[str(order.id)] = {
-                                "ticker": ticker, "strategy": strategy,
-                                "signal_price": entry_price, "signal_time": ts,
-                                "side": "buy", "requested_cost": trade_size,
-                            }
-                        if self.fill_stream is not None:
-                            self.fill_stream.register(order.id, self._on_buy_fill)
-                            log.info("BUY %s: order %s placed, awaiting TradingStream fill notification",
-                                     ticker, order.id)
-                            # Set safety-net polling: if stream misses for >60s, force-poll
-                            self._schedule_safety_poll(order.id, ticker, "buy", entry_price, ts, strategy)
-                        else:
-                            # Legacy path — no stream, poll inline (kept for backward compat)
-                            self._poll_buy_fill_inline(order, ticker, strategy, entry_price, ts)
+                order = self.executor.buy(ticker, trade_size, entry_price,
+                                         cumulative_dollar_volume=cum_dollar,
+                                         strategy=strategy)
+                if order:
+                    # 2026-06-23 FIX: previously polled for 15s and gave up — caused
+                    # 85 untracked duplicate fills on GITS today (microcap fills took
+                    # >15s; each "give up" triggered a NEW signal).
+                    # New: claim the slot IMMEDIATELY (active_positions + pending_orders),
+                    # register fill callback with TradingStream, return control.
+                    # Stream callback resolves position_entry with actual filled qty/avg
+                    # when the fill arrives — could be 2s or 30s, no longer matters.
+                    self.active_positions.add(ticker)
+                    # 2026-06-24 FIX: bootstrap position_entry IMMEDIATELY (using
+                    # signal_price as entry estimate, shares=0 placeholder). The
+                    # CCXI 2026-06-24 incident showed that the TradingStream fill
+                    # callback can silently miss, leaving position_entry empty for
+                    # the entire trade. Without strategy/entry_time, TIME_STOP can't
+                    # fire, and RECONCILE can't rehydrate (no internal record to update).
+                    # With this bootstrap, RECONCILE will see internal_qty=0 < Alpaca
+                    # actual_qty, hit the "rehydrate" path, and self-heal on the next bar.
+                    if ticker not in self.position_entry:
+                        self.position_entry[ticker] = {
+                            "entry_price": entry_price,
+                            "shares": 0,  # placeholder — RECONCILE/stream fills this in
+                            "cost": trade_size,
+                            "strategy": strategy,
+                            "entry_time": ts,
+                        }
+                    with self._pending_lock:
+                        self.pending_orders[str(order.id)] = {
+                            "ticker": ticker, "strategy": strategy,
+                            "signal_price": entry_price, "signal_time": ts,
+                            "side": "buy", "requested_cost": trade_size,
+                        }
+                    if self.fill_stream is not None:
+                        self.fill_stream.register(order.id, self._on_buy_fill)
+                        log.info("BUY %s: order %s placed, awaiting TradingStream fill notification",
+                                 ticker, order.id)
+                        # Set safety-net polling: if stream misses for >60s, force-poll
+                        self._schedule_safety_poll(order.id, ticker, "buy", entry_price, ts, strategy)
                     else:
-                        log.warning("BUY REJECTED %s: order returned None (vol_cap or executor error)", ticker)
-                elif self.active_position is not None:
-                    log.debug("SIGNAL %s skipped — already in position %s", ticker, self.active_position)
+                        # Legacy path — no stream, poll inline (kept for backward compat)
+                        self._poll_buy_fill_inline(order, ticker, strategy, entry_price, ts)
+                else:
+                    log.warning("BUY REJECTED %s: order returned None (vol_cap or executor error)", ticker)
 
             # Exit detected
             if st.get("exit_price") is not None and (prev is None or prev.get("exit_price") is None):
-                if ticker == self.active_position:
+                if ticker in self.active_positions:
                     exit_price = st["exit_price"]
                     exit_reason = st.get("exit_reason", "UNKNOWN")
                     pnl = st.get("pnl", 0)
@@ -547,7 +486,7 @@ class CombinedEngine:
                             self._schedule_sell_safety_poll(order.id, ticker)
                         else:
                             # Legacy synchronous behavior
-                            self.active_position = None
+                            self.active_positions.discard(ticker)
                             self.daily_pnl += pnl
                             entry_info_l = self.position_entry.get(ticker, {})
                             trade = {
@@ -575,7 +514,7 @@ class CombinedEngine:
                 and st.get("shares", 0) < prev.get("shares", 0)
                 and st.get("entry_price") is not None
                 and prev.get("entry_price") is not None
-                and ticker == self.active_position):
+                and ticker in self.active_positions):
                 pinfo = self.position_entry.get(ticker, {})
                 actual_shares = float(pinfo.get("shares", 0))
                 if actual_shares >= 1:
@@ -617,9 +556,65 @@ class CombinedEngine:
 
         # --- v3 overlay entry check ---
         if (self.v3_params.get("enabled", False)
-                and self.active_position is None
                 and picks_with_data):
             self._check_v3_entry(picks_with_data)
+
+    # ------------------------------------------------------------------ #
+    #  Reconciliation helper                                            #
+    # ------------------------------------------------------------------ #
+
+    def _reconcile_position(self, ticker, current_ts):
+        """Reconcile internal state for one ticker against Alpaca."""
+        try:
+            actual_pos = self.executor.client.get_open_position(ticker)
+            actual_qty = float(actual_pos.qty)
+            internal = self.position_entry.get(ticker, {})
+            internal_qty = float(internal.get("shares", 0))
+            if abs(actual_qty - internal_qty) >= 1.0:
+                log.warning("RECONCILE %s: internal=%.0f, Alpaca=%.0f → fixing",
+                            ticker, internal_qty, actual_qty)
+                if actual_qty < 1:
+                    log.info("RECONCILE %s: position closed externally — clearing", ticker)
+                    self.position_entry.pop(ticker, None)
+                    self.active_positions.discard(ticker)
+                else:
+                    if ticker not in self.position_entry or not internal:
+                        try:
+                            actual_avg = float(getattr(actual_pos, "avg_entry_price", 0)) \
+                                         or float(actual_pos.cost_basis) / max(actual_qty, 1)
+                        except (AttributeError, ValueError, ZeroDivisionError, TypeError):
+                            actual_avg = 0.0
+                        with self._pending_lock:
+                            pending_match = next(
+                                (p for p in self.pending_orders.values()
+                                 if p.get("ticker") == ticker and p.get("side") == "buy"),
+                                None,
+                            )
+                        strategy = (pending_match or {}).get("strategy", "G")
+                        entry_time = (pending_match or {}).get("signal_time", current_ts)
+                        self.position_entry[ticker] = {
+                            "entry_price": actual_avg, "shares": actual_qty,
+                            "cost": actual_qty * actual_avg,
+                            "strategy": strategy, "entry_time": entry_time,
+                        }
+                        log.info("RECONCILE %s: rehydrated from Alpaca — strategy=%s "
+                                 "qty=%.0f avg=$%.3f entry_time=%s",
+                                 ticker, strategy, actual_qty, actual_avg, entry_time)
+                    else:
+                        self.position_entry[ticker]["shares"] = actual_qty
+        except Exception:
+            with self._pending_lock:
+                has_pending_buy = any(
+                    p.get("ticker") == ticker and p.get("side") == "buy"
+                    for p in self.pending_orders.values()
+                )
+            if has_pending_buy:
+                log.debug("RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
+                          ticker)
+            else:
+                log.warning("RECONCILE %s: no position at Alpaca → clearing", ticker)
+                self.position_entry.pop(ticker, None)
+                self.active_positions.discard(ticker)
 
     # ------------------------------------------------------------------ #
     #  v3 OVERLAY (R-O any-green after G hold expires)                  #
@@ -665,7 +660,7 @@ class CombinedEngine:
         Exits: target hit, stop hit, trailing stop, time limit.
         Passes correct v3 bracket params so the safety net has the right values.
         """
-        ticker = self.active_position
+        ticker = symbol
         entry_info = self.position_entry.get(ticker, {})
         entry_price = entry_info.get("entry_price")
         if entry_price is None or entry_price <= 0:
@@ -762,7 +757,7 @@ class CombinedEngine:
                              ticker, exit_reason, order.id)
                 else:
                     # Legacy synchronous exit
-                    self.active_position = None
+                    self.active_positions.discard(ticker)
                     pnl = (exit_price - entry_price) * entry_info.get("shares", 0)
                     self.daily_pnl += pnl
                     trade = {
@@ -779,8 +774,9 @@ class CombinedEngine:
     def _check_v3_entry(self, picks_with_data):
         """Check for v3 overlay entry: first any-green after G holds expire.
 
-        Scans all picks, picks the first ticker with a v3 candidate.
-        Single-position so only enters if active_position is None (caller checks).
+        Scans all picks, picks the first eligible ticker with a v3 candidate.
+        Enforces aggregate 30% equity cap across ALL v3 positions combined.
+        Skips tickers already in active_positions (same-ticker guard).
         Passes v3 bracket params so the safety net uses v3's own stop/target.
         """
         # Build G hold end times from the current day's simulated states
@@ -790,8 +786,24 @@ class CombinedEngine:
                 if st.get("strategy") == "G" and st.get("entry_time") and st.get("exit_time"):
                     g_holds[ticker].append((st["entry_time"], st["exit_time"]))
 
-        cash = self.executor.get_buying_power()
+        # --- AGGREGATE CAP: all v3 positions combined ≤ 30% of equity ---
+        try:
+            acct = self.executor.get_account()
+            equity = max(0, float(acct.equity))
+        except Exception:
+            equity = 0
+        v3_budget = equity * 0.30  # 30% of total equity for ALL v3 entries
+        remaining_budget = v3_budget - getattr(self, "_v3_allocated_today", 0)
+        if remaining_budget <= 0:
+            return  # aggregate cap reached
+
+        # Use cash (floored at 0) for position sizing base
+        raw_cash = self.executor.get_buying_power()
+        cash = max(0, raw_cash)
         pos_pct = self.v3_params.get("position_pct", 30.0)
+        if cash <= 0:
+            log.debug("V3: no cash available (cash=$%.0f, equity=$%.0f)", raw_cash, equity)
+            return
 
         for pick in picks_with_data:
             mh = pick.get("market_hour_candles")
@@ -806,7 +818,11 @@ class CombinedEngine:
                 continue
 
             ets, fp, ba = cand
-            trade_size = cash * (pos_pct / 100)
+            # Cap both by per-position PCT and remaining aggregate budget
+            trade_size = min(cash * (pos_pct / 100), remaining_budget)
+            if trade_size < 50:
+                log.debug("V3 %s: trade_size $%.0f too small after cap", ticker, trade_size)
+                continue
             cum_dvol = self._cum_dollar_vol(ticker)
 
             # Use v3 bracket params so the safety net stops at v3's own values
@@ -821,7 +837,10 @@ class CombinedEngine:
                 bracket_target_pct=v3_target,
             )
             if order:
-                self.active_position = ticker
+                # Track aggregate allocation and recompute remaining budget
+                self._v3_allocated_today = getattr(self, "_v3_allocated_today", 0) + trade_size
+                remaining_budget = v3_budget - self._v3_allocated_today
+                self.active_positions.add(ticker)
                 if ticker not in self.position_entry:
                     self.position_entry[ticker] = {
                         "entry_price": fp,
@@ -847,7 +866,7 @@ class CombinedEngine:
                     self._schedule_safety_poll(order.id, ticker, "buy", fp, ets, "V3")
                 else:
                     self._poll_buy_fill_inline(order, ticker, "V3", fp, ets)
-                return  # single position — only one v3 entry per day
+                return  # one v3 entry per ticker per day
             else:
                 log.debug("V3 ENTRY %s rejected by executor (vol cap or equity cap)", ticker)
 
@@ -878,11 +897,9 @@ class CombinedEngine:
 
         # ----- Entry path -----
         if state["entry_price"] is None:
-            # Per spec open-question (2): single-position semantics — skip if
-            # already in a (non-halt) trade.
-            if self.active_position is not None and self.active_position != symbol:
-                log.debug("HALT %s: signal suppressed — already long %s",
-                          symbol, self.active_position)
+            # Skip if already in this ticker (multi-position allowed across tickers)
+            if symbol in self.active_positions:
+                log.debug("HALT %s: signal suppressed — already in this ticker", symbol)
                 return
 
             fired = hr.check_signal(state, c_open, c_high, c_low, c_close, c_vol)
@@ -909,7 +926,7 @@ class CombinedEngine:
             state["shares"] = shares
             state["position_cost"] = shares * entry_price
             state["highest_since_entry"] = c_high
-            self.active_position = symbol
+            self.active_positions.add(symbol)
             self.position_entry[symbol] = {
                 "entry_price": entry_price,
                 "shares": shares,
@@ -983,8 +1000,8 @@ class CombinedEngine:
             state["pnl"] = pnl
             state["done"] = True
             self.daily_pnl += pnl
-            if self.active_position == symbol:
-                self.active_position = None
+            if symbol in self.active_positions:
+                self.active_positions.discard(symbol)
             trade = {
                 "ticker": symbol,
                 "strategy": "HALT",
@@ -1046,9 +1063,9 @@ class CombinedEngine:
                 actual_shares = 0.0; actual_avg = pending["signal_price"]
             if actual_shares < 1:
                 log.warning("BUY %s STREAM-FILL: 0 shares filled (event=%s)", ticker, event_type)
-                # Don't clear active_position yet on partial_fill — may complete later
+                # Don't clear active_positions yet on partial_fill — may complete later
                 if event_type != "partial_fill":
-                    if self.active_position == ticker: self.active_position = None
+                    if ticker in self.active_positions: self.active_positions.discard(ticker)
                 return
             actual_cost = actual_shares * actual_avg
             self.position_entry[ticker] = {
@@ -1062,10 +1079,10 @@ class CombinedEngine:
                      ticker, strategy, actual_shares, actual_avg,
                      format(actual_cost, ",.0f"), oid, event_type)
         elif event_type in ("canceled", "rejected", "expired", "done_for_day"):
-            # No fill — clear active_position so engine can react to next signal
-            log.warning("BUY %s [STREAM]: no fill (event=%s) — clearing active_position", ticker, event_type)
-            if self.active_position == ticker and ticker not in self.position_entry:
-                self.active_position = None
+            # No fill — clear from active_positions so engine can react to next signal
+            log.warning("BUY %s [STREAM]: no fill (event=%s) — clearing active_positions", ticker, event_type)
+            if ticker in self.active_positions and ticker not in self.position_entry:
+                self.active_positions.discard(ticker)
         else:
             log.debug(f"BUY {ticker} STREAM event={event_type} order={oid}")
 
@@ -1121,7 +1138,7 @@ class CombinedEngine:
                 entry_price = float(pinfo.get("entry_price", 0))
                 # Compute realized PnL from actual fills (true vs expected)
                 pnl = (actual_avg - entry_price) * actual_sold
-                self.active_position = None
+                self.active_positions.discard(ticker)
                 self.daily_pnl += pnl
                 trade = {
                     "ticker": ticker, "strategy": strategy,
@@ -1196,8 +1213,8 @@ class CombinedEngine:
                                 ticker, order_id, status)
                     with self._pending_lock:
                         self.pending_orders.pop(str(order_id), None)
-                    if self.active_position == ticker and ticker not in self.position_entry:
-                        self.active_position = None
+                    if ticker in self.active_positions and ticker not in self.position_entry:
+                        self.active_positions.discard(ticker)
             except Exception as e:
                 log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
         threading.Thread(target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}").start()
@@ -1226,7 +1243,7 @@ class CombinedEngine:
                         ticker, order.id, last_status)
         if actual_shares < 1:
             log.warning("BUY %s LEGACY-POLL: 0 shares filled in 30s — not recording position", ticker)
-            if self.active_position == ticker: self.active_position = None
+            if ticker in self.active_positions: self.active_positions.discard(ticker)
         else:
             actual_cost = actual_shares * actual_avg
             self.position_entry[ticker] = {
@@ -1295,9 +1312,9 @@ class CombinedEngine:
 
     def eod_close(self):
         """Force close all positions."""
-        if self.active_position:
-            self.executor.sell(self.active_position, reason="EOD_CLOSE")
-            self.active_position = None
+        for ticker in list(self.active_positions):
+            self.executor.sell(ticker, reason="EOD_CLOSE")
+        self.active_positions.clear()
         # Mark any unfinished halt-resume states as done so they don't fire
         # entries on the next session if the process keeps running.
         for st in self.halt_states.values():

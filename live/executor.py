@@ -183,9 +183,9 @@ class OrderExecutor:
         return self.client.get_account()
 
     def get_buying_power(self):
-        """Get available buying power."""
+        """Get available cash (floored at 0)."""
         acct = self.get_account()
-        return float(acct.cash)
+        return max(0, float(acct.cash))
 
     def get_positions(self):
         """Get all open positions from Alpaca."""
