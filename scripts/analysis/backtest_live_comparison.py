@@ -29,12 +29,18 @@ from optimize_combined import set_strategy_params, _build_param_snapshot, _param
 CONFIG_PATH = "config/trial_g511_l626_v3_overlay.json"
 LOGS_DIR = "logs/bars"
 
-def load_bars_from_csv(date_str, symbol):
+def load_bars_from_csv(date_str, symbol, bars_type="intraday"):
     """Load a symbol's bars logged by the live engine.
+
+    Args:
+        date_str: YYYY-MM-DD format date
+        symbol: ticker symbol
+        bars_type: "intraday" for 2-min aggregated bars (for strategy backtest),
+                  or "raw-1min" for raw 1-min bars (for detailed audit)
 
     Returns a list of dicts: [{"timestamp": ..., "Open": ..., "High": ..., ...}, ...]
     """
-    bar_path = Path(LOGS_DIR) / date_str / f"{symbol}.csv"
+    bar_path = Path(LOGS_DIR) / bars_type / date_str / f"{symbol}.csv"
     if not bar_path.exists():
         return None
 
@@ -56,12 +62,16 @@ def load_bars_from_csv(date_str, symbol):
         return None
 
 
-def build_picks_from_logs(date_str):
+def build_picks_from_logs(date_str, bars_type="intraday"):
     """Scan all bars in the log directory for that date and create picks.
+
+    Args:
+        date_str: YYYY-MM-DD format date
+        bars_type: "intraday" for 2-min aggregated (strategy backtest) or "raw-1min"
 
     Returns a list of pick dicts suitable for simulate_day_combined().
     """
-    bars_date_dir = Path(LOGS_DIR) / date_str
+    bars_date_dir = Path(LOGS_DIR) / bars_type / date_str
     if not bars_date_dir.exists():
         print(f"ERROR: {bars_date_dir} not found")
         return []
@@ -69,7 +79,7 @@ def build_picks_from_logs(date_str):
     picks = []
     for csv_file in sorted(bars_date_dir.glob("*.csv")):
         symbol = csv_file.stem
-        bars = load_bars_from_csv(date_str, symbol)
+        bars = load_bars_from_csv(date_str, symbol, bars_type=bars_type)
 
         if not bars or len(bars) == 0:
             continue
@@ -207,6 +217,12 @@ def main():
         "--symbol",
         help="Single symbol to backtest (if omitted, tests all symbols in logs for that date)"
     )
+    parser.add_argument(
+        "--bars-type",
+        choices=["intraday", "raw-1min"],
+        default="intraday",
+        help="Bar type to backtest: intraday (2-min aggregated, default) or raw-1min"
+    )
 
     args = parser.parse_args()
 
@@ -223,9 +239,9 @@ def main():
 
     # Build picks from logged bars
     if args.symbol:
-        bars = load_bars_from_csv(args.date, args.symbol)
+        bars = load_bars_from_csv(args.date, args.symbol, bars_type=args.bars_type)
         if bars is None:
-            print(f"ERROR: No bars found for {args.symbol} on {args.date}")
+            print(f"ERROR: No {args.bars_type} bars found for {args.symbol} on {args.date}")
             return
 
         # Single symbol: manually build pick
@@ -244,10 +260,10 @@ def main():
 
         print(f"Symbol: {args.symbol}")
     else:
-        picks = build_picks_from_logs(args.date)
+        picks = build_picks_from_logs(args.date, bars_type=args.bars_type)
 
         if len(picks) == 0:
-            print(f"ERROR: No picks found in {LOGS_DIR}/{args.date}/")
+            print(f"ERROR: No picks found in {LOGS_DIR}/{args.bars_type}/{args.date}/")
             return
 
         print(f"Found {len(picks)} gap-ups in logs")

@@ -273,16 +273,16 @@ class CombinedEngine:
     def _log_bar_to_csv(self, symbol, bar):
         """Append each 2-min bar to a per-ticker CSV for backtest-vs-live audit.
 
-        Output path: logs/bars/<YYYY-MM-DD>/<symbol>.csv
-        Captures the EXACT bars the bot's engine processed, so a follow-up
-        backtest can run on the same data and produce an apples-to-apples
-        comparison (no source-mismatch artifact from SIP-vs-IEX or resample
-        boundary differences).
+        Output path: logs/bars/intraday/<YYYY-MM-DD>/<symbol>.csv
+        Captures the EXACT 2-min bars the bot's engine processed after aggregating
+        from live 1-min bars, so a follow-up backtest can run on the same data
+        and produce an apples-to-apples comparison (no source-mismatch artifact
+        from SIP-vs-IEX or resample boundary differences).
         """
         import csv
         try:
             today = datetime.now(ET).strftime("%Y-%m-%d")
-            bars_date_dir = os.path.join(BARS_LOG_DIR, today)
+            bars_date_dir = os.path.join(BARS_LOG_DIR, "intraday", today)
             os.makedirs(bars_date_dir, exist_ok=True)
             path = os.path.join(bars_date_dir, f"{symbol}.csv")
             new_file = not os.path.exists(path)

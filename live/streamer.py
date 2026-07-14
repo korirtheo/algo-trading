@@ -2,11 +2,14 @@
 Real-Time Bar Streamer: Alpaca WebSocket -> 2-minute candle aggregation.
 
 Subscribes to 1-minute bars for watchlist symbols via Alpaca's data stream.
+Logs raw 1-min bars to logs/bars/raw-1min/<YYYY-MM-DD>/<symbol>.csv
 Aggregates into 2-minute candles aligned to market open (9:30 ET).
 Emits completed 2-min bars to callback.
 """
 import logging
 import threading
+import os
+import csv
 from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 from collections import defaultdict
@@ -130,10 +133,40 @@ class BarStreamer:
         with self._lock:
             return list(self._symbols)
 
+    def _log_1min_bar_to_csv(self, symbol, bar):
+        """Log raw 1-min bar to CSV.
+
+        Output path: logs/bars/raw-1min/<YYYY-MM-DD>/<symbol>.csv
+        Useful for detailed audit trails and alternative analysis.
+        """
+        try:
+            today = datetime.now(ET).strftime("%Y-%m-%d")
+            # Get project root by going up from live/streamer.py
+            logs_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            bars_date_dir = os.path.join(logs_dir, "logs", "bars", "raw-1min", today)
+            os.makedirs(bars_date_dir, exist_ok=True)
+
+            path = os.path.join(bars_date_dir, f"{symbol}.csv")
+            new_file = not os.path.exists(path)
+
+            with open(path, "a", newline="") as f:
+                w = csv.writer(f)
+                if new_file:
+                    w.writerow(["timestamp", "Open", "High", "Low", "Close", "Volume"])
+                w.writerow([
+                    bar.timestamp, bar.open, bar.high, bar.low, bar.close, bar.volume,
+                ])
+        except Exception as e:
+            log.warning(f"Failed to log 1-min bar for {symbol}: {e}")
+
     def _handle_bar(self, bar):
         """Process incoming 1-min bar, aggregate to 2-min."""
         symbol = bar.symbol
         log.info(f"1min bar: {symbol} close={bar.close:.2f} vol={bar.volume:,} t={bar.timestamp}")
+
+        # Log raw 1-min bar
+        self._log_1min_bar_to_csv(symbol, bar)
+
         slot = _bar_slot(bar.timestamp)
 
         if symbol in self.pending:
