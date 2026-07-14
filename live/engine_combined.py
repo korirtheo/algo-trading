@@ -492,12 +492,19 @@ class CombinedEngine:
                             self.active_positions.discard(ticker)
                             self.daily_pnl += pnl
                             entry_info_l = self.position_entry.get(ticker, {})
+                            entry_px = entry_info_l.get("entry_price", 0)
+                            shares = entry_info_l.get("shares", 0)
+                            market_value = entry_px * shares
+                            pnl_pct = (pnl / market_value * 100) if market_value > 0 else 0
                             trade = {
                                 "ticker": ticker,
                                 "strategy": entry_info_l.get("strategy", "?"),
-                                "entry_price": entry_info_l.get("entry_price", 0),
+                                "entry_price": entry_px,
                                 "exit_price": exit_price,
-                                "pnl": pnl,
+                                "shares": int(shares),
+                                "market_value": round(market_value, 2),
+                                "pnl": round(pnl, 2),
+                                "pnl_pct": round(pnl_pct, 2),
                                 "reason": exit_reason,
                                 "entry_time": entry_info_l.get("entry_time"),
                                 "exit_time": ts,
@@ -1141,13 +1148,19 @@ class CombinedEngine:
                 entry_price = float(pinfo.get("entry_price", 0))
                 # Compute realized PnL from actual fills (true vs expected)
                 pnl = (actual_avg - entry_price) * actual_sold
+                market_value = entry_price * actual_sold
+                pnl_pct = (pnl / market_value * 100) if market_value > 0 else 0
                 self.active_positions.discard(ticker)
                 self.daily_pnl += pnl
                 trade = {
                     "ticker": ticker, "strategy": strategy,
                     "entry_price": entry_price,
                     "exit_price": actual_avg,
-                    "pnl": pnl, "reason": exit_reason,
+                    "shares": int(actual_sold),
+                    "market_value": round(market_value, 2),
+                    "pnl": round(pnl, 2),
+                    "pnl_pct": round(pnl_pct, 2),
+                    "reason": exit_reason,
                     "entry_time": pinfo.get("entry_time"),
                     "exit_time": pending["signal_time"],
                 }
