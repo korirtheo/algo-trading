@@ -1,0 +1,29 @@
+{
+  "label": "G+V3 joint optuna #564",
+  "params": {
+    "g_min_gap_pct": 15.0,
+    "g_require_2nd_green": true,
+    "g_require_2nd_new_high": true,
+    "g_target_pct": 66.0,
+    "g_time_limit_min": 12,
+    "g_stop_pct": 0.0,
+    "g_trail_pct": 0.5,
+    "g_trail_activate_pct": 0.0
+  },
+  "v3_overlay": {
+    "enabled": true,
+    "target_pct": 48.0,
+    "stop_pct": 20.0,
+    "time_limit_min": 33,
+    "trail_pct": 0.5,
+    "trail_activate_pct": 10.0
+  },
+  "source": "optuna_g_v3_joint.py trial #564",
+  "score": 114096202.1580688,
+  "g_pnl": 37850637.97,
+  "v3_pnl": 181429.41,
+  "g_pf": 199.743,
+  "combined_pf": 26.761,
+  "g_n": 1370,
+  "v3_n": 3977
+}

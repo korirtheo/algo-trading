@@ -103,6 +103,11 @@ def load_trial_params(path=None):
 
 
 TRADE_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+BARS_LOG_DIR = os.path.join(TRADE_LOG_DIR, "bars")
+
+# Ensure logging directories exist at module load time
+os.makedirs(TRADE_LOG_DIR, exist_ok=True)
+os.makedirs(BARS_LOG_DIR, exist_ok=True)
 
 
 def _trade_log_path():
@@ -277,11 +282,9 @@ class CombinedEngine:
         import csv
         try:
             today = datetime.now(ET).strftime("%Y-%m-%d")
-            bars_dir = os.path.join(
-                _PROJECT_ROOT, "logs", "bars", today
-            )
-            os.makedirs(bars_dir, exist_ok=True)
-            path = os.path.join(bars_dir, f"{symbol}.csv")
+            bars_date_dir = os.path.join(BARS_LOG_DIR, today)
+            os.makedirs(bars_date_dir, exist_ok=True)
+            path = os.path.join(bars_date_dir, f"{symbol}.csv")
             new_file = not os.path.exists(path)
             with open(path, "a", newline="") as f:
                 w = csv.writer(f)

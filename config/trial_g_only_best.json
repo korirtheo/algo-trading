@@ -1,0 +1,19 @@
+{
+  "label": "G-only optuna #486",
+  "params": {
+    "g_min_gap_pct": 15.0,
+    "g_require_2nd_green": true,
+    "g_require_2nd_new_high": false,
+    "g_target_pct": 68.0,
+    "g_time_limit_min": 22,
+    "g_stop_pct": 18.0,
+    "g_trail_pct": 0.5,
+    "g_trail_activate_pct": 0.0
+  },
+  "source": "optuna_g_only.py trial #486",
+  "score": 64202619.343743846,
+  "g_pnl": 21400873.11,
+  "g_pf": 9.499,
+  "g_n": 1640,
+  "g_wr": 83.2
+}

@@ -1,0 +1,6253 @@
+{
+  "label": "G #511 + L #626 + v3 #576 overlay (R-O any-green)",
+  "period": "2026-01-01_2026-12-31",
+  "starting_cash": 25000,
+  "end_cash": 1919153.57,
+  "total_pnl": 1894153.57,
+  "multiplier": 76.7661,
+  "n_trades": 270,
+  "n_wins": 171,
+  "n_losses": 99,
+  "win_rate": 63.3,
+  "daily": [
+    {
+      "date": "2026-01-05",
+      "trades": 5,
+      "g": 2,
+      "l": 3,
+      "v3": 11,
+      "g_pnl": 2965.76,
+      "l_pnl": 944.65,
+      "v3_pnl": 238.38,
+      "total_pnl": 4148.79,
+      "end_cash": 29148.79
+    },
+    {
+      "date": "2026-01-06",
+      "trades": 2,
+      "g": 2,
+      "l": 0,
+      "v3": 10,
+      "g_pnl": 7042.01,
+      "l_pnl": 0,
+      "v3_pnl": -116.54,
+      "total_pnl": 6925.47,
+      "end_cash": 36074.26
+    },
+    {
+      "date": "2026-01-07",
+      "trades": 2,
+      "g": 2,
+      "l": 0,
+      "v3": 10,
+      "g_pnl": 1836.23,
+      "l_pnl": 0,
+      "v3_pnl": -310.24,
+      "total_pnl": 1525.99,
+      "end_cash": 37600.25
+    },
+    {
+      "date": "2026-01-08",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 11,
+      "g_pnl": 6399.49,
+      "l_pnl": -3201.89,
+      "v3_pnl": 4938.0,
+      "total_pnl": 8135.6,
+      "end_cash": 45735.85
+    },
+    {
+      "date": "2026-01-09",
+      "trades": 0,
+      "g": 0,
+      "l": 0,
+      "v3": 9,
+      "g_pnl": 0,
+      "l_pnl": 0,
+      "v3_pnl": 609.44,
+      "total_pnl": 609.44,
+      "end_cash": 46345.29
+    },
+    {
+      "date": "2026-01-12",
+      "trades": 10,
+      "g": 8,
+      "l": 2,
+      "v3": 10,
+      "g_pnl": 9469.06,
+      "l_pnl": -1871.44,
+      "v3_pnl": 1013.83,
+      "total_pnl": 8611.46,
+      "end_cash": 54956.75
+    },
+    {
+      "date": "2026-01-13",
+      "trades": 4,
+      "g": 0,
+      "l": 4,
+      "v3": 8,
+      "g_pnl": 0,
+      "l_pnl": 9201.33,
+      "v3_pnl": 3947.8,
+      "total_pnl": 13149.13,
+      "end_cash": 68105.88
+    },
+    {
+      "date": "2026-01-14",
+      "trades": 3,
+      "g": 0,
+      "l": 3,
+      "v3": 11,
+      "g_pnl": 0,
+      "l_pnl": 7971.72,
+      "v3_pnl": 1373.74,
+      "total_pnl": 9345.46,
+      "end_cash": 77451.33
+    },
+    {
+      "date": "2026-01-15",
+      "trades": 11,
+      "g": 6,
+      "l": 5,
+      "v3": 10,
+      "g_pnl": 33239.62,
+      "l_pnl": 55829.98,
+      "v3_pnl": 3295.18,
+      "total_pnl": 92364.78,
+      "end_cash": 169816.11
+    },
+    {
+      "date": "2026-01-16",
+      "trades": 7,
+      "g": 2,
+      "l": 5,
+      "v3": 12,
+      "g_pnl": 38858.3,
+      "l_pnl": 5157.72,
+      "v3_pnl": 689.13,
+      "total_pnl": 44705.15,
+      "end_cash": 214521.26
+    },
+    {
+      "date": "2026-01-20",
+      "trades": 8,
+      "g": 4,
+      "l": 4,
+      "v3": 16,
+      "g_pnl": -10930.38,
+      "l_pnl": -50385.88,
+      "v3_pnl": 7740.24,
+      "total_pnl": -53576.02,
+      "end_cash": 160945.25
+    },
+    {
+      "date": "2026-01-21",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 13,
+      "g_pnl": 31824.78,
+      "l_pnl": -29823.73,
+      "v3_pnl": 4766.9,
+      "total_pnl": 6767.96,
+      "end_cash": 167713.2
+    },
+    {
+      "date": "2026-01-22",
+      "trades": 3,
+      "g": 2,
+      "l": 1,
+      "v3": 12,
+      "g_pnl": 5082.57,
+      "l_pnl": -35800.9,
+      "v3_pnl": 4484.21,
+      "total_pnl": -26234.12,
+      "end_cash": 141479.08
+    },
+    {
+      "date": "2026-01-23",
+      "trades": 5,
+      "g": 4,
+      "l": 1,
+      "v3": 11,
+      "g_pnl": 12397.6,
+      "l_pnl": 15887.24,
+      "v3_pnl": 3605.24,
+      "total_pnl": 31890.08,
+      "end_cash": 173369.16
+    },
+    {
+      "date": "2026-01-26",
+      "trades": 3,
+      "g": 2,
+      "l": 1,
+      "v3": 9,
+      "g_pnl": 15487.53,
+      "l_pnl": -1022.17,
+      "v3_pnl": -1767.47,
+      "total_pnl": 12697.88,
+      "end_cash": 186067.04
+    },
+    {
+      "date": "2026-01-27",
+      "trades": 4,
+      "g": 4,
+      "l": 0,
+      "v3": 7,
+      "g_pnl": 39225.02,
+      "l_pnl": 0,
+      "v3_pnl": 3344.43,
+      "total_pnl": 42569.45,
+      "end_cash": 228636.49
+    },
+    {
+      "date": "2026-01-28",
+      "trades": 5,
+      "g": 2,
+      "l": 3,
+      "v3": 8,
+      "g_pnl": 23382.51,
+      "l_pnl": 29915.42,
+      "v3_pnl": 2019.66,
+      "total_pnl": 55317.58,
+      "end_cash": 283954.07
+    },
+    {
+      "date": "2026-01-29",
+      "trades": 3,
+      "g": 2,
+      "l": 1,
+      "v3": 7,
+      "g_pnl": 46.54,
+      "l_pnl": 4029.6,
+      "v3_pnl": -349.76,
+      "total_pnl": 3726.39,
+      "end_cash": 287680.46
+    },
+    {
+      "date": "2026-01-30",
+      "trades": 5,
+      "g": 2,
+      "l": 3,
+      "v3": 12,
+      "g_pnl": 65439.61,
+      "l_pnl": -59625.83,
+      "v3_pnl": 6935.14,
+      "total_pnl": 12748.92,
+      "end_cash": 300429.38
+    },
+    {
+      "date": "2026-02-02",
+      "trades": 6,
+      "g": 2,
+      "l": 4,
+      "v3": 14,
+      "g_pnl": 37497.42,
+      "l_pnl": -47536.44,
+      "v3_pnl": 32958.98,
+      "total_pnl": 22919.97,
+      "end_cash": 323349.35
+    },
+    {
+      "date": "2026-02-03",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 10,
+      "g_pnl": 17470.11,
+      "l_pnl": -2198.12,
+      "v3_pnl": 3124.83,
+      "total_pnl": 18396.81,
+      "end_cash": 341746.16
+    },
+    {
+      "date": "2026-02-04",
+      "trades": 6,
+      "g": 4,
+      "l": 2,
+      "v3": 12,
+      "g_pnl": 1985.85,
+      "l_pnl": 22868.38,
+      "v3_pnl": -3968.37,
+      "total_pnl": 20885.86,
+      "end_cash": 362632.02
+    },
+    {
+      "date": "2026-02-05",
+      "trades": 7,
+      "g": 4,
+      "l": 3,
+      "v3": 9,
+      "g_pnl": -26029.8,
+      "l_pnl": -66914.97,
+      "v3_pnl": 11329.87,
+      "total_pnl": -81614.9,
+      "end_cash": 281017.11
+    },
+    {
+      "date": "2026-02-06",
+      "trades": 7,
+      "g": 6,
+      "l": 1,
+      "v3": 7,
+      "g_pnl": -2523.98,
+      "l_pnl": -30940.95,
+      "v3_pnl": -3755.76,
+      "total_pnl": -37220.68,
+      "end_cash": 243796.43
+    },
+    {
+      "date": "2026-02-09",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 9,
+      "g_pnl": 104171.58,
+      "l_pnl": 16720.27,
+      "v3_pnl": 788.75,
+      "total_pnl": 121680.6,
+      "end_cash": 365477.03
+    },
+    {
+      "date": "2026-02-10",
+      "trades": 3,
+      "g": 2,
+      "l": 1,
+      "v3": 8,
+      "g_pnl": 30398.04,
+      "l_pnl": 27187.92,
+      "v3_pnl": -5113.51,
+      "total_pnl": 52472.44,
+      "end_cash": 417949.47
+    },
+    {
+      "date": "2026-02-11",
+      "trades": 0,
+      "g": 0,
+      "l": 0,
+      "v3": 9,
+      "g_pnl": 0,
+      "l_pnl": 0,
+      "v3_pnl": -4741.43,
+      "total_pnl": -4741.43,
+      "end_cash": 413208.04
+    },
+    {
+      "date": "2026-02-12",
+      "trades": 1,
+      "g": 0,
+      "l": 1,
+      "v3": 6,
+      "g_pnl": 0,
+      "l_pnl": -1181.96,
+      "v3_pnl": -1149.81,
+      "total_pnl": -2331.77,
+      "end_cash": 410876.27
+    },
+    {
+      "date": "2026-02-13",
+      "trades": 3,
+      "g": 0,
+      "l": 3,
+      "v3": 10,
+      "g_pnl": 0,
+      "l_pnl": 17038.55,
+      "v3_pnl": -13319.09,
+      "total_pnl": 3719.47,
+      "end_cash": 414595.74
+    },
+    {
+      "date": "2026-02-17",
+      "trades": 9,
+      "g": 4,
+      "l": 5,
+      "v3": 10,
+      "g_pnl": -27780.61,
+      "l_pnl": 68663.51,
+      "v3_pnl": 9458.51,
+      "total_pnl": 50341.41,
+      "end_cash": 464937.15
+    },
+    {
+      "date": "2026-02-18",
+      "trades": 6,
+      "g": 4,
+      "l": 2,
+      "v3": 9,
+      "g_pnl": 55412.97,
+      "l_pnl": -12645.44,
+      "v3_pnl": -4536.35,
+      "total_pnl": 38231.18,
+      "end_cash": 503168.33
+    },
+    {
+      "date": "2026-02-19",
+      "trades": 1,
+      "g": 0,
+      "l": 1,
+      "v3": 6,
+      "g_pnl": 0,
+      "l_pnl": -1826.45,
+      "v3_pnl": -288.47,
+      "total_pnl": -2114.93,
+      "end_cash": 501053.4
+    },
+    {
+      "date": "2026-02-20",
+      "trades": 2,
+      "g": 2,
+      "l": 0,
+      "v3": 8,
+      "g_pnl": 21101.67,
+      "l_pnl": 0,
+      "v3_pnl": -4657.26,
+      "total_pnl": 16444.41,
+      "end_cash": 517497.81
+    },
+    {
+      "date": "2026-02-23",
+      "trades": 2,
+      "g": 0,
+      "l": 2,
+      "v3": 11,
+      "g_pnl": 0,
+      "l_pnl": 9067.65,
+      "v3_pnl": -3324.37,
+      "total_pnl": 5743.28,
+      "end_cash": 523241.08
+    },
+    {
+      "date": "2026-02-24",
+      "trades": 2,
+      "g": 0,
+      "l": 2,
+      "v3": 9,
+      "g_pnl": 0,
+      "l_pnl": -14640.58,
+      "v3_pnl": -8198.71,
+      "total_pnl": -22839.29,
+      "end_cash": 500401.8
+    },
+    {
+      "date": "2026-02-25",
+      "trades": 3,
+      "g": 0,
+      "l": 3,
+      "v3": 7,
+      "g_pnl": 0,
+      "l_pnl": -54054.76,
+      "v3_pnl": 1280.93,
+      "total_pnl": -52773.83,
+      "end_cash": 447627.96
+    },
+    {
+      "date": "2026-02-26",
+      "trades": 5,
+      "g": 4,
+      "l": 1,
+      "v3": 9,
+      "g_pnl": 8361.72,
+      "l_pnl": 16778.13,
+      "v3_pnl": 12382.96,
+      "total_pnl": 37522.8,
+      "end_cash": 485150.76
+    },
+    {
+      "date": "2026-02-27",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 12,
+      "g_pnl": -14745.42,
+      "l_pnl": -6546.84,
+      "v3_pnl": -159.22,
+      "total_pnl": -21451.49,
+      "end_cash": 463699.28
+    },
+    {
+      "date": "2026-05-21",
+      "trades": 9,
+      "g": 6,
+      "l": 3,
+      "v3": 15,
+      "g_pnl": 21736.43,
+      "l_pnl": 15536.72,
+      "v3_pnl": 17473.41,
+      "total_pnl": 54746.57,
+      "end_cash": 518445.84
+    },
+    {
+      "date": "2026-05-22",
+      "trades": 5,
+      "g": 2,
+      "l": 3,
+      "v3": 13,
+      "g_pnl": 9732.06,
+      "l_pnl": 16152.2,
+      "v3_pnl": 9192.28,
+      "total_pnl": 35076.54,
+      "end_cash": 553522.38
+    },
+    {
+      "date": "2026-05-26",
+      "trades": 12,
+      "g": 8,
+      "l": 4,
+      "v3": 13,
+      "g_pnl": 45244.62,
+      "l_pnl": -107374.39,
+      "v3_pnl": 19289.97,
+      "total_pnl": -42839.81,
+      "end_cash": 510682.57
+    },
+    {
+      "date": "2026-05-27",
+      "trades": 7,
+      "g": 2,
+      "l": 5,
+      "v3": 16,
+      "g_pnl": -5310.35,
+      "l_pnl": -92724.47,
+      "v3_pnl": 2528.75,
+      "total_pnl": -95506.07,
+      "end_cash": 415176.5
+    },
+    {
+      "date": "2026-05-28",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 13,
+      "g_pnl": 28321.59,
+      "l_pnl": 116965.52,
+      "v3_pnl": 21310.74,
+      "total_pnl": 166597.85,
+      "end_cash": 581774.35
+    },
+    {
+      "date": "2026-05-29",
+      "trades": 8,
+      "g": 4,
+      "l": 4,
+      "v3": 15,
+      "g_pnl": -1070.66,
+      "l_pnl": -54916.14,
+      "v3_pnl": 4719.23,
+      "total_pnl": -51267.57,
+      "end_cash": 530506.78
+    },
+    {
+      "date": "2026-06-02",
+      "trades": 0,
+      "g": 0,
+      "l": 0,
+      "v3": 3,
+      "g_pnl": 0,
+      "l_pnl": 0,
+      "v3_pnl": -1380.96,
+      "total_pnl": -1380.96,
+      "end_cash": 529125.83
+    },
+    {
+      "date": "2026-06-03",
+      "trades": 6,
+      "g": 2,
+      "l": 4,
+      "v3": 12,
+      "g_pnl": -15100.88,
+      "l_pnl": -113942.96,
+      "v3_pnl": 31283.72,
+      "total_pnl": -97760.13,
+      "end_cash": 431365.7
+    },
+    {
+      "date": "2026-06-04",
+      "trades": 8,
+      "g": 2,
+      "l": 6,
+      "v3": 11,
+      "g_pnl": 108754.32,
+      "l_pnl": -142669.58,
+      "v3_pnl": 3957.91,
+      "total_pnl": -29957.34,
+      "end_cash": 401408.36
+    },
+    {
+      "date": "2026-06-05",
+      "trades": 3,
+      "g": 2,
+      "l": 1,
+      "v3": 11,
+      "g_pnl": 10518.72,
+      "l_pnl": 559.58,
+      "v3_pnl": 17229.33,
+      "total_pnl": 28307.64,
+      "end_cash": 429716.0
+    },
+    {
+      "date": "2026-06-08",
+      "trades": 3,
+      "g": 0,
+      "l": 3,
+      "v3": 9,
+      "g_pnl": 0,
+      "l_pnl": 128415.69,
+      "v3_pnl": 20138.2,
+      "total_pnl": 148553.88,
+      "end_cash": 578269.88
+    },
+    {
+      "date": "2026-06-09",
+      "trades": 13,
+      "g": 10,
+      "l": 3,
+      "v3": 16,
+      "g_pnl": 229200.74,
+      "l_pnl": 104673.39,
+      "v3_pnl": 43838.68,
+      "total_pnl": 377712.81,
+      "end_cash": 955982.69
+    },
+    {
+      "date": "2026-06-10",
+      "trades": 5,
+      "g": 4,
+      "l": 1,
+      "v3": 13,
+      "g_pnl": 103245.77,
+      "l_pnl": 15430.91,
+      "v3_pnl": 104882.63,
+      "total_pnl": 223559.31,
+      "end_cash": 1179542.0
+    },
+    {
+      "date": "2026-06-11",
+      "trades": 5,
+      "g": 2,
+      "l": 3,
+      "v3": 11,
+      "g_pnl": 288205.64,
+      "l_pnl": 143604.58,
+      "v3_pnl": -3572.46,
+      "total_pnl": 428237.76,
+      "end_cash": 1607779.76
+    },
+    {
+      "date": "2026-06-12",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 11,
+      "g_pnl": 36790.43,
+      "l_pnl": -62838.52,
+      "v3_pnl": 62532.7,
+      "total_pnl": 36484.61,
+      "end_cash": 1644264.37
+    },
+    {
+      "date": "2026-06-15",
+      "trades": 4,
+      "g": 2,
+      "l": 2,
+      "v3": 12,
+      "g_pnl": 11315.97,
+      "l_pnl": 45921.14,
+      "v3_pnl": -19784.3,
+      "total_pnl": 37452.81,
+      "end_cash": 1681717.18
+    },
+    {
+      "date": "2026-06-16",
+      "trades": 11,
+      "g": 8,
+      "l": 3,
+      "v3": 9,
+      "g_pnl": 171703.4,
+      "l_pnl": 66663.75,
+      "v3_pnl": -930.76,
+      "total_pnl": 237436.39,
+      "end_cash": 1919153.57
+    }
+  ],
+  "trades": [
+    {
+      "date": "2026-01-05",
+      "ticker": "MNTS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 11.6414005,
+      "pnl": 2652.8571801407124,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "VRME",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.3266,
+      "pnl": 2377.6186625543523,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "UFG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.05,
+      "pnl": -995.5469173060264,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "SOWG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.4173,
+      "pnl": -437.42341180319454,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "MNTS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 11.39275,
+      "pnl": 312.89839811555794,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "EVTV",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.76615,
+      "pnl": 6707.211793316066,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "EVTV",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.7455535,
+      "pnl": 334.7976202245918,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "GLUE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 23.7805,
+      "pnl": 2028.451823008916,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "GLUE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 23.681,
+      "pnl": -192.2232284476122,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "FLYX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.6864,
+      "pnl": 2325.873302360873,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "ACON",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.68,
+      "pnl": -5628.9787319191455,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "JTAI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.0494,
+      "pnl": 2427.0913344434302,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "FLYX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.7311749999999995,
+      "pnl": 4073.617193188147,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "EVTV",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.1741,
+      "pnl": 1401.5788152150853,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "SOGP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 18.417350499999998,
+      "pnl": 3563.6432310554737,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "INBS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 22.819927,
+      "pnl": -626.5446017874783,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "BDSX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 8.1391,
+      "pnl": 1944.6145334192988,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "EVTV",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.4553,
+      "pnl": 7020.26091076633,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "BDSX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 8.4099,
+      "pnl": -8891.698641199044,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "EVTV",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.18405,
+      "pnl": -411.8749116950494,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "SOGP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 18.417450000000002,
+      "pnl": 1170.3834642333895,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "INBS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 22.885,
+      "pnl": 368.9009803068766,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "BDSX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 8.4177,
+      "pnl": 2058.360773452805,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "AHMA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 13.691699999999999,
+      "pnl": 3513.5314609403576,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "ATON",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.5244999999999997,
+      "pnl": 4201.603334134605,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "DCOY",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.15,
+      "pnl": -2578.728493669749,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "EVTV",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.96,
+      "pnl": 4064.920480219138,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "SEGG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.3266,
+      "pnl": 9496.38590437021,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "GELS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.1821,
+      "pnl": -824.0555924723958,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "JTAI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.5201,
+      "pnl": -700.6094843408937,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CJMB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.8008005000000002,
+      "pnl": 22874.520192729222,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "AUID",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.9103999999999999,
+      "pnl": 2820.3487132705777,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "BNKK",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.32825,
+      "pnl": -34.623553664030624,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "SPHL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 9.5634,
+      "pnl": 15888.841446191684,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CJMB",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 5.5539000000000005,
+      "pnl": 46766.82516628885,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "ATPC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.22205,
+      "pnl": 10099.383011312631,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "BNKK",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.999499999999999,
+      "pnl": 10704.491611959762,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CGTL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.5949980347370314,
+      "pnl": -27629.561591558086,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CJMB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.91035,
+      "pnl": 5870.29785120851,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "AUID",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.90045,
+      "pnl": 385.2626402954047,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "BNKK",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.30835,
+      "pnl": 1323.815336606378,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "VERO",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.0843005,
+      "pnl": 22525.1071946561,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "VERO",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 8.286201,
+      "pnl": 19395.400055669714,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "BIYA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 6.63,
+      "pnl": -18629.884525394533,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "SOWG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.05,
+      "pnl": -667.9023645446196,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "TNMG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.108401,
+      "pnl": 4889.180658830781,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "PTLE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 11.879999999999999,
+      "pnl": 170.92410469945935,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "VERO",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.1539505,
+      "pnl": 16333.193253066478,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "NUAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 5.4981,
+      "pnl": -12070.521294963139,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "POLA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.35815,
+      "pnl": 4683.696107257885,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "IVF",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.3808602228243654,
+      "pnl": -46930.06741040363,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "SHPH",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.3811418839559475,
+      "pnl": -31360.65407080065,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "CCHH",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.74745,
+      "pnl": 3351.9646944555643,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "POLA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.544101,
+      "pnl": 24552.879792885302,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "NUAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 5.5412545,
+      "pnl": -3625.8825914081826,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "POLA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.35815,
+      "pnl": 82.33126324889486,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "PAVM",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 21.492,
+      "pnl": 24367.501867884013,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "PAVM",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 21.60729066819112,
+      "pnl": -39389.22690585526,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "SEGG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.7126,
+      "pnl": 9565.499700367043,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "PAVM",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 22.4472,
+      "pnl": 7457.27819717559,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "SXTP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.6217,
+      "pnl": 4320.892883009918,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "CMCT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.5252955659295395,
+      "pnl": -35800.90353319771,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "SXTP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.328175,
+      "pnl": 761.6770819587691,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "MOVE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 22.098950000000002,
+      "pnl": -768.4295713837491,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "RVYL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.9003000000000005,
+      "pnl": 6002.9053911774245,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "BNAI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 14.041269,
+      "pnl": 15887.23661338404,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "MOVE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 21.2333,
+      "pnl": 2618.8482031769527,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "RVYL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 8.158999999999999,
+      "pnl": 4544.275989875838,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "OPTT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.69451,
+      "pnl": 15131.568012041913,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "NAMM",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 5.46,
+      "pnl": -1022.1711379625776,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "OPTT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.69451,
+      "pnl": 355.95855120841134,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "NUWE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.905349999999999,
+      "pnl": 7864.230974555714,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "PHGE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.4525500000000005,
+      "pnl": 22989.102857958525,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "NUWE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.9152005,
+      "pnl": -586.3962065283267,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "PHGE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.9102500000000004,
+      "pnl": 8958.082109935873,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.7758014999999999,
+      "pnl": 22874.007534278528,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "FEED",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.1681,
+      "pnl": 23459.26625784865,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "BKYI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.869022,
+      "pnl": 6548.750169594918,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "ATON",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.7275,
+      "pnl": -92.60023926424765,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.7758014999999999,
+      "pnl": 508.50127311681126,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "DCX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.24865,
+      "pnl": 23.71320933070092,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "DCX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 5.0193,
+      "pnl": 4029.599154751704,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "DCX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.24865,
+      "pnl": 22.83062282875403,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "TWNP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.86565,
+      "pnl": 61624.092725929455,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "VIVS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.915,
+      "pnl": -41716.184032723424,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "RPGL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 28.368,
+      "pnl": -5107.7895508988295,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "CISS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.931,
+      "pnl": -12801.859149304568,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "TWNP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.8018704999999999,
+      "pnl": 3815.5192972536897,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "FUSE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.7263,
+      "pnl": 18916.90539620153,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "FATBP",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.3564,
+      "pnl": 4595.04239841476,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "RPGL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 16.295066619821664,
+      "pnl": -53934.69479535695,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "XTKG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.3861,
+      "pnl": 2033.4435920156102,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "ACCL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.62,
+      "pnl": -230.22783874796733,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "FUSE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.73625,
+      "pnl": 18580.51693340356,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.16089150000000002,
+      "pnl": 16487.952809956332,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "NPT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.485583278685495,
+      "pnl": -27103.77565412449,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "GXAI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.3364,
+      "pnl": 24905.655898198485,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.16089150000000002,
+      "pnl": 982.1538597570907,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "FEED",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.6218,
+      "pnl": -1106.6513137739967,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "ENPH",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 52.0385,
+      "pnl": 2187.916692335217,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "BOXL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.1978,
+      "pnl": 20224.277172732167,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "SUNE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.188,
+      "pnl": 2644.1055600123946,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "FEED",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.4326505,
+      "pnl": -344.6271304367692,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "ENPH",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 52.0385,
+      "pnl": 1249.2097835253226,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "AIM",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.46265,
+      "pnl": -3004.9650417629455,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "ZSL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 28.457,
+      "pnl": -1530.9583288196009,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "CISS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.06,
+      "pnl": -9431.616228865227,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "BNAI",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 25.7,
+      "pnl": -57407.47355708509,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "GDTC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.994,
+      "pnl": -75.88036726864993,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "AIM",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.46265,
+      "pnl": 12.83377993737031,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "ZSL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 27.067,
+      "pnl": -21506.7120109275,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "XXRP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.86555,
+      "pnl": 121.31022202316672,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "UXRP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.6348095,
+      "pnl": -9.111933350630352,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.156215,
+      "pnl": -2689.763141469768,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "CCHH",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.5728108499217058,
+      "pnl": -30940.948330901447,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "XXRP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.86555,
+      "pnl": 13.531788810196417,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "UXRP",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.6348095,
+      "pnl": 2.723680443803431,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "TIRX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.156215,
+      "pnl": 37.330099884778974,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "UOKA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.18895,
+      "pnl": 99258.10288211895,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "EZRA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.2135,
+      "pnl": -7784.132850131413,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "CCHH",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.0395,
+      "pnl": 24504.403699614282,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "UOKA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.183975,
+      "pnl": 4913.4765512555605,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "QNCX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.33531500000000003,
+      "pnl": 38894.648008375545,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "JZXN",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.7819,
+      "pnl": 27187.922116130067,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "QNCX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.3214845,
+      "pnl": -8496.612916610087,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "JDZG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.65,
+      "pnl": -1181.9614338969368,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "VTAK",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.455,
+      "pnl": -351.9533230904872,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "JDZG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.5641,
+      "pnl": 5278.9423758146,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "RIME",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.6335,
+      "pnl": 12111.565941881781,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "OLB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.84575,
+      "pnl": -4831.63328190241,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "GXAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.4925,
+      "pnl": -4332.904622313305,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "OLB",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.0889010000000001,
+      "pnl": 45672.77667034103,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "GVH",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.5246,
+      "pnl": 5153.5273404970285,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "PLYX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.5045,
+      "pnl": 19596.354911234987,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "FRGT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.1384000000000003,
+      "pnl": 1141.310804237326,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "LFS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.2599,
+      "pnl": -2900.458550805997,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "OLB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.84,
+      "pnl": -18619.34501033835,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "GXAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.4925,
+      "pnl": 3.2680762392060387,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "RXT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.1342999999999999,
+      "pnl": 15138.094950865605,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "LRHC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.809109,
+      "pnl": -2866.0731026527355,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "JDZG",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.085,
+      "pnl": -1203.4724895510517,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "BENF",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.815,
+      "pnl": -11441.970867390599,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "RXT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.2536005000000001,
+      "pnl": 43134.79206432053,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "LRHC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.809109,
+      "pnl": 6.155638938465927,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "JZXN",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.56,
+      "pnl": -1826.4547744100819,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "CDIO",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.41285,
+      "pnl": 26181.935625403945,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "CDIO",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.2636,
+      "pnl": -5080.262697757687,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "SGN",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.78705,
+      "pnl": 11611.492259949431,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "EZRA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.2196,
+      "pnl": -2543.8420967730926,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "BRTX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.3069,
+      "pnl": 2643.5897874259463,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "RIME",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.4116,
+      "pnl": -17284.17092996507,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "XWEL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.325,
+      "pnl": -49464.47510314931,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "RETO",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.768,
+      "pnl": -1296.212287573564,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "UOKA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.2175,
+      "pnl": -3294.073185608213,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "CURX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.5497375,
+      "pnl": 8878.948055544286,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "HCTI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 8.34805,
+      "pnl": -820.064734209067,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "AEHL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.0593000000000001,
+      "pnl": 16778.12793511193,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "CURX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.5497375,
+      "pnl": 287.91560012281025,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "HCTI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 8.34805,
+      "pnl": 14.916881976118475,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "ENSC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.6056,
+      "pnl": -14720.601106873626,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "ENSC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.7623,
+      "pnl": 19183.92025507294,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "CDIO",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 6.985,
+      "pnl": -25730.763298105157,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "ENSC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.6474464999999999,
+      "pnl": -24.819991378244595,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.7611,
+      "pnl": 14492.920972841966,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NIVF",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.24375,
+      "pnl": 14716.407301191153,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.2636,
+      "pnl": -71.5121018186037,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.53,
+      "pnl": -30582.30164440439,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.1283,
+      "pnl": 45527.89804418094,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "PCLA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.9304999999999999,
+      "pnl": 591.1215276061939,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.7611,
+      "pnl": 279.67910377513454,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NIVF",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.0845500000000001,
+      "pnl": -18.966403720168273,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.17405,
+      "pnl": -7662.095167071093,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "PCLA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.75605,
+      "pnl": 9556.249332953797,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "BIYA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.2902,
+      "pnl": -13876.193814477738,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "MTVA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.1877,
+      "pnl": 8488.572321573665,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "RYOJ",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.475517283370555,
+      "pnl": 21539.822704988066,
+      "ret_pct": 0,
+      "reason": "TARGET"
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "PCLA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.75605,
+      "pnl": 175.80798862840265,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "NCRA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.565558,
+      "pnl": 35162.92985508079,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.72135,
+      "pnl": 5636.766670206867,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.3033,
+      "pnl": 7663.869785531482,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.82085,
+      "pnl": -721.4684502740274,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.5107,
+      "pnl": -29704.884081661832,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "MNTS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 12.9983,
+      "pnl": -77697.0707268928,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 8.632800000000001,
+      "pnl": 3111.4722914644444,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.7701,
+      "pnl": -3083.9090772995405,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "NCRA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.565558,
+      "pnl": 932.0872399631426,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.6517,
+      "pnl": -3617.3756708818837,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 7.3033,
+      "pnl": 179.41416437079715,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.82085,
+      "pnl": 8.392883214417225,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.635,
+      "pnl": -5309.309731844929,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "ASTC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 10.4742,
+      "pnl": 18786.426277885796,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "BRTX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.47281349765788977,
+      "pnl": -37931.26921504803,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.1482,
+      "pnl": 5562.416709939353,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "QTTB",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 12.15,
+      "pnl": -22261.196594804205,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "MNTS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 19.32,
+      "pnl": -56880.84611345455,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.8456005,
+      "pnl": -1.0450743287851765,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "UMAC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 28.041089999999997,
+      "pnl": 21032.88931905903,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "ATPC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.900200000000001,
+      "pnl": 50965.13832321402,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "ASTC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 30.492,
+      "pnl": 66000.38624250167,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "UMAC",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 27.85005,
+      "pnl": 7288.696065438504,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "OLOX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 10.9251,
+      "pnl": 4258.314957819122,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTN",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.26855,
+      "pnl": 747.327861335747,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "DEVS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.42223499999999997,
+      "pnl": 8507.982765367138,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "CMND",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.711918015845493,
+      "pnl": -99730.33670593757,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 54.45,
+      "pnl": 40649.99344862724,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "PLCE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 5.01,
+      "pnl": -4343.77475260818,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "OLOX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 10.9251,
+      "pnl": 183.35513591820018,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTN",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.2387,
+      "pnl": -6259.661784308031,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "LASE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.8407,
+      "pnl": 13027.353039761307,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "SDOT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.170806857953192,
+      "pnl": -110142.33519939973,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "YMAT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.435401,
+      "pnl": 8281.854830079013,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "SELX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.45,
+      "pnl": -12579.023728112748,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "NCT",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.346199,
+      "pnl": 496.54064577756253,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "LASE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.475,
+      "pnl": -28128.231277630024,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.65655,
+      "pnl": 82937.74933457916,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 6.070646687731641,
+      "pnl": -129606.9974986891,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "SBEV",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.3412,
+      "pnl": -22821.989283995295,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "SPRC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 12.37,
+      "pnl": -66310.67609706608,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "EDHL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 5.5638,
+      "pnl": 75533.4793774304,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "RPGL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.8213,
+      "pnl": 3057.605978344909,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "ACCL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.945,
+      "pnl": -2521.0020421868103,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 6.6864,
+      "pnl": 25816.572311152355,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "CMND",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.3480505,
+      "pnl": 10357.081906535226,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "ACCL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.8612,
+      "pnl": 559.5831366817984,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "CMND",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.3480505,
+      "pnl": 161.64286864844212,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "SUNE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 4.8411,
+      "pnl": 126701.49157247756,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "SMTK",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.824175,
+      "pnl": 15080.538057388418,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "OCC",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 20.545,
+      "pnl": -13366.342443760484,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CHAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.8207005,
+      "pnl": 43495.97288471041,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AZI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.22875,
+      "pnl": 88037.4176351531,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AHMA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 5.06455,
+      "pnl": 122751.13170780195,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.985,
+      "pnl": 42322.44890025824,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "MTEN",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.8022185,
+      "pnl": -2498.2106564596907,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 7.7913,
+      "pnl": 90714.5088430061,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "JZXN",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.8017,
+      "pnl": 14476.58873115771,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "EPSM",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.44,
+      "pnl": -517.7036659210016,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CHAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.8207999999999998,
+      "pnl": -10718.2408200762,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AZI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.6964,
+      "pnl": 83696.2146470364,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AHMA",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.827561870607756,
+      "pnl": -138531.56958295667,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.985,
+      "pnl": 641.4053832146737,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "MTEN",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.8022185,
+      "pnl": 4.171194704875006,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 5.1143,
+      "pnl": 110570.05384269764,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "QH",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.51,
+      "pnl": -3376.4752726711886,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "GLE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.8712,
+      "pnl": 15430.907376624324,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.8555005,
+      "pnl": -3913.595044575399,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "QH",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.51,
+      "pnl": -34.20981064671315,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.577,
+      "pnl": 105729.34480223269,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 6.4845,
+      "pnl": 84551.33294232376,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "WTO",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 2.3215500000000002,
+      "pnl": 44406.357000798394,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "RKDA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.4751,
+      "pnl": 14646.886312724135,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 5.0745,
+      "pnl": 182476.3000354988,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.1988505000000003,
+      "pnl": 36245.52278440024,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.761038497267048,
+      "pnl": -60860.87824639495,
+      "ret_pct": 0,
+      "reason": "STOP"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "EDHL",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 8.13,
+      "pnl": -1977.640278721461,
+      "ret_pct": 0,
+      "reason": "TIME_STOP"
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 2.1988505000000003,
+      "pnl": 544.9035349296164,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.1839005,
+      "pnl": 11088.212550554425,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.7125,
+      "pnl": 21249.498617716745,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "GELS",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 1.9404,
+      "pnl": 24671.640444105433,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 3.1839005,
+      "pnl": 227.7546731096645,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "SLBT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 13.6514,
+      "pnl": 70263.16627903527,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "OBAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.2735005,
+      "pnl": 79953.77980960981,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.5272499999999996,
+      "pnl": 1355.442816839677,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "NIVF",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.9073405,
+      "pnl": 17233.14400897594,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "IVDA",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 0.677358,
+      "pnl": 20991.99091129005,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRVO",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 3.7323,
+      "pnl": 14673.820629007852,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "strategy": "L",
+      "entry": 0.0,
+      "exit": 6.1083,
+      "pnl": 30997.94218528422,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "SLBT",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 13.6514,
+      "pnl": 1046.4886169632482,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "OBAI",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 1.2735005,
+      "pnl": 1472.4248485161243,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 4.280092,
+      "pnl": -0.47057397253587396,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "NIVF",
+      "strategy": "G",
+      "entry": 0.0,
+      "exit": 0.9073405,
+      "pnl": 379.41981875583815,
+      "ret_pct": 0,
+      "reason": "TRAIL"
+    }
+  ],
+  "v3_trades": [
+    {
+      "date": "2026-01-05",
+      "ticker": "MNTS",
+      "pnl": -0.69
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "VRME",
+      "pnl": -88.59
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "SMXT",
+      "pnl": 42.29
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "DVLT",
+      "pnl": 248.18
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "MASK",
+      "pnl": -177.46
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "UFG",
+      "pnl": 303.95
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "SOWG",
+      "pnl": -53.2
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "SMU",
+      "pnl": 168.98
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "SMUP",
+      "pnl": -14.06
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "RGC",
+      "pnl": -47.76
+    },
+    {
+      "date": "2026-01-05",
+      "ticker": "JCSE",
+      "pnl": -143.25
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "CYCN",
+      "pnl": -82.26
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "AZI",
+      "pnl": -76.82
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "NVX",
+      "pnl": -50.59
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "EVTV",
+      "pnl": -120.42
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "OS",
+      "pnl": -29.08
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "OPTT",
+      "pnl": -213.26
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "AEVA",
+      "pnl": 292.78
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "IBIO",
+      "pnl": 48.75
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "BNAI",
+      "pnl": 108.1
+    },
+    {
+      "date": "2026-01-06",
+      "ticker": "STXS",
+      "pnl": 6.27
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "MASK",
+      "pnl": -164.31
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "LUCY",
+      "pnl": 254.36
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "GLUE",
+      "pnl": 58.71
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "AMOD",
+      "pnl": -46.59
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "SKYQ",
+      "pnl": -51.96
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "MNTS",
+      "pnl": 68.75
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "HOUS",
+      "pnl": -48.5
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "NMRA",
+      "pnl": -29.58
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "GPUS",
+      "pnl": -286.88
+    },
+    {
+      "date": "2026-01-07",
+      "ticker": "ZSL",
+      "pnl": -64.24
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "FLYX",
+      "pnl": 2058.19
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "NVVE",
+      "pnl": 270.57
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "ACON",
+      "pnl": 327.29
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "JTAI",
+      "pnl": -141.76
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "ASPC",
+      "pnl": -133.67
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "NEOG",
+      "pnl": 179.45
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "BEX",
+      "pnl": 270.84
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "IPSC",
+      "pnl": 461.72
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "VNRX",
+      "pnl": -307.36
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "UAVS",
+      "pnl": 1117.18
+    },
+    {
+      "date": "2026-01-08",
+      "ticker": "CGTL",
+      "pnl": 835.54
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "ANPA",
+      "pnl": 57.2
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "GP",
+      "pnl": 355.07
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "OPAD",
+      "pnl": 436.97
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "LRHC",
+      "pnl": -69.8
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "RENX",
+      "pnl": -310.53
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "CETX",
+      "pnl": 299.4
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "BLNE",
+      "pnl": 148.92
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "SMUP",
+      "pnl": -232.61
+    },
+    {
+      "date": "2026-01-09",
+      "ticker": "SMU",
+      "pnl": -75.18
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "EVTV",
+      "pnl": -33.05
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "SOGP",
+      "pnl": 567.55
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "BDSX",
+      "pnl": 658.25
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "UP",
+      "pnl": 590.21
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "BARK",
+      "pnl": -244.11
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "DAWN",
+      "pnl": -28.49
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "STKL",
+      "pnl": -193.8
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "MREO",
+      "pnl": -259.32
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "OSS",
+      "pnl": 5.52
+    },
+    {
+      "date": "2026-01-12",
+      "ticker": "CLRB",
+      "pnl": -48.95
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "AHMA",
+      "pnl": 323.23
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "ATON",
+      "pnl": 1671.99
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "EVTV",
+      "pnl": 1292.47
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "XTLB",
+      "pnl": 90.05
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "WATT",
+      "pnl": 317.08
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "UAVS",
+      "pnl": 702.37
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "UP",
+      "pnl": -271.41
+    },
+    {
+      "date": "2026-01-13",
+      "ticker": "PDYN",
+      "pnl": -177.98
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "SEGG",
+      "pnl": 2319.65
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "GELS",
+      "pnl": -304.19
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "JTAI",
+      "pnl": -323.7
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "BEEM",
+      "pnl": -24.53
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "RIME",
+      "pnl": -319.78
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "ALTS",
+      "pnl": -119.18
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "AZI",
+      "pnl": 484.74
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "YYAI",
+      "pnl": 451.35
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "AGIG",
+      "pnl": -195.46
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "MREO",
+      "pnl": -402.4
+    },
+    {
+      "date": "2026-01-14",
+      "ticker": "KOLD",
+      "pnl": -192.75
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "SPHL",
+      "pnl": 817.96
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CJMB",
+      "pnl": -140.29
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "AUID",
+      "pnl": -4.94
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "ATPC",
+      "pnl": 200.36
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "BNKK",
+      "pnl": 1689.27
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CGTL",
+      "pnl": 815.29
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "RILY",
+      "pnl": -164.44
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "OCUL",
+      "pnl": -173.62
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "ASNS",
+      "pnl": -143.04
+    },
+    {
+      "date": "2026-01-15",
+      "ticker": "CRWG",
+      "pnl": 398.63
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "VERO",
+      "pnl": 1383.21
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "LCFY",
+      "pnl": -400.79
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "BIYA",
+      "pnl": 797.64
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "SOWG",
+      "pnl": -938.21
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "TNMG",
+      "pnl": -503.93
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "BNAI",
+      "pnl": -484.7
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "PTLE",
+      "pnl": -67.34
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "IBRX",
+      "pnl": 929.45
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "PRFX",
+      "pnl": -317.84
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "SHPH",
+      "pnl": -106.84
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "SEGG",
+      "pnl": 517.67
+    },
+    {
+      "date": "2026-01-16",
+      "ticker": "GWAV",
+      "pnl": -119.19
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "IVF",
+      "pnl": 621.5
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "SHPH",
+      "pnl": 2118.24
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "TWG",
+      "pnl": -343.17
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "NUAI",
+      "pnl": -391.96
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "CRVS",
+      "pnl": 962.71
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "BTTC",
+      "pnl": 4089.66
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "CCHH",
+      "pnl": 1825.29
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "ICON",
+      "pnl": 616.56
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "BOIL",
+      "pnl": -609.83
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "ATON",
+      "pnl": -1078.64
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "POLA",
+      "pnl": 1024.63
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "TII",
+      "pnl": -933.07
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "UNG",
+      "pnl": -656.08
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "IBRX",
+      "pnl": 1767.85
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "UVIX",
+      "pnl": -677.51
+    },
+    {
+      "date": "2026-01-20",
+      "ticker": "RMTI",
+      "pnl": -595.93
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "PAVM",
+      "pnl": 1791.46
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "LSTA",
+      "pnl": -850.18
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "BOXL",
+      "pnl": 2135.15
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "PAPL",
+      "pnl": 187.24
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "BNAI",
+      "pnl": -372.84
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "MLEC",
+      "pnl": -144.59
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "LUCD",
+      "pnl": -726.94
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "ADTX",
+      "pnl": 285.12
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "SEGG",
+      "pnl": 3073.83
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "BOIL",
+      "pnl": -404.23
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "GORO",
+      "pnl": -741.21
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "OKLL",
+      "pnl": 555.04
+    },
+    {
+      "date": "2026-01-21",
+      "ticker": "SMUP",
+      "pnl": -20.93
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "SXTP",
+      "pnl": 3447.38
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "CMCT",
+      "pnl": 960.13
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "HCTI",
+      "pnl": -301.79
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "GLSI",
+      "pnl": 1677.79
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "IOBT",
+      "pnl": -147.72
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "CABA",
+      "pnl": -395.37
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "NITO",
+      "pnl": -807.19
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "AREB",
+      "pnl": 229.07
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "CORT",
+      "pnl": 196.4
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "RAYA",
+      "pnl": -221.15
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "CUE",
+      "pnl": -44.57
+    },
+    {
+      "date": "2026-01-22",
+      "ticker": "VRME",
+      "pnl": -108.77
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "MOVE",
+      "pnl": 2803.34
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "KUST",
+      "pnl": 321.79
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "RVYL",
+      "pnl": -596.58
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "REVB",
+      "pnl": 1971.22
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "SLE",
+      "pnl": 312.21
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "WORX",
+      "pnl": -251.62
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "BNAI",
+      "pnl": 203.94
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "YYAI",
+      "pnl": -150.5
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "CHRS",
+      "pnl": -472.59
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "NAMM",
+      "pnl": -127.05
+    },
+    {
+      "date": "2026-01-23",
+      "ticker": "SGML",
+      "pnl": -408.92
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "GXAI",
+      "pnl": 46.27
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "NAMM",
+      "pnl": -280.7
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "EVTV",
+      "pnl": -524.63
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "OPTT",
+      "pnl": 199.06
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "LXEH",
+      "pnl": -47.31
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "ABOS",
+      "pnl": -273.16
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "CWVX",
+      "pnl": 507.17
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "CRWG",
+      "pnl": 513.39
+    },
+    {
+      "date": "2026-01-26",
+      "ticker": "SGN",
+      "pnl": -1907.54
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "NUWE",
+      "pnl": -529.94
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "IVF",
+      "pnl": 2259.31
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "PHGE",
+      "pnl": 1632.61
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "SAFX",
+      "pnl": -260.79
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "USBC",
+      "pnl": -203.6
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "BZAI",
+      "pnl": -695.23
+    },
+    {
+      "date": "2026-01-27",
+      "ticker": "RDW",
+      "pnl": 1142.07
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "TIRX",
+      "pnl": 2591.0
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "FEED",
+      "pnl": -520.54
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "BKYI",
+      "pnl": -278.64
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "AZI",
+      "pnl": 1438.55
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "ATON",
+      "pnl": -82.3
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "AIMD",
+      "pnl": -678.36
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "TRX",
+      "pnl": -493.9
+    },
+    {
+      "date": "2026-01-28",
+      "ticker": "BATL",
+      "pnl": 43.84
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "SER",
+      "pnl": -440.18
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "DCX",
+      "pnl": -1330.82
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "TRX",
+      "pnl": 4316.59
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "FBL",
+      "pnl": -1372.05
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "AUST",
+      "pnl": 96.97
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "GCTS",
+      "pnl": -1661.28
+    },
+    {
+      "date": "2026-01-29",
+      "ticker": "DUO",
+      "pnl": 41.01
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "FATBB",
+      "pnl": 3278.85
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "TWNP",
+      "pnl": 7095.36
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "FAT",
+      "pnl": 995.96
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "VIVS",
+      "pnl": -995.03
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "LRHC",
+      "pnl": -1406.32
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "RPGL",
+      "pnl": 1117.79
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "ANL",
+      "pnl": -226.77
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "SNXX",
+      "pnl": 29.47
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "ZSL",
+      "pnl": -171.55
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "CISS",
+      "pnl": -1493.48
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "GDXD",
+      "pnl": -1227.23
+    },
+    {
+      "date": "2026-01-30",
+      "ticker": "MGLD",
+      "pnl": -61.92
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "SXTC",
+      "pnl": 3950.74
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "VHUB",
+      "pnl": 8131.52
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "FATBP",
+      "pnl": -885.21
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "RPGL",
+      "pnl": 1276.42
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "FUSE",
+      "pnl": 17776.37
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "XTKG",
+      "pnl": 643.96
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "CISS",
+      "pnl": 4721.79
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "KOLD",
+      "pnl": -420.82
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "AQST",
+      "pnl": 158.04
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "PKST",
+      "pnl": -1047.13
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "SWVL",
+      "pnl": -908.14
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "ACCL",
+      "pnl": -211.78
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "YJ",
+      "pnl": 691.53
+    },
+    {
+      "date": "2026-02-02",
+      "ticker": "BMNZ",
+      "pnl": -918.3
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "TIRX",
+      "pnl": 8723.08
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "INLF",
+      "pnl": -1299.16
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "NPT",
+      "pnl": -1389.28
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "HCAI",
+      "pnl": -49.64
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "GXAI",
+      "pnl": 937.19
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "XTKG",
+      "pnl": -348.78
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "LIMN",
+      "pnl": -128.3
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "CYN",
+      "pnl": -1647.7
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "SHNY",
+      "pnl": -486.59
+    },
+    {
+      "date": "2026-02-03",
+      "ticker": "HYMC",
+      "pnl": -1185.99
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "BYAH",
+      "pnl": -1099.96
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "FEED",
+      "pnl": -762.07
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "BOXL",
+      "pnl": -318.05
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "ENPH",
+      "pnl": -581.39
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "SUNE",
+      "pnl": -381.09
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "SMCX",
+      "pnl": 1323.49
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "EGHT",
+      "pnl": -9.41
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "SMCL",
+      "pnl": 1236.08
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "APPS",
+      "pnl": -1221.85
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "LITX",
+      "pnl": -1255.73
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "ONCY",
+      "pnl": -270.8
+    },
+    {
+      "date": "2026-02-04",
+      "ticker": "EVGN",
+      "pnl": -627.58
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "RNAZ",
+      "pnl": -1465.18
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "ZSL",
+      "pnl": -499.39
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "CISS",
+      "pnl": 7039.12
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "TEAD",
+      "pnl": -328.61
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "BNAI",
+      "pnl": 2401.96
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "GDTC",
+      "pnl": -102.09
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "LIMN",
+      "pnl": 5007.56
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "HIMZ",
+      "pnl": -534.7
+    },
+    {
+      "date": "2026-02-05",
+      "ticker": "NXL",
+      "pnl": -188.82
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "CCHH",
+      "pnl": 2053.06
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "XXRP",
+      "pnl": -875.03
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "FLYE",
+      "pnl": 969.44
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "UXRP",
+      "pnl": -794.87
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "RDIB",
+      "pnl": -414.34
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "TIRX",
+      "pnl": -3961.61
+    },
+    {
+      "date": "2026-02-06",
+      "ticker": "STKL",
+      "pnl": -732.41
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "UOKA",
+      "pnl": 4000.46
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "EZRA",
+      "pnl": -2076.01
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "CCHH",
+      "pnl": 239.43
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "MNTS",
+      "pnl": 561.09
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "TIRX",
+      "pnl": -1233.11
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "MIMI",
+      "pnl": 322.95
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "PLBY",
+      "pnl": 449.22
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "TNON",
+      "pnl": -713.23
+    },
+    {
+      "date": "2026-02-09",
+      "ticker": "KOLD",
+      "pnl": -762.06
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "QNCX",
+      "pnl": -3330.83
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "EVMN",
+      "pnl": -1323.84
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "ABP",
+      "pnl": 2858.25
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "PHIO",
+      "pnl": -1604.78
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "EWCZ",
+      "pnl": -1363.57
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "SPOG",
+      "pnl": -65.95
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "JZXN",
+      "pnl": -168.51
+    },
+    {
+      "date": "2026-02-10",
+      "ticker": "HBIO",
+      "pnl": -114.29
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "RENX",
+      "pnl": -3383.89
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "MNTN",
+      "pnl": -1921.64
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "QNCX",
+      "pnl": 2714.89
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "STIM",
+      "pnl": -420.85
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "SUNE",
+      "pnl": 1741.6
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "ELAB",
+      "pnl": -2262.92
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "CCHH",
+      "pnl": -866.26
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "BETA",
+      "pnl": 997.74
+    },
+    {
+      "date": "2026-02-11",
+      "ticker": "HNGE",
+      "pnl": -1340.1
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "FSLY",
+      "pnl": 872.68
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "PMI",
+      "pnl": 1024.63
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "JDZG",
+      "pnl": -346.07
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "WORX",
+      "pnl": -122.72
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "JTAI",
+      "pnl": -1397.41
+    },
+    {
+      "date": "2026-02-12",
+      "ticker": "SNXX",
+      "pnl": -1180.92
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "MLEC",
+      "pnl": -254.77
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "IVDA",
+      "pnl": -3792.4
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "IMUX",
+      "pnl": -2298.2
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "RIVN",
+      "pnl": -1140.91
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "TPH",
+      "pnl": -976.13
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "JDZG",
+      "pnl": 795.09
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "QNCX",
+      "pnl": -1494.64
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "DXST",
+      "pnl": -311.09
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "RIME",
+      "pnl": -2098.32
+    },
+    {
+      "date": "2026-02-13",
+      "ticker": "CONL",
+      "pnl": -1747.7
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "CMPS",
+      "pnl": 3344.87
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "OLB",
+      "pnl": 7258.53
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "GVH",
+      "pnl": 3713.92
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "GXAI",
+      "pnl": -2557.63
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "PLYX",
+      "pnl": 893.38
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "FRGT",
+      "pnl": 230.22
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "LFS",
+      "pnl": -401.1
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "SUNE",
+      "pnl": -2297.31
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "ERNA",
+      "pnl": -290.32
+    },
+    {
+      "date": "2026-02-17",
+      "ticker": "NCI",
+      "pnl": -436.05
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "SNSE",
+      "pnl": -1468.98
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "RXT",
+      "pnl": 154.03
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "JDZG",
+      "pnl": -524.21
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "BENF",
+      "pnl": -930.02
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "APRE",
+      "pnl": -157.5
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "DGNX",
+      "pnl": 565.95
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "MCW",
+      "pnl": -1799.01
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "RENX",
+      "pnl": -362.59
+    },
+    {
+      "date": "2026-02-18",
+      "ticker": "BHAT",
+      "pnl": -14.02
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "AGAE",
+      "pnl": 460.78
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "JZXN",
+      "pnl": -260.05
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "TOVX",
+      "pnl": -3048.16
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "BOXL",
+      "pnl": 3307.17
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "RELY",
+      "pnl": -735.21
+    },
+    {
+      "date": "2026-02-19",
+      "ticker": "DRMA",
+      "pnl": -13.01
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "AIOS",
+      "pnl": -734.46
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "CDIO",
+      "pnl": -1908.36
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "OPEX",
+      "pnl": -327.18
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "GFAI",
+      "pnl": 1730.68
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "OPEN",
+      "pnl": -1591.21
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "ANPA",
+      "pnl": -419.57
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "SGN",
+      "pnl": -538.29
+    },
+    {
+      "date": "2026-02-20",
+      "ticker": "INDI",
+      "pnl": -868.88
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "VNDA",
+      "pnl": 3544.54
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "GETY",
+      "pnl": -2100.63
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "SGN",
+      "pnl": -811.22
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "EHAB",
+      "pnl": -1666.32
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "EZRA",
+      "pnl": -528.61
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "LEGN",
+      "pnl": -608.08
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "VHUB",
+      "pnl": -331.13
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "IBRX",
+      "pnl": 1891.29
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "FBIO",
+      "pnl": -1489.84
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "IKT",
+      "pnl": -1207.64
+    },
+    {
+      "date": "2026-02-23",
+      "ticker": "GITS",
+      "pnl": -16.73
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "VIR",
+      "pnl": 1925.19
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "BRTX",
+      "pnl": -744.92
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "CLVT",
+      "pnl": -2018.5
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "RIME",
+      "pnl": -2455.48
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "SILO",
+      "pnl": -154.51
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "EZRA",
+      "pnl": -1734.57
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "AMDL",
+      "pnl": -2179.72
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "CDIO",
+      "pnl": -709.49
+    },
+    {
+      "date": "2026-02-24",
+      "ticker": "NXL",
+      "pnl": -126.71
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "XWEL",
+      "pnl": 1270.44
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "CRCG",
+      "pnl": -736.75
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "CRCA",
+      "pnl": 923.6
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "CCUP",
+      "pnl": 200.46
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "RETO",
+      "pnl": -154.49
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "UOKA",
+      "pnl": -185.72
+    },
+    {
+      "date": "2026-02-25",
+      "ticker": "HCWC",
+      "pnl": -36.62
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "CURX",
+      "pnl": 14762.95
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "AEHL",
+      "pnl": -995.04
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "HCTI",
+      "pnl": -2066.58
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "IONL",
+      "pnl": -1604.23
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "IONX",
+      "pnl": -9.27
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "BFLY",
+      "pnl": 2509.84
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "RXT",
+      "pnl": -2503.21
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "DNUT",
+      "pnl": 3273.6
+    },
+    {
+      "date": "2026-02-26",
+      "ticker": "UOKA",
+      "pnl": -985.09
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "KORE",
+      "pnl": -22.52
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "ENSC",
+      "pnl": -3379.12
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "ONMD",
+      "pnl": -2531.89
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "JEM",
+      "pnl": -1192.8
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "MRAL",
+      "pnl": -738.02
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "VEEA",
+      "pnl": -245.49
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "BATL",
+      "pnl": 3015.68
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "NFXL",
+      "pnl": -2241.07
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "CDIO",
+      "pnl": 2623.58
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "TMDE",
+      "pnl": -36.88
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "XWEL",
+      "pnl": 2527.58
+    },
+    {
+      "date": "2026-02-27",
+      "ticker": "FIGS",
+      "pnl": 2061.74
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "LIMN",
+      "pnl": -4688.18
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "ATPC",
+      "pnl": 746.1
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "SBFM",
+      "pnl": -1626.52
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NIVF",
+      "pnl": 14508.6
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "CODX",
+      "pnl": -1431.93
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "QBTX",
+      "pnl": 2264.99
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "PCLA",
+      "pnl": -60.91
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "AUUD",
+      "pnl": -236.7
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "QUBX",
+      "pnl": 2075.21
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "RGTX",
+      "pnl": 4422.57
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NBIL",
+      "pnl": -1527.0
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "INFQ",
+      "pnl": 1220.52
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NEBX",
+      "pnl": -1983.84
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "QUCY",
+      "pnl": 3987.72
+    },
+    {
+      "date": "2026-05-21",
+      "ticker": "NCPL",
+      "pnl": -197.23
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "PCLA",
+      "pnl": 8252.08
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "AKTX",
+      "pnl": -2188.29
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "LFS",
+      "pnl": 4153.69
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "BIYA",
+      "pnl": -2490.74
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "QTEX",
+      "pnl": 2558.2
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "MEHA",
+      "pnl": -2862.93
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "GOVX",
+      "pnl": -2153.79
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "HCWB",
+      "pnl": 3559.07
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "MRM",
+      "pnl": -125.77
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "MTVA",
+      "pnl": 2038.73
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "RYOJ",
+      "pnl": 765.88
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "KIDZ",
+      "pnl": 205.72
+    },
+    {
+      "date": "2026-05-22",
+      "ticker": "AKAN",
+      "pnl": -2519.57
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "YMAT",
+      "pnl": -2132.67
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "NCRA",
+      "pnl": 16398.68
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "PHGE",
+      "pnl": -2812.41
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "MNTS",
+      "pnl": 4813.04
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "UZX",
+      "pnl": 3017.92
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "OTLK",
+      "pnl": 605.87
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "CODX",
+      "pnl": -2394.95
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "BIYA",
+      "pnl": -705.17
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "HTT",
+      "pnl": -279.99
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "VCIG",
+      "pnl": -646.39
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "AIIO",
+      "pnl": -1084.79
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "FUTG",
+      "pnl": 5032.96
+    },
+    {
+      "date": "2026-05-26",
+      "ticker": "OKLL",
+      "pnl": -522.13
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "ASTC",
+      "pnl": -646.63
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "SNGX",
+      "pnl": -2999.76
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "BRTX",
+      "pnl": -4040.48
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "FGL",
+      "pnl": -2076.94
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "UZX",
+      "pnl": -748.82
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "APPS",
+      "pnl": -1186.14
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "QTTB",
+      "pnl": 6859.65
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "MNTS",
+      "pnl": 9341.24
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "LGHL",
+      "pnl": -519.8
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "HOTH",
+      "pnl": -598.07
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "NCPL",
+      "pnl": 309.29
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "VCIG",
+      "pnl": -436.86
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "CPSH",
+      "pnl": -1526.88
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "LUNL",
+      "pnl": 1767.36
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "ALP",
+      "pnl": -886.84
+    },
+    {
+      "date": "2026-05-27",
+      "ticker": "VTIX",
+      "pnl": -81.58
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "WGRX",
+      "pnl": -659.71
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "SPRC",
+      "pnl": 8872.04
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "NCT",
+      "pnl": 2667.51
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "ATPC",
+      "pnl": 6509.44
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "ASTC",
+      "pnl": -1218.78
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "MASK",
+      "pnl": 1923.42
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "UMAC",
+      "pnl": 1179.51
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "RCAX",
+      "pnl": 4973.56
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "KTUP",
+      "pnl": -769.76
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "PRZO",
+      "pnl": -502.29
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "QTEX",
+      "pnl": 1135.7
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "PUSA",
+      "pnl": -1480.63
+    },
+    {
+      "date": "2026-05-28",
+      "ticker": "AVXX",
+      "pnl": -1319.27
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "HUBC",
+      "pnl": -1103.57
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "PRFX",
+      "pnl": 1446.59
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "DEVS",
+      "pnl": -2002.86
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "OLOX",
+      "pnl": -2641.29
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "STG",
+      "pnl": 382.63
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "REPL",
+      "pnl": -4.32
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "CMND",
+      "pnl": 3341.59
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "CREG",
+      "pnl": -477.64
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTN",
+      "pnl": -2741.22
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "ASTC",
+      "pnl": 14304.37
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "PD",
+      "pnl": -2095.15
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "PLCE",
+      "pnl": -748.3
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "MASK",
+      "pnl": -171.42
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "NOWL",
+      "pnl": -2296.47
+    },
+    {
+      "date": "2026-05-29",
+      "ticker": "WNW",
+      "pnl": -473.72
+    },
+    {
+      "date": "2026-06-02",
+      "ticker": "LOBO",
+      "pnl": -852.26
+    },
+    {
+      "date": "2026-06-02",
+      "ticker": "DBGI",
+      "pnl": 247.68
+    },
+    {
+      "date": "2026-06-02",
+      "ticker": "ANY",
+      "pnl": -776.38
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "XOS",
+      "pnl": 709.81
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "SDOT",
+      "pnl": 2749.54
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "YMAT",
+      "pnl": 1262.22
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "SELX",
+      "pnl": -3270.99
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "HUBC",
+      "pnl": 5554.27
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "LASE",
+      "pnl": 20609.39
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "KUST",
+      "pnl": 461.33
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "MSAI",
+      "pnl": 2387.15
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "PMI",
+      "pnl": -3170.61
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "DEVS",
+      "pnl": 959.37
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "NCT",
+      "pnl": -218.36
+    },
+    {
+      "date": "2026-06-03",
+      "ticker": "NVTS",
+      "pnl": 3250.6
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "STI",
+      "pnl": -1257.2
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "CXAI",
+      "pnl": -3647.92
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "FOXX",
+      "pnl": 2950.54
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "SBEV",
+      "pnl": -3344.54
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "TWAV",
+      "pnl": 7232.81
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "SPRC",
+      "pnl": -2114.21
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "EDHL",
+      "pnl": 4465.17
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "HCAT",
+      "pnl": 470.47
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "RPGL",
+      "pnl": 1433.92
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "ACCL",
+      "pnl": -297.3
+    },
+    {
+      "date": "2026-06-04",
+      "ticker": "AVS",
+      "pnl": -1933.84
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "RMSG",
+      "pnl": 5666.53
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "STI",
+      "pnl": -166.44
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "BESS",
+      "pnl": 5508.08
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "BBCP",
+      "pnl": 628.88
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "BCDA",
+      "pnl": 2491.31
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "MRLN",
+      "pnl": 718.58
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "CMND",
+      "pnl": 1623.04
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "ACCL",
+      "pnl": 512.26
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "HUBC",
+      "pnl": -288.14
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "SOXS",
+      "pnl": 536.72
+    },
+    {
+      "date": "2026-06-05",
+      "ticker": "BQ",
+      "pnl": -1.49
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "SUNE",
+      "pnl": 4098.32
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "SMTK",
+      "pnl": 8585.19
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "OCC",
+      "pnl": 3532.54
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "TNGX",
+      "pnl": -1356.69
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "TDIC",
+      "pnl": 3704.0
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "ABAT",
+      "pnl": -1984.06
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "FRSX",
+      "pnl": 5682.64
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "CYPH",
+      "pnl": -873.03
+    },
+    {
+      "date": "2026-06-08",
+      "ticker": "AIM",
+      "pnl": -1250.72
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CCTG",
+      "pnl": 714.98
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CHAI",
+      "pnl": -2625.87
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AZI",
+      "pnl": 56801.82
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "AHMA",
+      "pnl": -2481.77
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "GMM",
+      "pnl": -1776.09
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "SLGB",
+      "pnl": 2870.25
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "RGNT",
+      "pnl": -2712.92
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "PAVS",
+      "pnl": -2527.56
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "JZXN",
+      "pnl": -1721.03
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "CPOP",
+      "pnl": -1092.72
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "FAC",
+      "pnl": 735.01
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "MTEN",
+      "pnl": -1958.6
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "EPSM",
+      "pnl": -228.18
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "LZMH",
+      "pnl": -200.27
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "GMEX",
+      "pnl": -146.28
+    },
+    {
+      "date": "2026-06-09",
+      "ticker": "DAIC",
+      "pnl": 187.9
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "DSY",
+      "pnl": 66593.74
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "VSME",
+      "pnl": 14339.87
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "CIIT",
+      "pnl": 8007.25
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "FLD",
+      "pnl": 6946.04
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "GCDT",
+      "pnl": 2445.38
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "HWH",
+      "pnl": -1210.33
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "GLE",
+      "pnl": -883.07
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "HKIT",
+      "pnl": -466.16
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "CPOP",
+      "pnl": 7977.77
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "QH",
+      "pnl": -141.04
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "BQ",
+      "pnl": 1159.72
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "SMCZ",
+      "pnl": -779.61
+    },
+    {
+      "date": "2026-06-10",
+      "ticker": "AZI",
+      "pnl": 893.08
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "EDHL",
+      "pnl": -4706.36
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "GLXG",
+      "pnl": -1235.14
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "PPCB",
+      "pnl": -3772.84
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "QH",
+      "pnl": 2388.7
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "WTO",
+      "pnl": 22109.65
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "TOVX",
+      "pnl": -4612.26
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "MTEN",
+      "pnl": -2054.78
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "LASE",
+      "pnl": -6715.17
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "RKDA",
+      "pnl": 224.86
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "TMDE",
+      "pnl": -255.25
+    },
+    {
+      "date": "2026-06-11",
+      "ticker": "NAVN",
+      "pnl": -4943.88
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "BYAH",
+      "pnl": 62224.97
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "DSY",
+      "pnl": 3718.24
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "VSME",
+      "pnl": -9001.78
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "EDHL",
+      "pnl": -573.4
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "AKAN",
+      "pnl": 4286.13
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "DFNS",
+      "pnl": -2712.56
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "ADTX",
+      "pnl": -503.87
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "UBXG",
+      "pnl": 6253.47
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "MASK",
+      "pnl": -411.9
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "CIIT",
+      "pnl": -14.78
+    },
+    {
+      "date": "2026-06-12",
+      "ticker": "RUBI",
+      "pnl": -731.81
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "CAST",
+      "pnl": -2161.87
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "PAVS",
+      "pnl": -7330.77
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "VSME",
+      "pnl": -4422.98
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "GELS",
+      "pnl": 2582.73
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "AHMA",
+      "pnl": 1525.04
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "BYAH",
+      "pnl": -455.87
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "GPUS",
+      "pnl": -2485.62
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "DXST",
+      "pnl": -65.49
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "CYPH",
+      "pnl": -505.21
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "HUBC",
+      "pnl": -255.33
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "AXTX",
+      "pnl": -5875.14
+    },
+    {
+      "date": "2026-06-15",
+      "ticker": "GMM",
+      "pnl": -333.77
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "SLBT",
+      "pnl": 721.12
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "TDIC",
+      "pnl": 760.65
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "OBAI",
+      "pnl": -8702.85
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "AHMA",
+      "pnl": -3777.66
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "IVDA",
+      "pnl": 7306.76
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "GDHG",
+      "pnl": 180.01
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRVO",
+      "pnl": 8862.14
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "CRE",
+      "pnl": -898.66
+    },
+    {
+      "date": "2026-06-16",
+      "ticker": "NIVF",
+      "pnl": -5382.28
+    }
+  ]
+}
