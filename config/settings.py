@@ -5,8 +5,8 @@ import os
 import json
 
 # --- Alpaca API ---
-ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PKIPXFIETM7H4BAGQ64FQV3IWJ")
-ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "25RY682kuN9EBcFr6SFxgbSpFjdZkn613PLKPy1TdYzG")
+ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PK2GSDA7DAJJLE3Y7REPAO4XV5")
+ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "8gZp7Sc9QY9U6g33t4f5ycdLwfuVg4iZxZiyCJyC7tc7")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
 ALPACA_FEED = "iex"  # "sip" for full market data, "iex" for free tier
 
@@ -46,7 +46,7 @@ LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires
 # uncapped). Calibrate via fills_calibration.csv: median G entry slip ~0-50bp,
 # tail to 150bp. 1.5% catches most fills, blocks the worst tails.
 # Set to 0 to revert to MarketOrderRequest behavior.
-LIVE_BUY_LIMIT_BUFFER_PCT = 1.5
+LIVE_BUY_LIMIT_BUFFER_PCT = 0  # CHANGED 2026-07-14: use MARKET orders (limit orders weren't filling on 2026-07-13)
 # Hard cap on position size: never more than this fraction of total EQUITY
 # per single trade. Equity-basis (not literal cash) is correct because:
 #   1. backtest's cash_box[0] accumulates wins — matches equity, not cash
