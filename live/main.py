@@ -621,23 +621,23 @@ def _run_one_day(executor, args, log):
                 _poll_missing_bars()
 
             # Monitor recovered positions with hard stop/target
-            active = engine.active_position
-            if active and engine.position_entry.get(active, {}).get("strategy") == "RECOVERED":
-                try:
-                    positions = executor.get_positions()
-                    for pos in positions:
-                        if pos.symbol == active:
-                            entry = engine.position_entry[active]["entry_price"]
-                            current = float(pos.current_price)
-                            chg = (current / entry - 1) * 100
-                            if chg <= RECOVERY_STOP:
-                                log.warning(f"RECOVERY STOP HIT: {active} {chg:+.1f}% — selling")
-                                executor.sell(active, reason="RECOVERY_STOP")
-                                engine.active_position = None
-                            elif chg >= RECOVERY_TARGET:
-                                log.info(f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling")
-                                executor.sell(active, reason="RECOVERY_TARGET")
-                                engine.active_position = None
+            for active in engine.active_positions:
+                if engine.position_entry.get(active, {}).get("strategy") == "RECOVERED":
+                    try:
+                        positions = executor.get_positions()
+                        for pos in positions:
+                            if pos.symbol == active:
+                                entry = engine.position_entry[active]["entry_price"]
+                                current = float(pos.current_price)
+                                chg = (current / entry - 1) * 100
+                                if chg <= RECOVERY_STOP:
+                                    log.warning(f"RECOVERY STOP HIT: {active} {chg:+.1f}% — selling")
+                                    executor.sell(active, reason="RECOVERY_STOP")
+                                    engine.active_positions.discard(active)
+                                elif chg >= RECOVERY_TARGET:
+                                    log.info(f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling")
+                                    executor.sell(active, reason="RECOVERY_TARGET")
+                                    engine.active_positions.discard(active)
                 except Exception:
                     pass
 
