@@ -8,7 +8,8 @@ import json
 ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PK2GSDA7DAJJLE3Y7REPAO4XV5")
 ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "8gZp7Sc9QY9U6g33t4f5ycdLwfuVg4iZxZiyCJyC7tc7")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
-ALPACA_FEED = "iex"  # "sip" for full market data, "iex" for free tier
+ALPACA_FEED = "sip"  # "sip" for full market data (15-min delayed on free), "iex" for partial coverage
+ALPACA_FEED_DELAYED = True  # True = SIP data is 15-min delayed (free tier), False = real-time (paid)
 
 # --- Risk Management ---
 SLIPPAGE_PCT = 0.05
@@ -54,24 +55,19 @@ LIVE_BUY_LIMIT_BUFFER_PCT = 0  # CHANGED 2026-07-14: use MARKET orders (limit or
 #   3. drawdowns eat cash first; cash-basis would lock the bot out
 # Prevents the bot from putting 100%+ of equity (via buying power) into
 # one microcap when position_cost arrives misconfigured.
-LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # cap at 30% of EQUITY per trade
-# 2026-06-23: reverted from 100 back to 30 — backtest IS applying vol caps
-# (5% cum_$vol, 8% v_regime, 15% v_eff_adj — test_green_candle_combined.py:2976-2990).
-# Backtest's "deploy" is actually capped by vol, not 100% cash. The 30%
-# equity wrapper is a reasonable proxy for vol caps while IEX feed under-counts.
-# WHEN SIP UPGRADE COMPLETES: set LIVE_DISABLE_VOL_CAPS=False + raise this to
-# 100 (vol caps will become the natural size limit, matching backtest behavior).
+LIVE_MAX_POSITION_PCT_OF_CASH = 100.0  # CHANGED 2026-07-15: SIP feed active, vol caps now work
+# With accurate SIP volume data, backtest's participation caps bind correctly.
+# Raised from 30% to 100% because vol caps (5% cum_$vol, 8% v_regime, etc.) are
+# the natural size limit. This matches backtest behavior exactly.
 
-# --- IEX FEED WORKAROUND (2026-06-18) ---
-# Live cum_$vol from IEX-only feed under-counts by 100-1000x on hot gappers
-# (~2% market share on most stocks, but <0.5% on heavily-routed names like
-# APWC at open). This causes the simulator's vol/regime/participation caps
-# to bind absurdly tight (e.g. $116 position on a stock with $2.1M real
-# cum_$vol). When this flag is True, those caps are zeroed in live mode
-# so position sizing depends purely on the equity cap above (30%).
-# TURN OFF when ALPACA_FEED is upgraded to "sip" (then caps re-bind on
-# accurate participation rates).
-LIVE_DISABLE_VOL_CAPS = True
+# --- VOLUME CAPS (re-enabled 2026-07-15 with SIP feed) ---
+# CHANGED: SIP feed provides accurate consolidated volume (was IEX at 2-3% coverage).
+# Vol caps are now ENABLED to match backtest behavior exactly:
+#   - MAX_2MIN_PARTICIPATION = 5% of bar volume
+#   - MAX_REGIME_PARTICIPATION = 8% of regime cumulative volume
+#   - VOL_CAP_PCT = 5% effective participation
+# These caps prevent oversizing on low-liquidity tickers (exactly like backtest).
+LIVE_DISABLE_VOL_CAPS = False  # CHANGED from True — SIP feed active
 
 # --- PDT (Pattern Day Trader) — NO-OP'd 2026-06-17 ---
 # FINRA abolished the $25K minimum and the 4-day-trade-in-5-days counter

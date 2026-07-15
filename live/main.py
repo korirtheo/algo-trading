@@ -14,6 +14,17 @@ Schedule:
   3:45 PM ET  - EOD close all positions
   4:00 PM ET  - Daily summary, dashboard stays alive
 
+Data Feed:
+  SIP (delayed 15-min on free tier): Bars arrive at wall_clock = bar_timestamp + 15min.
+  Strategy uses the bar's timestamp as "market time", not wall clock. So a 9:30 AM bar
+  arrives at 9:45 AM wall time, but is processed as "9:30 AM market time."
+
+  This gives us:
+  - Complete market coverage (SIP = all exchanges consolidated)
+  - Consistent bar delivery (no IEX feed gaps)
+  - G/L strategies work correctly (see first bars at "market open")
+  - Paper trading validation matches backtest (same data quality)
+
 Usage:
   python -m live.main              # run full day + dashboard
   python -m live.main --scan-only  # only run scanner, print watchlist

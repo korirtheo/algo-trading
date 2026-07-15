@@ -15,9 +15,13 @@ from zoneinfo import ZoneInfo
 from collections import defaultdict
 
 from alpaca.data.enums import DataFeed
-from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
+from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED, ALPACA_FEED_DELAYED
 
 _FEED_ENUM = DataFeed.IEX if ALPACA_FEED == "iex" else DataFeed.SIP
+
+# When using delayed SIP (free tier), bars arrive 15 min late but have correct timestamps.
+# We use the bar's timestamp (not wall clock) to align strategy timing.
+FEED_DELAYED = ALPACA_FEED_DELAYED if ALPACA_FEED == "sip" else False
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
