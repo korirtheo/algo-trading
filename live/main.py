@@ -638,8 +638,8 @@ def _run_one_day(executor, args, log):
                                     log.info(f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling")
                                     executor.sell(active, reason="RECOVERY_TARGET")
                                     engine.active_positions.discard(active)
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
 
             time.sleep(30)
 
