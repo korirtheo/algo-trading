@@ -442,6 +442,13 @@ class OrderExecutor:
         if LIVE_BRACKET_ORDERS:
             self._cancel_bracket_legs_for_ticker(ticker)
 
+        # Detect trail stop exits: use LIMIT order at signal_price instead of
+        # MARKET to capture continued upside. Trail stops fire when price pulls
+        # back from peak, but with tight trail % (0-0.5%), price often continues
+        # rising. A limit order at the trail price lets us participate in that
+        # upside rather than dumping immediately.
+        is_trail_exit = "TRAIL" in reason.upper() if reason else False
+
         try:
             if shares is None:
                 # Close entire position. With bracket legs already canceled,
@@ -452,15 +459,31 @@ class OrderExecutor:
                 # Mirror the BUY-side: whole shares only (most small-caps
                 # are non-fractionable on Alpaca).
                 sell_qty = max(1, int(shares))
-                order = self.client.submit_order(
-                    MarketOrderRequest(
-                        symbol=ticker,
-                        qty=sell_qty,
-                        side=OrderSide.SELL,
-                        time_in_force=TimeInForce.DAY,
+
+                # Trail stops: use limit order at signal price
+                if is_trail_exit and signal_price:
+                    limit_price = round(signal_price, 2)
+                    order = self.client.submit_order(
+                        LimitOrderRequest(
+                            symbol=ticker,
+                            qty=sell_qty,
+                            side=OrderSide.SELL,
+                            time_in_force=TimeInForce.DAY,
+                            limit_price=str(limit_price),
+                        )
                     )
-                )
-                log.info(f"SELL {ticker}: {sell_qty} shares ({reason}) | order_id={order.id}")
+                    log.info(f"SELL {ticker}: {sell_qty} shares ({reason}) LIMIT@${limit_price:.2f} | order_id={order.id}")
+                else:
+                    # All other exits: use market order
+                    order = self.client.submit_order(
+                        MarketOrderRequest(
+                            symbol=ticker,
+                            qty=sell_qty,
+                            side=OrderSide.SELL,
+                            time_in_force=TimeInForce.DAY,
+                        )
+                    )
+                    log.info(f"SELL {ticker}: {sell_qty} shares ({reason}) | order_id={order.id}")
 
             # Stage-1 calibration row for the sell leg.
             if signal_price is not None:
