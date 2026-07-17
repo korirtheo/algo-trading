@@ -63,6 +63,15 @@ def recover_open_positions(engine, executor, candidates, log):
         return candidates
 
     if not open_positions:
+        log.info("RECOVERY: No open Alpaca positions")
+        return candidates
+
+    # Reconcile with persistent state file
+    log.info(f"RECOVERY: Found {len(open_positions)} open Alpaca positions — reconciling with state file")
+    recovered = engine.position_state.reconcile_with_alpaca(open_positions)
+
+    if not recovered:
+        log.info("RECOVERY: All Alpaca positions already tracked (no action needed)")
         return candidates
 
     from alpaca.data.historical import StockHistoricalDataClient
@@ -76,31 +85,31 @@ def recover_open_positions(engine, executor, candidates, log):
     today = datetime.now(ET).date()
     market_open_dt = datetime.combine(today, dt_time(9, 30), tzinfo=ET)
 
-    for pos in open_positions:
-        ticker = pos.symbol
-        entry_price = float(pos.avg_entry_price)
-        qty = float(pos.qty)
-        current_price = float(pos.current_price)
+    for ticker, state in recovered.items():
+        entry_price = state["entry_price"]
+        current_price = state["current_price"]
+        strategy = state["strategy"]
+        has_metadata = state["has_metadata"]
         change_pct = (current_price / entry_price - 1) * 100
 
-        log.info(f"RECOVERY: Found open position {ticker} | "
-                 f"entry=${entry_price:.2f} | current=${current_price:.2f} | "
-                 f"change={change_pct:+.1f}%")
+        log.info(f"RECOVERY: {ticker} ({strategy}) | "
+                 f"entry=${entry_price:.2f} current=${current_price:.2f} ({change_pct:+.1f}%) | "
+                 f"metadata={'YES' if has_metadata else 'NO (orphan)'}")
 
-        # Immediate safety checks — derived from worst-case strategy params
-        stop_keys = [v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0]
-        target_keys = [v for k, v in engine.params.items() if k.endswith("_target_pct") or k.endswith("_target1_pct") or k.endswith("_target2_pct")]
-        HARD_STOP_PCT = -(max(stop_keys) if stop_keys else 12.0)
-        HARD_TARGET_PCT = max(target_keys) if target_keys else 23.0
+        # Check if stop/target already breached during downtime
+        stop_price = state.get("stop_price", entry_price * 0.95)
+        target_price = state.get("target_price", entry_price * 1.10)
 
-        if change_pct <= HARD_STOP_PCT:
-            log.warning(f"RECOVERY STOP: {ticker} down {change_pct:.1f}% — selling immediately")
+        if current_price <= stop_price:
+            log.warning(f"RECOVERY: {ticker} STOP BREACHED (${current_price:.2f} <= ${stop_price:.2f}) — selling immediately")
             executor.sell(ticker, reason="RECOVERY_STOP")
+            engine.position_state.remove_position(ticker)
             continue
 
-        if change_pct >= HARD_TARGET_PCT:
-            log.info(f"RECOVERY TARGET: {ticker} up {change_pct:.1f}% — taking profit")
+        if current_price >= target_price:
+            log.info(f"RECOVERY: {ticker} TARGET REACHED (${current_price:.2f} >= ${target_price:.2f}) — taking profit")
             executor.sell(ticker, reason="RECOVERY_TARGET")
+            engine.position_state.remove_position(ticker)
             continue
 
         # Fetch today's 2-min bars
@@ -133,23 +142,26 @@ def recover_open_positions(engine, executor, candidates, log):
                     "Volume": float(row["volume"]),
                 })
 
-        # Restore engine position state
-        engine.active_position = ticker
+        # Restore engine runtime state
+        engine.active_positions.add(ticker)
         engine.position_entry[ticker] = {
             "entry_price": entry_price,
-            "shares": qty,
-            "cost": entry_price * qty,
-            "strategy": "RECOVERED",
-            "entry_time": datetime.now(ET),
+            "shares": state["shares"],
+            "cost": state["cost"],
+            "strategy": strategy,
+            "entry_time": state.get("entry_time"),
         }
         # Pre-populate last_states so engine won't re-enter
         engine.last_states[ticker] = {
             "ticker": ticker,
             "entry_price": entry_price,
-            "shares": qty,
-            "strategy": "RECOVERED",
+            "shares": state["shares"],
+            "strategy": strategy,
             "exit_price": None,
         }
+
+        # Also update daily_state so it's tracked for time limits and done status
+        engine.daily_state.update_last_state(ticker, engine.last_states[ticker])
 
         # Add to candidates if not already there
         if ticker not in candidate_tickers:
@@ -161,7 +173,6 @@ def recover_open_positions(engine, executor, candidates, log):
                 "prev_close": entry_price,
                 "float_shares": None,
             }]
-            # Also add to engine picks
             engine.picks.append({
                 "ticker": ticker,
                 "gap_pct": 0,
@@ -173,7 +184,30 @@ def recover_open_positions(engine, executor, candidates, log):
             })
             candidate_tickers.add(ticker)
 
-        log.info(f"RECOVERY: {ticker} restored — will manage to EOD (stop={HARD_STOP_PCT}%, target={HARD_TARGET_PCT}%)")
+        if has_metadata:
+            log.info(f"RECOVERY: {ticker} restored with full monitoring | "
+                    f"strategy={strategy} stop=${stop_price:.2f} target=${target_price:.2f} "
+                    f"trail={state.get('trail_pct', 0):.1f}% peak=${state.get('peak_price', 0):.2f}")
+        else:
+            log.warning(f"RECOVERY: {ticker} orphan — defensive monitoring | "
+                       f"stop=${stop_price:.2f} (-5%) target=${target_price:.2f} (+10%) trail=1%")
+
+    # Save account snapshot after recovery
+    try:
+        account = executor.get_account()
+        engine.db.save_account_snapshot(
+            'recovery',
+            cash=account.cash,
+            equity=account.equity,
+            buying_power=account.buying_power,
+            portfolio_value=account.portfolio_value,
+            positions_count=len(recovered)
+        )
+        # Log recovery event
+        engine.db.log_system_event('recovery', 'warning' if recovered else 'info',
+                                   f'Recovery completed: {len(recovered)} positions restored')
+    except Exception as e:
+        log.warning(f"Failed to save recovery snapshot: {e}")
 
     return candidates
 
@@ -413,6 +447,13 @@ def _run_one_day(executor, args, log):
     engine = CombinedEngine(executor, fill_stream=fill_stream)
     engine.initialize_watchlist(candidates)
 
+    # Save watchlist to database
+    engine.db.save_watchlist(candidates, scan_time=datetime.now(ET))
+
+    # Log system startup event
+    engine.db.log_system_event('startup', 'info',
+                               f'Engine started with {len(candidates)} candidates for {trading_day}')
+
     # Recover any open positions from a previous session/crash
     candidates = recover_open_positions(engine, executor, candidates, log)
 
@@ -609,6 +650,34 @@ def _run_one_day(executor, args, log):
             if now.hour == 15 and now.minute >= 45:
                 log.info("EOD: Closing all positions")
                 engine.eod_close()
+
+                # Save EOD account snapshot
+                try:
+                    account = executor.get_account()
+                    engine.db.save_account_snapshot(
+                        'market_close',
+                        cash=account.cash,
+                        equity=account.equity,
+                        buying_power=account.buying_power,
+                        portfolio_value=account.portfolio_value,
+                        daily_pnl=engine.daily_pnl,
+                        trades_count=len(engine.trades_today),
+                        positions_count=len(engine.active_positions)
+                    )
+                    log.info(f"EOD snapshot saved: equity=${account.equity:.2f} P&L=${engine.daily_pnl:.2f}")
+                except Exception as e:
+                    log.warning(f"Failed to save EOD snapshot: {e}")
+
+                # Save bar summaries
+                try:
+                    engine.save_bar_summaries()
+                except Exception as e:
+                    log.warning(f"Failed to save bar summaries: {e}")
+
+                # Log shutdown event
+                engine.db.log_system_event('shutdown', 'info',
+                                          f'Market close: {len(engine.trades_today)} trades, P&L=${engine.daily_pnl:.2f}')
+
                 break
 
             # After market close

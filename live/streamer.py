@@ -145,9 +145,8 @@ class BarStreamer:
         """
         try:
             today = datetime.now(ET).strftime("%Y-%m-%d")
-            # Get project root by going up from live/streamer.py
-            logs_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            bars_date_dir = os.path.join(logs_dir, "logs", "bars", "raw-1min", today)
+            # Use /app/logs directly since we're in Docker
+            bars_date_dir = os.path.join("/app/logs", "bars", "raw-1min", today)
             os.makedirs(bars_date_dir, exist_ok=True)
 
             path = os.path.join(bars_date_dir, f"{symbol}.csv")

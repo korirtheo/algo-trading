@@ -161,6 +161,13 @@ N_PARTICIPATION_CAP = 0.0
 L_PARTICIPATION_CAP = 0.0
 X_PARTICIPATION_CAP = 0.0
 
+# Re-entry control — allow multiple entries per ticker per day per strategy
+# When ENABLE_REENTRY=False, each (ticker, strategy) can only enter once per day
+# When ENABLE_REENTRY=True, re-entry is allowed if price > last_exit * (1 + REENTRY_PRICE_BUFFER_PCT/100)
+# This ensures we only re-enter on momentum continuation, not catching falling knives
+ENABLE_REENTRY = False             # Master toggle for re-entry (DISABLED - marginal +0.9% impact)
+REENTRY_PRICE_BUFFER_PCT = 1.0     # Require price > last_exit * 1.01 to re-enter (1% buffer)
+
 # Point-in-time news filter (drop picks lacking enough premarket news coverage)
 NEWS_FILTER_ENABLED = False          # master toggle
 NEWS_MIN_ARTICLES = 0                # require >= this many articles before 9:30 ET
@@ -1073,6 +1080,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     unsettled_box = [0.0]
     selection_log = []
 
+    # Track exit prices per (ticker, strategy) for re-entry control
+    # When ENABLE_REENTRY=False: Block all re-entries (one entry per ticker/strategy/day)
+    # When ENABLE_REENTRY=True: Allow re-entry only if price > last_exit * (1 + buffer%)
+    # This ensures momentum continuation rather than catching falling knives
+    reentry_floor = {}  # {(ticker, strategy): exit_price}
+
     def _receive_proceeds(amount):
         if cash_account:
             unsettled_box[0] += amount
@@ -1604,6 +1617,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     st["shares"] = 0
                     st["done"] = True
                     _receive_proceeds(proceeds)
+
+                    # Record exit price as re-entry floor for this ticker+strategy
+                    reentry_floor[(st["ticker"], st["strategy"])] = price
 
                 # EOD forced exit (all strategies)
                 if minutes_to_close <= EOD_EXIT_MINUTES:
@@ -2904,6 +2920,17 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         for st in entry_candidates:
             if st["done"] or st["entry_price"] is not None:
                 continue
+
+            # Re-entry control: check if this ticker+strategy already exited today
+            last_exit = reentry_floor.get((st["ticker"], st["strategy"]))
+            if last_exit is not None:
+                if not ENABLE_REENTRY:
+                    # Re-entry disabled: block all re-entries
+                    continue
+                # Re-entry enabled: only allow if price > last_exit * (1 + buffer%)
+                required_price = last_exit * (1 + REENTRY_PRICE_BUFFER_PCT / 100)
+                if st["signal_price"] <= required_price:
+                    continue  # Price hasn't exceeded threshold — skip re-entry
 
             try:
                 ts_et = ts.astimezone(ET_TZ)

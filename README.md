@@ -65,6 +65,37 @@ Common commands:
 
 ## Live trading architecture
 
+### Crash Recovery & Persistent State
+
+**Position State Manager** ([live/position_state.py](live/position_state.py)):
+- Saves all position metadata to `logs/position_state.json` (entry, peak, strategy, stop/target/trail)
+- Survives crashes, restarts, Docker recreation
+- On startup: reconciles Alpaca positions with saved state
+  - **Positions with metadata**: Resume full monitoring (original strategy, peak, trail)
+  - **Orphaned positions**: Apply defensive rules (5% stop, 10% target, 1% trail)
+  - **Breached positions**: Immediately exit if stop/target hit during downtime
+- Atomic writes (temp → rename) prevent corruption
+- Thread-safe with lock on all operations
+
+**Daily State Manager** ([live/daily_state.py](live/daily_state.py)) - NEW:
+- Saves intraday evaluation state to `logs/{date}_daily_state.json`
+- Prevents duplicate entries after mid-day crashes/restarts
+- Tracks per ticker+strategy:
+  - **Exit prices**: For re-entry floor (won't re-buy if price ≤ last_exit × 1.01)
+  - **Done strategies**: Strategies that timed out (won't re-fire after restart)
+  - **Signal times**: First signal timestamp (ET) for time limit enforcement
+  - **Last states**: Prevents re-evaluation of already-processed tickers
+- **Example**: If G times out on ABCD at 10:15, crashes at 10:30, restarts at 11:00 → G won't re-fire on ABCD (marked done)
+- All timestamps stored in ET (respects strategy time windows like "G shouldn't fire after 10:30")
+- Resets automatically each new trading day
+
+**Re-Entry Control** (tunable via `ENABLE_REENTRY`, `REENTRY_PRICE_BUFFER_PCT`):
+- **Currently DISABLED** (marginal +0.9% impact over 2.5 years, see backtest results)
+- **When enabled**: Allow re-entry if `price > last_exit * 1.01` (1% buffer)
+- **When disabled**: One entry per `(ticker, strategy)` per day
+- Ensures momentum continuation vs catching falling knives
+- Tracked per strategy: B's state doesn't affect G
+
 ### Daily schedule (ET)
 
 | Time | Action |
@@ -82,12 +113,27 @@ holidays handled automatically.
 
 | File | Role |
 |---|---|
-| [live/main.py](live/main.py) | Entry point — scanner, engine, streamer, dashboard, rollover |
+| [live/main.py](live/main.py) | Entry point — scanner, engine, streamer, dashboard, rollover, crash recovery |
 | [live/scanner.py](live/scanner.py) | Webull + Alpaca + Finviz pre-market scan |
-| [live/streamer.py](live/streamer.py) | Alpaca WS 1-min → 2-min bar aggregation |
-| [live/engine_combined.py](live/engine_combined.py) | Runs `simulate_day_combined` per bar; emits ENTRY/EXIT/PARTIAL |
+| [live/streamer.py](live/streamer.py) | Alpaca WS 1-min → 2-min bar aggregation, raw bar logging |
+| [live/engine_combined.py](live/engine_combined.py) | Runs `simulate_day_combined` per bar; emits ENTRY/EXIT/PARTIAL; tracks position state |
 | [live/executor.py](live/executor.py) | Alpaca order execution + volume-cap enforcement + PDT gate |
 | [live/halt_monitor.py](live/halt_monitor.py) | Intraday halt-resume scanner |
+| [live/position_state.py](live/position_state.py) | Persistent position state manager (survives crashes) |
+| [live/daily_state.py](live/daily_state.py) | Daily evaluation state (exit prices, done strategies, signal times) — prevents duplicate entries after restart |
+
+### Backtest/Optuna/Live Consistency
+
+**All three systems use the SAME core simulation:**
+- Backtest: `test_green_candle_combined.simulate_day_combined()`
+- Optuna: calls `test_green_candle_combined.simulate_day_combined()` (via `optimize_combined.py`)
+- Live: calls `test_green_candle_combined.simulate_day_combined()` (via `engine_combined.py`)
+
+**Only intentional difference: Volume caps**
+- Backtest/Optuna: `VOL_CAP_PCT` from historical SIP data (accurate volume)
+- Live: `LIVE_DISABLE_VOL_CAPS = True` (IEX real-time feed lacks volume data)
+
+**Any strategy change automatically affects all three.** Parameters are tunable via JSON configs loaded by all systems.
 
 ### Scanner sources
 
