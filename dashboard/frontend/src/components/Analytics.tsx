@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchJSON } from '../api/client';
 
-type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist';
+type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage';
 
 interface Signal {
   id: number;
@@ -96,6 +96,49 @@ interface TradeDetail {
   hold_time_min: number | null;
 }
 
+interface SlippageStats {
+  date: string;
+  n_fills: number;
+  avg_slip_bp: number | null;
+  median_slip_bp: number | null;
+  max_slip_bp: number | null;
+  min_slip_bp: number | null;
+  p95_slip_bp: number | null;
+  dollar_volume: number;
+  realized_cost: number;
+}
+
+interface SlippageByStrategy {
+  strategy: string;
+  n: number;
+  n_buys: number;
+  n_sells: number;
+  avg_slip_bp: number | null;
+  median_slip_bp: number | null;
+  min_slip_bp: number | null;
+  max_slip_bp: number | null;
+  avg_buy_slip_bp: number | null;
+  avg_sell_slip_bp: number | null;
+  dollar_volume: number;
+  realized_cost: number;
+}
+
+interface SlippageRow {
+  id: number;
+  timestamp: string;
+  order_id: string;
+  ticker: string;
+  strategy: string;
+  side: string;
+  event_type: string;
+  signal_price: number | null;
+  fill_price: number | null;
+  filled_qty: number | null;
+  slip_bp: number | null;
+  status: string | null;
+  dollar_amount: number;
+}
+
 export const Analytics = () => {
   const [tab, setTab] = useState<Tab>('trades');
   const [date, setDate] = useState(() => {
@@ -110,6 +153,9 @@ export const Analytics = () => {
   const [events, setEvents] = useState<SystemEvent[]>([]);
   const [bars, setBars] = useState<BarSummary[]>([]);
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [slippageStats, setSlippageStats] = useState<SlippageStats | null>(null);
+  const [slippageByStrategy, setSlippageByStrategy] = useState<SlippageByStrategy[]>([]);
+  const [slippageRows, setSlippageRows] = useState<SlippageRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -147,6 +193,12 @@ export const Analytics = () => {
         case 'watchlist':
           const watchlistData = await fetchJSON<WatchlistItem[]>(`/api/analytics/watchlist/${date}`);
           setWatchlist(watchlistData);
+          break;
+        case 'slippage':
+          const slippageData = await fetchJSON<{ stats: SlippageStats; by_strategy: SlippageByStrategy[]; rows: SlippageRow[] }>(`/api/analytics/slippage/${date}`);
+          setSlippageStats(slippageData.stats);
+          setSlippageByStrategy(slippageData.by_strategy);
+          setSlippageRows(slippageData.rows);
           break;
       }
     } catch (err) {
@@ -441,6 +493,192 @@ export const Analytics = () => {
     </div>
   );
 
+  const fmtBp = (v: number | null) => {
+    if (v === null || v === undefined) return '—';
+    return `${v >= 0 ? '+' : ''}${v.toFixed(1)} bp`;
+  };
+
+  const bpColor = (v: number | null) => {
+    if (v === null || v === undefined) return 'var(--text-secondary)';
+    if (v > 20) return 'var(--red)';
+    if (v < -10) return 'var(--green)';
+    return 'var(--text-secondary)';
+  };
+
+  const renderSlippage = () => (
+    <div>
+      {slippageStats && (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+            gap: 12,
+            padding: '12px',
+            borderBottom: '1px solid var(--border)',
+            fontSize: 12,
+          }}>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Fills</div>
+              <div style={{ fontWeight: 600 }}>{slippageStats.n_fills}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Avg Slip</div>
+              <div style={{ fontWeight: 600, color: bpColor(slippageStats.avg_slip_bp) }}>
+                {fmtBp(slippageStats.avg_slip_bp)}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Median</div>
+              <div style={{ fontWeight: 600, color: bpColor(slippageStats.median_slip_bp) }}>
+                {fmtBp(slippageStats.median_slip_bp)}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>P95</div>
+              <div style={{ fontWeight: 600, color: bpColor(slippageStats.p95_slip_bp) }}>
+                {fmtBp(slippageStats.p95_slip_bp)}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Best</div>
+              <div style={{ fontWeight: 600, color: bpColor(slippageStats.min_slip_bp) }}>
+                {fmtBp(slippageStats.min_slip_bp)}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Worst</div>
+              <div style={{ fontWeight: 600, color: bpColor(slippageStats.max_slip_bp) }}>
+                {fmtBp(slippageStats.max_slip_bp)}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>$ Volume</div>
+              <div style={{ fontWeight: 600 }}>
+                ${slippageStats.dollar_volume.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Slip Cost</div>
+              <div style={{
+                fontWeight: 600,
+                color: slippageStats.realized_cost > 0 ? 'var(--red)' : 'var(--green)',
+              }}>
+                ${slippageStats.realized_cost.toFixed(2)}
+              </div>
+            </div>
+          </div>
+
+          {slippageByStrategy.length > 0 && (
+            <div style={{ borderBottom: '1px solid var(--border)' }}>
+              <div style={{
+                fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase',
+                letterSpacing: 0.5, padding: '8px 12px 4px',
+              }}>
+                By Strategy
+              </div>
+              <table className="analytics-table" style={{ marginBottom: 4 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: 'left' }}>Strategy</th>
+                    <th style={{ textAlign: 'right' }}>Fills</th>
+                    <th style={{ textAlign: 'right' }}>Avg</th>
+                    <th style={{ textAlign: 'right' }}>Median</th>
+                    <th style={{ textAlign: 'right' }}>Avg Buy</th>
+                    <th style={{ textAlign: 'right' }}>Avg Sell</th>
+                    <th style={{ textAlign: 'right' }}>Worst</th>
+                    <th style={{ textAlign: 'right' }}>$ Volume</th>
+                    <th style={{ textAlign: 'right' }}>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {slippageByStrategy.map((s) => (
+                    <tr key={s.strategy}>
+                      <td style={{ fontWeight: 700 }}>{s.strategy}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        {s.n}
+                        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                          {' '}({s.n_buys}b/{s.n_sells}s)
+                        </span>
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700, color: bpColor(s.avg_slip_bp) }}>
+                        {fmtBp(s.avg_slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right', color: bpColor(s.median_slip_bp) }}>
+                        {fmtBp(s.median_slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right', color: bpColor(s.avg_buy_slip_bp) }}>
+                        {fmtBp(s.avg_buy_slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right', color: bpColor(s.avg_sell_slip_bp) }}>
+                        {fmtBp(s.avg_sell_slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right', color: bpColor(s.max_slip_bp) }}>
+                        {fmtBp(s.max_slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        ${s.dollar_volume.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </td>
+                      <td style={{
+                        textAlign: 'right', fontWeight: 600,
+                        color: s.realized_cost > 0 ? 'var(--red)' : 'var(--green)',
+                      }}>
+                        ${s.realized_cost.toFixed(2)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {slippageRows.length > 0 && (
+            <div className="analytics-table-container">
+              <table className="analytics-table">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Ticker</th>
+                    <th>Strat</th>
+                    <th>Side</th>
+                    <th style={{ textAlign: 'right' }}>Signal</th>
+                    <th style={{ textAlign: 'right' }}>Fill</th>
+                    <th style={{ textAlign: 'right' }}>Slip BP</th>
+                    <th style={{ textAlign: 'right' }}>Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {slippageRows.map((r) => (
+                    <tr key={r.id}>
+                      <td>{new Date(r.timestamp).toLocaleTimeString()}</td>
+                      <td className="ticker-cell">{r.ticker}</td>
+                      <td>{r.strategy}</td>
+                      <td>{r.side.toUpperCase()}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        ${r.signal_price ? r.signal_price.toFixed(2) : '-'}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        ${r.fill_price ? r.fill_price.toFixed(2) : '-'}
+                      </td>
+                      <td style={{
+                        textAlign: 'right',
+                        fontWeight: 600,
+                        color: bpColor(r.slip_bp),
+                      }}>
+                        {fmtBp(r.slip_bp)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>{r.filled_qty}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+      {!slippageStats && !loading && <div className="empty-state">No slippage data for this date</div>}
+    </div>
+  );
+
   return (
     <div className="analytics-page">
       <div className="analytics-header">
@@ -502,6 +740,12 @@ export const Analytics = () => {
         >
           Watchlist
         </button>
+        <button
+          className={`tab-btn ${tab === 'slippage' ? 'active' : ''}`}
+          onClick={() => setTab('slippage')}
+        >
+          Slippage
+        </button>
       </div>
 
       <div className="analytics-content">
@@ -516,6 +760,7 @@ export const Analytics = () => {
             {tab === 'events' && renderEvents()}
             {tab === 'bars' && renderBars()}
             {tab === 'watchlist' && renderWatchlist()}
+            {tab === 'slippage' && renderSlippage()}
           </>
         )}
       </div>

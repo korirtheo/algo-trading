@@ -195,6 +195,103 @@ async def get_watchlist(date: str):
     return watchlist
 
 
+@router.get("/analytics/slippage/{date}")
+async def get_slippage_by_date(date: str):
+    """Get slippage data for a specific date."""
+    from statistics import median
+    from collections import defaultdict
+
+    try:
+        with db._conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, timestamp, order_id, ticker, strategy, side, event_type,
+                       signal_price, fill_price, filled_qty, slip_bp, status
+                FROM order_events
+                WHERE DATE(timestamp) = ? AND event_type IN ('fill', 'partial_fill')
+                      AND slip_bp IS NOT NULL
+                ORDER BY timestamp DESC
+            """, (date,))
+            rows = cursor.fetchall()
+
+        # Build result rows
+        result_rows = []
+        for row in rows:
+            result_rows.append({
+                "id": row[0],
+                "timestamp": row[1],
+                "order_id": row[2],
+                "ticker": row[3],
+                "strategy": row[4],
+                "side": row[5],
+                "event_type": row[6],
+                "signal_price": row[7],
+                "fill_price": row[8],
+                "filled_qty": row[9],
+                "slip_bp": row[10],
+                "status": row[11],
+                "dollar_amount": (row[8] or 0) * (row[9] or 0),
+            })
+
+        # Aggregate stats
+        slips = [r["slip_bp"] for r in result_rows if r["slip_bp"] is not None]
+        dollar_total = sum(r["dollar_amount"] for r in result_rows)
+        dollar_slip_cost = sum((r["slip_bp"] or 0) / 10_000 * r["dollar_amount"]
+                              for r in result_rows)
+
+        stats = {
+            "date": date,
+            "n_fills": len(result_rows),
+            "avg_slip_bp": (sum(slips) / len(slips)) if slips else None,
+            "median_slip_bp": median(slips) if slips else None,
+            "max_slip_bp": max(slips) if slips else None,
+            "min_slip_bp": min(slips) if slips else None,
+            "p95_slip_bp": (sorted(slips)[int(len(slips) * 0.95)] if len(slips) >= 20 else None),
+            "dollar_volume": dollar_total,
+            "realized_cost": dollar_slip_cost,
+        }
+
+        # Per-strategy breakdown
+        groups = defaultdict(list)
+        for r in result_rows:
+            groups[r["strategy"]].append(r)
+
+        by_strategy = []
+        for strat, items in groups.items():
+            s = [it["slip_bp"] for it in items if it["slip_bp"] is not None]
+            buys = [it for it in items if it["side"] == "buy"]
+            sells = [it for it in items if it["side"] == "sell"]
+            dvol = sum(it["dollar_amount"] for it in items)
+            cost = sum((it["slip_bp"] or 0) / 10_000 * it["dollar_amount"]
+                      for it in items)
+            by_strategy.append({
+                "strategy": strat,
+                "n": len(items),
+                "n_buys": len(buys),
+                "n_sells": len(sells),
+                "avg_slip_bp": sum(s) / len(s) if s else None,
+                "median_slip_bp": median(s) if s else None,
+                "min_slip_bp": min(s) if s else None,
+                "max_slip_bp": max(s) if s else None,
+                "avg_buy_slip_bp": (sum(it["slip_bp"] for it in buys) / len(buys)) if buys else None,
+                "avg_sell_slip_bp": (sum(it["slip_bp"] for it in sells) / len(sells)) if sells else None,
+                "dollar_volume": dvol,
+                "realized_cost": cost,
+            })
+
+        by_strategy.sort(key=lambda x: -x["dollar_volume"])
+
+        return {
+            "stats": stats,
+            "by_strategy": by_strategy,
+            "rows": result_rows,
+        }
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to get slippage: {e}")
+        return {"stats": {}, "by_strategy": [], "rows": []}
+
+
 @router.get("/analytics/trades/details/{date}")
 async def get_trade_details(date: str):
     """Get trades with execution details for a specific date."""
