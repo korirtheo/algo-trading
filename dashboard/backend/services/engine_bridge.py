@@ -447,22 +447,31 @@ class EngineBridge:
 
         return out
 
-    def get_slippage_data(self, limit=100):
-        """Get slippage data from the database for today's orders.
+    def get_slippage_data(self, limit=100, days_back=7):
+        """Get slippage data from the database for the last N days.
 
-        Queries the order_events table for all fills/partial_fills from today
-        with slippage data, computes aggregates by strategy, and returns recent rows.
+        Queries the order_events table for all fills/partial_fills from the last
+        N days (default 7) with slippage data, computes aggregates by strategy,
+        and returns recent rows. CSV is cleared daily for fresh start, but
+        database keeps all historical data.
         """
-        from datetime import date
+        from datetime import date, timedelta
         from statistics import median
         from collections import defaultdict
-
-        today = date.today().isoformat()
 
         try:
             from live.persistence_db import TradingDatabase
             db = TradingDatabase()
-            order_events = db.get_order_events_by_date(today)
+
+            # Query last N days of data
+            today = date.today().isoformat()
+            start_date = (date.today() - timedelta(days=days_back-1)).isoformat()
+
+            order_events = []
+            # Fetch each day's data
+            for i in range(days_back):
+                d = (date.today() - timedelta(days=i)).isoformat()
+                order_events.extend(db.get_order_events_by_date(d))
         except Exception as e:
             log.warning(f"get_slippage_data failed to read database: {e}")
             return {"stats": {}, "by_strategy": [], "rows": []}
