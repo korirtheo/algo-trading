@@ -218,13 +218,18 @@ class EngineBridge:
             return []
         trades = []
         for t in self.engine.trades_today:
+            shares = t.get("shares", 0)
+            entry_price = t.get("entry_price", 0)
+            deployed_amount = shares * entry_price if shares and entry_price else 0
             trades.append({
                 "ticker": t["ticker"],
                 "strategy": t.get("strategy", "?"),
-                "entry_price": t["entry_price"],
+                "entry_price": entry_price,
                 "exit_price": t["exit_price"],
+                "shares": shares,
+                "deployed_amount": deployed_amount,
                 "pnl": t["pnl"],
-                "pnl_pct": ((t["exit_price"] / t["entry_price"] - 1) * 100) if t["entry_price"] > 0 else 0,
+                "pnl_pct": ((t["exit_price"] / entry_price - 1) * 100) if entry_price > 0 else 0,
                 "reason": t["reason"],
                 "entry_time": str(t.get("entry_time", "")),
                 "exit_time": str(t.get("exit_time", "")),
@@ -443,65 +448,53 @@ class EngineBridge:
         return out
 
     def get_slippage_data(self, limit=100):
-        """Read logs/fills_calibration.csv and return last N rows + aggregates.
+        """Get slippage data from the database for today's orders.
 
-        Stage-1 calibration log written by OrderExecutor._reconcile_fill_async.
-        Each row is one terminal-status order (filled / partially_filled / etc).
+        Queries the order_events table for all fills/partial_fills from today
+        with slippage data, computes aggregates by strategy, and returns recent rows.
         """
-        import csv as _csv
-        import os as _os
+        from datetime import date
         from statistics import median
+        from collections import defaultdict
 
-        # File is engine_bridge.py at dashboard/backend/services/engine_bridge.py
-        # so we need 4 dirname()s to reach the project root, then logs/...
-        path = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
-            _os.path.dirname(_os.path.abspath(__file__))))), "logs", "fills_calibration.csv")
-        rows = []
-        if _os.path.exists(path):
-            try:
-                with open(path, newline="") as f:
-                    for r in _csv.DictReader(f):
-                        rows.append(r)
-            except Exception as e:
-                log.warning(f"get_slippage_data read failed: {e}")
+        today = date.today().isoformat()
 
-        # Parse numeric fields where present
-        def _f(s):
-            try:
-                return float(s) if s not in ("", None) else None
-            except Exception:
-                return None
+        try:
+            from live.persistence_db import TradingDatabase
+            db = TradingDatabase()
+            order_events = db.get_order_events_by_date(today)
+        except Exception as e:
+            log.warning(f"get_slippage_data failed to read database: {e}")
+            return {"stats": {}, "by_strategy": [], "rows": []}
 
+        # Clean order events: filter to fills with slippage data
         cleaned = []
-        for r in rows:
-            cleaned.append({
-                "ts_signal": r.get("ts_signal", ""),
-                "ts_fill": r.get("ts_fill", ""),
-                "ticker": r.get("ticker", ""),
-                "side": r.get("side", ""),
-                "strategy": r.get("strategy", ""),
-                "signal_price": _f(r.get("signal_price")),
-                "fill_price": _f(r.get("fill_price")),
-                "slip_bp": _f(r.get("slip_bp")),
-                "qty": _f(r.get("qty")),
-                "dollar_amount": _f(r.get("dollar_amount")),
-                "cum_dollar_vol": _f(r.get("cum_dollar_vol")),
-                "participation_rate": _f(r.get("participation_rate")),
-                "status": r.get("status", ""),
-                "order_id": r.get("order_id", ""),
-            })
+        for ev in order_events:
+            if ev.get("event_type") in ("fill", "partial_fill") and ev.get("slip_bp") is not None:
+                cleaned.append({
+                    "timestamp": ev.get("timestamp", ""),
+                    "order_id": ev.get("order_id", ""),
+                    "ticker": ev.get("ticker", ""),
+                    "side": ev.get("side", ""),
+                    "strategy": ev.get("strategy", "?"),
+                    "signal_price": ev.get("signal_price"),
+                    "fill_price": ev.get("fill_price"),
+                    "slip_bp": ev.get("slip_bp"),
+                    "filled_qty": ev.get("filled_qty"),
+                    "dollar_amount": ev.get("fill_price", 0) * ev.get("filled_qty", 0) if ev.get("fill_price") and ev.get("filled_qty") else 0,
+                    "cum_dollar_vol": ev.get("cum_dollar_vol"),
+                    "status": ev.get("status", ""),
+                })
 
-        # Compute aggregates over rows that actually filled with a slip value
-        filled = [r for r in cleaned if r["slip_bp"] is not None
-                  and r["status"] in ("filled", "partially_filled")]
-        slips = [r["slip_bp"] for r in filled]
-        dollar_total = sum(r["dollar_amount"] or 0.0 for r in filled)
+        # Compute aggregates
+        slips = [r["slip_bp"] for r in cleaned if r["slip_bp"] is not None]
+        dollar_total = sum(r["dollar_amount"] or 0.0 for r in cleaned)
         dollar_slip_cost = sum((r["slip_bp"] or 0) / 10_000 * (r["dollar_amount"] or 0)
-                                for r in filled)
+                                for r in cleaned)
 
         stats = {
-            "n_total": len(cleaned),
-            "n_filled": len(filled),
+            "n_total": len(order_events),
+            "n_filled": len(cleaned),
             "avg_slip_bp": (sum(slips) / len(slips)) if slips else None,
             "median_slip_bp": median(slips) if slips else None,
             "max_slip_bp": max(slips) if slips else None,
@@ -511,14 +504,14 @@ class EngineBridge:
             "realized_slip_cost": dollar_slip_cost,
         }
 
-        # Per-strategy breakdown — same metrics, grouped by `strategy` field.
-        from collections import defaultdict
+        # Per-strategy breakdown
         groups = defaultdict(list)
-        for r in filled:
+        for r in cleaned:
             groups[(r["strategy"] or "?")].append(r)
+
         by_strategy = []
         for strat, items in groups.items():
-            s = [it["slip_bp"] for it in items]
+            s = [it["slip_bp"] for it in items if it["slip_bp"] is not None]
             buys = [it for it in items if it["side"] == "buy"]
             sells = [it for it in items if it["side"] == "sell"]
             dvol = sum(it["dollar_amount"] or 0.0 for it in items)
@@ -529,10 +522,10 @@ class EngineBridge:
                 "n": len(items),
                 "n_buys": len(buys),
                 "n_sells": len(sells),
-                "avg_slip_bp": sum(s) / len(s),
-                "median_slip_bp": median(s),
-                "min_slip_bp": min(s),
-                "max_slip_bp": max(s),
+                "avg_slip_bp": sum(s) / len(s) if s else None,
+                "median_slip_bp": median(s) if s else None,
+                "min_slip_bp": min(s) if s else None,
+                "max_slip_bp": max(s) if s else None,
                 "avg_buy_slip_bp": (sum(it["slip_bp"] for it in buys) / len(buys)) if buys else None,
                 "avg_sell_slip_bp": (sum(it["slip_bp"] for it in sells) / len(sells)) if sells else None,
                 "dollar_volume": dvol,
@@ -558,7 +551,7 @@ class EngineBridge:
                 "tracking_count": 0,
             }
         return {
-            "active_position": self.engine.active_position,
+            "active_position": list(self.engine.active_positions)[0] if self.engine.active_positions else None,
             "daily_pnl": self.engine.daily_pnl,
             "trades_count": len(self.engine.trades_today),
             "wins": sum(1 for t in self.engine.trades_today if t["pnl"] > 0),

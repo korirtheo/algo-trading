@@ -38,6 +38,7 @@ from config.settings import (
 )
 
 import test_green_candle_combined as tgc
+from live.persistence_db import TradingDatabase
 
 
 def _resolve_bracket_stop_pct(strategy_code):
@@ -83,10 +84,12 @@ _TERMINAL_STATUSES = {"filled", "partially_filled", "canceled", "expired", "reje
 
 
 def _ensure_fill_log_header():
+    """Clear the fills_calibration.csv for a fresh start each day.
+    All data is now stored in the database via log_order_event.
+    """
     os.makedirs(os.path.dirname(_FILL_LOG_PATH), exist_ok=True)
-    if not os.path.exists(_FILL_LOG_PATH):
-        with open(_FILL_LOG_PATH, "w", newline="") as f:
-            csv.DictWriter(f, fieldnames=_FILL_LOG_FIELDS).writeheader()
+    with open(_FILL_LOG_PATH, "w", newline="") as f:
+        csv.DictWriter(f, fieldnames=_FILL_LOG_FIELDS).writeheader()
 
 
 class OrderExecutor:
@@ -94,6 +97,7 @@ class OrderExecutor:
         self.client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
         self.positions = {}  # ticker -> position info
         self.pending_orders = {}  # ticker -> order info
+        self.db = TradingDatabase()
         _ensure_fill_log_header()
 
     def _reconcile_fill_async(self, order_id, ticker, side, signal_price,
@@ -164,6 +168,26 @@ class OrderExecutor:
             with _FILL_LOG_LOCK:
                 with open(_FILL_LOG_PATH, "a", newline="") as f:
                     csv.DictWriter(f, fieldnames=_FILL_LOG_FIELDS).writerow(row)
+
+            # Log order event to database (fill or terminal status)
+            event_type = 'fill' if status == 'filled' else 'partial_fill' if status == 'partially_filled' else status
+            try:
+                self.db.log_order_event(
+                    order_id=str(order_id),
+                    ticker=ticker,
+                    strategy=strategy,
+                    side=side,
+                    event_type=event_type,
+                    signal_price=signal_price,
+                    fill_price=fill_price,
+                    filled_qty=filled_qty,
+                    slip_bp=slip_bp,
+                    status=status,
+                    cum_dollar_vol=cum_dollar_vol
+                )
+            except Exception as e:
+                log.error(f"Failed to log order event to DB: {e}")
+
             # Stash the real fill on the executor's position record so future
             # consumers (dashboard, EOD report) can pick it up.
             if ticker in self.positions and fill_price is not None:
@@ -375,6 +399,22 @@ class OrderExecutor:
                 "bracket_stop": bracket_stop if LIVE_BRACKET_ORDERS else None,
                 "bracket_target": bracket_target if LIVE_BRACKET_ORDERS else None,
             }
+
+            # Log order placed event to database
+            try:
+                self.db.log_order_event(
+                    order_id=str(order.id),
+                    ticker=ticker,
+                    strategy=strategy,
+                    side='buy',
+                    event_type='placed',
+                    signal_price=current_price,
+                    qty=shares,
+                    cum_dollar_vol=cumulative_dollar_volume
+                )
+            except Exception as e:
+                log.error(f"Failed to log order placed event: {e}")
+
             # Stage-1 calibration: background poll for the fill, append row
             # to logs/fills_calibration.csv. Doesn't change live behavior.
             self._reconcile_fill_async(
@@ -484,6 +524,21 @@ class OrderExecutor:
                         )
                     )
                     log.info(f"SELL {ticker}: {sell_qty} shares ({reason}) | order_id={order.id}")
+
+            # Log order placed event to database
+            try:
+                self.db.log_order_event(
+                    order_id=str(order.id),
+                    ticker=ticker,
+                    strategy=strategy or reason,
+                    side='sell',
+                    event_type='placed',
+                    signal_price=signal_price,
+                    qty=shares,
+                    cum_dollar_vol=cumulative_dollar_volume
+                )
+            except Exception as ex:
+                log.error(f"Failed to log sell order placed event: {ex}")
 
             # Stage-1 calibration row for the sell leg.
             if signal_price is not None:
