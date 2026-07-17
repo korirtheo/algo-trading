@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { api } from '../api/client';
 import { usePolling } from '../hooks/usePolling';
 import { strategyColor } from './StrategyTag';
@@ -9,10 +10,16 @@ const STATUS_LABEL: Record<string, string> = {
   not_eligible: 'Not Eligible',
 };
 
+const ITEMS_PER_PAGE = 10;
+
 export function Diagnostics() {
   const { data: items } = usePolling(api.diagnostics, 5000);
+  const [page, setPage] = useState(0);
 
   if (!items || items.length === 0) return null;
+
+  const totalPages = Math.ceil(items.length / ITEMS_PER_PAGE);
+  const paginatedItems = items.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 
   return (
     <div className="card animate-in" style={{ gridColumn: '1 / -1' }}>
@@ -45,7 +52,7 @@ export function Diagnostics() {
             </tr>
           </thead>
           <tbody>
-            {items.map((item) => (
+            {paginatedItems.map((item) => (
               <tr key={item.ticker}>
                 <td style={{ fontWeight: 700 }}>
                   {item.ticker}
@@ -107,6 +114,48 @@ export function Diagnostics() {
           </tbody>
         </table>
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Page {page + 1} of {totalPages} ({items.length} items)
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setPage(Math.max(0, page - 1))}
+              disabled={page === 0}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 4,
+                border: '1px solid var(--border)',
+                background: page === 0 ? 'var(--bg-card)' : 'var(--bg-elevated)',
+                color: page === 0 ? 'var(--text-muted)' : 'var(--text-primary)',
+                cursor: page === 0 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+              disabled={page === totalPages - 1}
+              style={{
+                padding: '4px 12px',
+                fontSize: 12,
+                fontWeight: 600,
+                borderRadius: 4,
+                border: '1px solid var(--border)',
+                background: page === totalPages - 1 ? 'var(--bg-card)' : 'var(--bg-elevated)',
+                color: page === totalPages - 1 ? 'var(--text-muted)' : 'var(--text-primary)',
+                cursor: page === totalPages - 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

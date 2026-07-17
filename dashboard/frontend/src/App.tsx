@@ -8,10 +8,14 @@ import { StrategyPanel } from './components/StrategyPanel';
 import { Diagnostics } from './components/Diagnostics';
 import { HaltMonitor } from './components/HaltMonitor';
 import { Slippage } from './components/Slippage';
+import { Analytics } from './components/Analytics';
 import { useWebSocket } from './hooks/useWebSocket';
+
+type Page = 'dashboard' | 'analytics';
 
 function App() {
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [page, setPage] = useState<Page>('dashboard');
   const { connected } = useWebSocket('/ws/live');
 
   return (
@@ -22,6 +26,20 @@ function App() {
           <div className="logo-mark" />
           <span className="logo-text">AlgoTrader</span>
           <span className="badge badge-mode">PAPER</span>
+          <nav className="page-nav">
+            <button
+              className={`page-nav-btn ${page === 'dashboard' ? 'active' : ''}`}
+              onClick={() => setPage('dashboard')}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`page-nav-btn ${page === 'analytics' ? 'active' : ''}`}
+              onClick={() => setPage('analytics')}
+            >
+              Analytics
+            </button>
+          </nav>
         </div>
         <div className="top-bar-right">
           <div className="connection-status">
@@ -36,32 +54,38 @@ function App() {
         </div>
       </header>
 
-      {/* ─── Dashboard Grid ─── */}
+      {/* ─── Dashboard Grid or Analytics Page ─── */}
       <main className="dashboard-main">
-        <PortfolioHeader />
+        {page === 'dashboard' ? (
+          <>
+            <PortfolioHeader />
 
-        <div className="row-chart-watch">
-          <Chart symbol={selectedSymbol} />
-          <Watchlist onSelectSymbol={setSelectedSymbol} selectedSymbol={selectedSymbol} />
-        </div>
+            <div className="row-chart-watch">
+              <Chart symbol={selectedSymbol} />
+              <Watchlist onSelectSymbol={setSelectedSymbol} selectedSymbol={selectedSymbol} />
+            </div>
 
-        <div className="row-bottom">
-          <Positions />
-          <TradeLog />
-          <StrategyPanel />
-        </div>
+            <div className="row-bottom">
+              <Positions />
+              <TradeLog />
+              <StrategyPanel />
+            </div>
 
-        <div className="row-diagnostics">
-          <Diagnostics />
-        </div>
+            <div className="row-diagnostics">
+              <Diagnostics />
+            </div>
 
-        <div className="row-diagnostics">
-          <HaltMonitor />
-        </div>
+            <div className="row-diagnostics">
+              <HaltMonitor />
+            </div>
 
-        <div className="row-diagnostics">
-          <Slippage />
-        </div>
+            <div className="row-diagnostics">
+              <Slippage />
+            </div>
+          </>
+        ) : (
+          <Analytics />
+        )}
       </main>
     </div>
   );

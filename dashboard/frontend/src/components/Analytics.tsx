@@ -1,0 +1,524 @@
+import { useState, useEffect } from 'react';
+import { fetchJSON } from '../api/client';
+
+type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist';
+
+interface Signal {
+  id: number;
+  date: string;
+  ticker: string;
+  strategy: string;
+  signal_price: number;
+  action: string;
+  reason: string | null;
+  order_id: string | null;
+  gap_pct: number | null;
+}
+
+interface OrderEvent {
+  id: number;
+  timestamp: string;
+  order_id: string;
+  ticker: string;
+  strategy: string;
+  side: string;
+  event_type: string;
+  signal_price: number | null;
+  fill_price: number | null;
+  filled_qty: number | null;
+  slip_bp: number | null;
+  status: string | null;
+}
+
+interface AccountSnapshot {
+  id: number;
+  timestamp: string;
+  snapshot_type: string;
+  cash: number;
+  equity: number;
+  buying_power: number;
+  portfolio_value: number;
+  daily_pnl: number | null;
+  trades_count: number | null;
+  positions_count: number | null;
+}
+
+interface SystemEvent {
+  id: number;
+  timestamp: string;
+  event_type: string;
+  severity: string;
+  message: string;
+  details: string | null;
+}
+
+interface BarSummary {
+  id: number;
+  date: string;
+  ticker: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  vwap: number | null;
+  bar_count: number;
+}
+
+interface WatchlistItem {
+  id: number;
+  date: string;
+  ticker: string;
+  gap_pct: number | null;
+  pm_volume: number | null;
+  float_shares: number | null;
+  scan_time: string;
+}
+
+interface TradeDetail {
+  id: number;
+  ticker: string;
+  strategy: string;
+  entry_price: number;
+  exit_price: number;
+  shares: number;
+  pnl: number;
+  pnl_pct: number;
+  reason: string;
+  entry_time: string;
+  exit_time: string;
+  deployed_amount: number | null;
+  stop_price: number | null;
+  target_price: number | null;
+  peak_price: number | null;
+  trail_pct: number | null;
+  time_limit_min: number | null;
+  hold_time_min: number | null;
+}
+
+export const Analytics = () => {
+  const [tab, setTab] = useState<Tab>('trades');
+  const [date, setDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+
+  const [tradeDetails, setTradeDetails] = useState<TradeDetail[]>([]);
+  const [signals, setSignals] = useState<Signal[]>([]);
+  const [orders, setOrders] = useState<OrderEvent[]>([]);
+  const [snapshots, setSnapshots] = useState<AccountSnapshot[]>([]);
+  const [events, setEvents] = useState<SystemEvent[]>([]);
+  const [bars, setBars] = useState<BarSummary[]>([]);
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    loadData();
+  }, [tab, date]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      switch (tab) {
+        case 'trades':
+          const tradesData = await fetchJSON<TradeDetail[]>(`/api/analytics/trades/details/${date}`);
+          setTradeDetails(tradesData);
+          break;
+        case 'signals':
+          const signalsData = await fetchJSON<Signal[]>(`/api/analytics/signals/${date}`);
+          setSignals(signalsData);
+          break;
+        case 'orders':
+          const ordersData = await fetchJSON<OrderEvent[]>(`/api/analytics/orders/${date}`);
+          setOrders(ordersData);
+          break;
+        case 'snapshots':
+          const snapshotsData = await fetchJSON<AccountSnapshot[]>(`/api/analytics/snapshots/${date}`);
+          setSnapshots(snapshotsData);
+          break;
+        case 'events':
+          const eventsData = await fetchJSON<SystemEvent[]>(`/api/analytics/events/${date}`);
+          setEvents(eventsData);
+          break;
+        case 'bars':
+          const barsData = await fetchJSON<BarSummary[]>(`/api/analytics/bars/${date}`);
+          setBars(barsData);
+          break;
+        case 'watchlist':
+          const watchlistData = await fetchJSON<WatchlistItem[]>(`/api/analytics/watchlist/${date}`);
+          setWatchlist(watchlistData);
+          break;
+      }
+    } catch (err) {
+      console.error('Failed to load analytics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const changeDate = (offset: number) => {
+    const d = new Date(date);
+    d.setDate(d.getDate() + offset);
+    setDate(d.toISOString().split('T')[0]);
+  };
+
+  const renderTradeDetails = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Entry Time</th>
+            <th>Ticker</th>
+            <th>Strat</th>
+            <th>Entry $</th>
+            <th>Exit $</th>
+            <th>Peak $</th>
+            <th>Stop $</th>
+            <th>Target $</th>
+            <th>Trail %</th>
+            <th>Time Limit</th>
+            <th>Hold Time</th>
+            <th>Shares</th>
+            <th>Deployed</th>
+            <th>P&L</th>
+            <th>P&L %</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tradeDetails.map((t) => {
+            const pnlClass = t.pnl > 0 ? 'positive' : t.pnl < 0 ? 'negative' : '';
+            const peakAboveTarget = t.peak_price && t.target_price && t.peak_price >= t.target_price;
+            const exitBelowStop = t.exit_price && t.stop_price && t.exit_price <= t.stop_price;
+            return (
+              <tr key={t.id}>
+                <td>{new Date(t.entry_time).toLocaleTimeString()}</td>
+                <td className="ticker-cell">{t.ticker}</td>
+                <td>{t.strategy}</td>
+                <td>${t.entry_price.toFixed(2)}</td>
+                <td className={pnlClass}>${t.exit_price.toFixed(2)}</td>
+                <td className={peakAboveTarget ? 'positive' : ''}>
+                  {t.peak_price ? `$${t.peak_price.toFixed(2)}` : '-'}
+                </td>
+                <td className={exitBelowStop ? 'negative' : ''}>
+                  {t.stop_price ? `$${t.stop_price.toFixed(2)}` : '-'}
+                </td>
+                <td>{t.target_price ? `$${t.target_price.toFixed(2)}` : '-'}</td>
+                <td>{t.trail_pct !== null ? `${t.trail_pct.toFixed(1)}%` : '-'}</td>
+                <td>{t.time_limit_min ? `${t.time_limit_min}m` : '-'}</td>
+                <td>{t.hold_time_min ? `${t.hold_time_min.toFixed(1)}m` : '-'}</td>
+                <td>{t.shares}</td>
+                <td>{t.deployed_amount ? `$${t.deployed_amount.toFixed(0)}` : '-'}</td>
+                <td className={pnlClass}>{t.pnl >= 0 ? '+' : ''}${t.pnl.toFixed(2)}</td>
+                <td className={pnlClass}>{t.pnl_pct >= 0 ? '+' : ''}{t.pnl_pct.toFixed(1)}%</td>
+                <td style={{ fontSize: 11 }}>{t.reason}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {tradeDetails.length === 0 && !loading && <div className="empty-state">No trades for this date</div>}
+    </div>
+  );
+
+  const renderSignals = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Ticker</th>
+            <th>Strategy</th>
+            <th>Price</th>
+            <th>Gap%</th>
+            <th>Action</th>
+            <th>Reason</th>
+            <th>Order ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {signals.map((s) => (
+            <tr key={s.id}>
+              <td>{new Date(s.date).toLocaleTimeString()}</td>
+              <td className="ticker-cell">{s.ticker}</td>
+              <td>{s.strategy}</td>
+              <td>${s.signal_price.toFixed(2)}</td>
+              <td className={s.gap_pct && s.gap_pct > 0 ? 'positive' : ''}>{s.gap_pct?.toFixed(1)}%</td>
+              <td>
+                <span className={`badge ${s.action === 'TAKEN' ? 'badge-success' : 'badge-warning'}`}>
+                  {s.action}
+                </span>
+              </td>
+              <td>{s.reason || '-'}</td>
+              <td className="order-id-cell">{s.order_id || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {signals.length === 0 && !loading && <div className="empty-state">No signals for this date</div>}
+    </div>
+  );
+
+  const renderOrders = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Order ID</th>
+            <th>Ticker</th>
+            <th>Strategy</th>
+            <th>Side</th>
+            <th>Event</th>
+            <th>Signal $</th>
+            <th>Fill $</th>
+            <th>Qty</th>
+            <th>Slip (bp)</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {orders.map((o) => (
+            <tr key={o.id}>
+              <td>{new Date(o.timestamp).toLocaleTimeString()}</td>
+              <td className="order-id-cell">{o.order_id.substring(0, 8)}...</td>
+              <td className="ticker-cell">{o.ticker}</td>
+              <td>{o.strategy}</td>
+              <td className={o.side === 'buy' ? 'positive' : 'negative'}>{o.side.toUpperCase()}</td>
+              <td>{o.event_type}</td>
+              <td>{o.signal_price ? `$${o.signal_price.toFixed(2)}` : '-'}</td>
+              <td>{o.fill_price ? `$${o.fill_price.toFixed(2)}` : '-'}</td>
+              <td>{o.filled_qty || '-'}</td>
+              <td className={o.slip_bp && o.slip_bp > 0 ? 'negative' : o.slip_bp ? 'positive' : ''}>
+                {o.slip_bp !== null ? o.slip_bp.toFixed(1) : '-'}
+              </td>
+              <td>{o.status || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {orders.length === 0 && !loading && <div className="empty-state">No order events for this date</div>}
+    </div>
+  );
+
+  const renderSnapshots = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Equity</th>
+            <th>Cash</th>
+            <th>Buying Power</th>
+            <th>Portfolio Value</th>
+            <th>Daily P&L</th>
+            <th>Trades</th>
+            <th>Positions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {snapshots.map((s) => (
+            <tr key={s.id}>
+              <td>{new Date(s.timestamp).toLocaleTimeString()}</td>
+              <td>{s.snapshot_type}</td>
+              <td className="positive">${s.equity.toLocaleString()}</td>
+              <td>${s.cash.toLocaleString()}</td>
+              <td>${s.buying_power.toLocaleString()}</td>
+              <td>${s.portfolio_value.toLocaleString()}</td>
+              <td className={s.daily_pnl && s.daily_pnl > 0 ? 'positive' : s.daily_pnl && s.daily_pnl < 0 ? 'negative' : ''}>
+                {s.daily_pnl !== null ? `$${s.daily_pnl.toFixed(2)}` : '-'}
+              </td>
+              <td>{s.trades_count ?? '-'}</td>
+              <td>{s.positions_count ?? '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {snapshots.length === 0 && !loading && <div className="empty-state">No snapshots for this date</div>}
+    </div>
+  );
+
+  const renderEvents = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Type</th>
+            <th>Severity</th>
+            <th>Message</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          {events.map((e) => (
+            <tr key={e.id}>
+              <td>{new Date(e.timestamp).toLocaleTimeString()}</td>
+              <td>{e.event_type}</td>
+              <td>
+                <span className={`badge ${
+                  e.severity === 'critical' ? 'badge-error' :
+                  e.severity === 'warning' ? 'badge-warning' :
+                  'badge-info'
+                }`}>
+                  {e.severity.toUpperCase()}
+                </span>
+              </td>
+              <td>{e.message}</td>
+              <td className="details-cell">{e.details || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {events.length === 0 && !loading && <div className="empty-state">No system events for this date</div>}
+    </div>
+  );
+
+  const renderBars = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Ticker</th>
+            <th>Open</th>
+            <th>High</th>
+            <th>Low</th>
+            <th>Close</th>
+            <th>Volume</th>
+            <th>VWAP</th>
+            <th>Bars</th>
+          </tr>
+        </thead>
+        <tbody>
+          {bars.map((b) => (
+            <tr key={b.id}>
+              <td className="ticker-cell">{b.ticker}</td>
+              <td>${b.open.toFixed(2)}</td>
+              <td>${b.high.toFixed(2)}</td>
+              <td>${b.low.toFixed(2)}</td>
+              <td className={b.close > b.open ? 'positive' : b.close < b.open ? 'negative' : ''}>
+                ${b.close.toFixed(2)}
+              </td>
+              <td>{b.volume.toLocaleString()}</td>
+              <td>{b.vwap ? `$${b.vwap.toFixed(2)}` : '-'}</td>
+              <td>{b.bar_count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {bars.length === 0 && !loading && <div className="empty-state">No bar summaries for this date</div>}
+    </div>
+  );
+
+  const renderWatchlist = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Scan Time</th>
+            <th>Ticker</th>
+            <th>Gap%</th>
+            <th>PM Volume</th>
+            <th>Float</th>
+          </tr>
+        </thead>
+        <tbody>
+          {watchlist.map((w) => (
+            <tr key={w.id}>
+              <td>{new Date(w.scan_time).toLocaleTimeString()}</td>
+              <td className="ticker-cell">{w.ticker}</td>
+              <td className={w.gap_pct && w.gap_pct > 0 ? 'positive' : ''}>
+                {w.gap_pct !== null ? `${w.gap_pct.toFixed(1)}%` : '-'}
+              </td>
+              <td>{w.pm_volume !== null ? w.pm_volume.toLocaleString() : '-'}</td>
+              <td>{w.float_shares !== null ? `${(w.float_shares / 1e6).toFixed(1)}M` : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {watchlist.length === 0 && !loading && <div className="empty-state">No watchlist for this date</div>}
+    </div>
+  );
+
+  return (
+    <div className="analytics-page">
+      <div className="analytics-header">
+        <div className="analytics-title">
+          <h2>Analytics & Database</h2>
+        </div>
+        <div className="date-nav">
+          <button onClick={() => changeDate(-1)} className="nav-btn">←</button>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="date-input"
+          />
+          <button onClick={() => changeDate(1)} className="nav-btn">→</button>
+        </div>
+      </div>
+
+      <div className="analytics-tabs">
+        <button
+          className={`tab-btn ${tab === 'trades' ? 'active' : ''}`}
+          onClick={() => setTab('trades')}
+        >
+          Trade Details
+        </button>
+        <button
+          className={`tab-btn ${tab === 'signals' ? 'active' : ''}`}
+          onClick={() => setTab('signals')}
+        >
+          Signals
+        </button>
+        <button
+          className={`tab-btn ${tab === 'orders' ? 'active' : ''}`}
+          onClick={() => setTab('orders')}
+        >
+          Orders
+        </button>
+        <button
+          className={`tab-btn ${tab === 'snapshots' ? 'active' : ''}`}
+          onClick={() => setTab('snapshots')}
+        >
+          Snapshots
+        </button>
+        <button
+          className={`tab-btn ${tab === 'events' ? 'active' : ''}`}
+          onClick={() => setTab('events')}
+        >
+          System Events
+        </button>
+        <button
+          className={`tab-btn ${tab === 'bars' ? 'active' : ''}`}
+          onClick={() => setTab('bars')}
+        >
+          Bar Summaries
+        </button>
+        <button
+          className={`tab-btn ${tab === 'watchlist' ? 'active' : ''}`}
+          onClick={() => setTab('watchlist')}
+        >
+          Watchlist
+        </button>
+      </div>
+
+      <div className="analytics-content">
+        {loading ? (
+          <div className="loading-state">Loading...</div>
+        ) : (
+          <>
+            {tab === 'trades' && renderTradeDetails()}
+            {tab === 'signals' && renderSignals()}
+            {tab === 'orders' && renderOrders()}
+            {tab === 'snapshots' && renderSnapshots()}
+            {tab === 'events' && renderEvents()}
+            {tab === 'bars' && renderBars()}
+            {tab === 'watchlist' && renderWatchlist()}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};

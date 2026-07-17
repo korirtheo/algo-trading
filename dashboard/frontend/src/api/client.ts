@@ -156,6 +156,7 @@ export const api = {
   positions: () => fetchJSON<Position[]>('/api/positions'),
   watchlist: () => fetchJSON<WatchlistItem[]>('/api/watchlist'),
   trades: () => fetchJSON<Trade[]>('/api/trades/today'),
+  tradesByDate: (date: string) => fetchJSON<{trades: Trade[], date: string, found: boolean}>(`/api/trades/${date}`),
   strategies: () => fetchJSON<StrategyInfo[]>('/api/strategies'),
   strategyConfig: () => fetchJSON<StrategyConfig[]>('/api/strategies/config'),
   chart: (symbol: string) => fetchJSON<ChartData>(`/api/charts/${symbol}`),
