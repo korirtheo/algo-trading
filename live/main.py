@@ -472,14 +472,17 @@ def _run_one_day(executor, args, log):
     if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
         wait_until(dt_time(9, 30), log)
 
-    # Phase 5: Start bar stream
-    log.info("Starting bar stream")
+    # Phase 5: Start bar streams (Tradier primary + Alpaca IEX for comparison)
+    log.info("Starting bar streams")
     symbols = [c["ticker"] for c in candidates]
+
+    # Feed comparison logger — writes to feed_comparison DB table
+    from live.feed_logger import FeedLogger, SOURCE_TRADIER, SOURCE_ALPACA_IEX
+    feed_logger = FeedLogger(engine.db)
 
     def on_bar_with_ws(symbol, bar):
         """Process bar in engine AND broadcast to dashboard."""
         engine.on_bar(symbol, bar)
-        # Broadcast to WebSocket clients
         try:
             from dashboard.backend.services.ws_manager import ws_manager
             ws_manager.broadcast_sync({
@@ -490,11 +493,52 @@ def _run_one_day(executor, args, log):
         except Exception:
             pass
 
-    streamer = BarStreamer(on_2min_bar=on_bar_with_ws if not args.no_dash else engine.on_bar)
-    streamer.subscribe(symbols)
-    stream_thread = streamer.start_async()
+    def on_tradier_bar(symbol, bar):
+        """Tradier bar: drives the engine + log for comparison."""
+        feed_logger.log(SOURCE_TRADIER, symbol, bar)
+        on_bar_with_ws(symbol, bar) if not args.no_dash else engine.on_bar(symbol, bar)
 
-    log.info("Streaming... waiting for signals")
+    def on_alpaca_bar(symbol, bar):
+        """Alpaca IEX bar: comparison logging only (no engine calls)."""
+        feed_logger.log(SOURCE_ALPACA_IEX, symbol, bar)
+
+    # Primary feed: Tradier (SIP-level real-time)
+    tradier_streamer = None
+    from config.settings import TRADIER_API_KEY
+    try:
+        from live.tradier_streamer import TradierStreamer
+        tradier_streamer = TradierStreamer(api_key=TRADIER_API_KEY, on_2min_bar=on_tradier_bar)
+        tradier_streamer.subscribe(symbols)
+        tradier_stream_thread = tradier_streamer.start_async()
+        log.info("TradierStreamer: started as primary data feed")
+    except Exception as e:
+        log.error(f"TradierStreamer failed to start, falling back to Alpaca IEX as primary: {e}")
+        tradier_streamer = None
+
+    # Secondary feed: Alpaca IEX — comparison logging only when Tradier is up,
+    # or primary engine feed when Tradier is unavailable.
+    if tradier_streamer is not None:
+        alpaca_streamer = BarStreamer(on_2min_bar=on_alpaca_bar)
+    else:
+        alpaca_streamer = BarStreamer(on_2min_bar=on_bar_with_ws if not args.no_dash else engine.on_bar)
+        log.warning("Tradier unavailable — Alpaca IEX is driving the engine (volume caps unreliable)")
+
+    # Keep `streamer` pointing at whichever streamer owns the engine feed
+    # (halt-resume monitor calls streamer.add_symbol)
+    streamer = tradier_streamer if tradier_streamer is not None else alpaca_streamer
+
+    alpaca_streamer.subscribe(symbols)
+    stream_thread = alpaca_streamer.start_async()
+
+    # Tag the engine with which feed is driving it
+    if tradier_streamer is not None:
+        engine.active_feed = "tradier"
+        engine.feed_fallback = False
+    else:
+        engine.active_feed = "alpaca_iex"
+        engine.feed_fallback = True
+
+    log.info("Streaming... waiting for signals (primary feed: %s)", engine.active_feed)
 
     # Phase 5b: Halt-resume monitor (intraday discovery channel)
     halt_monitor = None
@@ -529,6 +573,9 @@ def _run_one_day(executor, args, log):
                 added = engine.on_intraday_addition(ticker, ev, source="halt_resume")
                 if added:
                     streamer.add_symbol(ticker)
+                    # Also subscribe Alpaca IEX side for comparison logging
+                    if tradier_streamer is not None:
+                        alpaca_streamer.add_symbol(ticker)
                     if not args.no_dash:
                         try:
                             from dashboard.backend.app import bridge

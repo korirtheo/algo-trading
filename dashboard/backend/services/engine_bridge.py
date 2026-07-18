@@ -567,4 +567,6 @@ class EngineBridge:
             "losses": sum(1 for t in self.engine.trades_today if t["pnl"] <= 0),
             "candidates_count": len(self.scanner_candidates),
             "tracking_count": len(self.engine.last_states) if self.engine else 0,
+            "active_feed": getattr(self.engine, "active_feed", "unknown"),
+            "feed_fallback": getattr(self.engine, "feed_fallback", False),
         }

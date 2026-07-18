@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchJSON } from '../api/client';
 
-type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage';
+type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage' | 'feed_comparison';
 
 interface Signal {
   id: number;
@@ -139,6 +139,23 @@ interface SlippageRow {
   dollar_amount: number;
 }
 
+interface FeedComparisonRow {
+  bar_time: string;
+  ticker: string;
+  tradier_open: number | null;
+  tradier_high: number | null;
+  tradier_low: number | null;
+  tradier_close: number | null;
+  tradier_volume: number | null;
+  alpaca_open: number | null;
+  alpaca_high: number | null;
+  alpaca_low: number | null;
+  alpaca_close: number | null;
+  alpaca_volume: number | null;
+  close_diff_bp: number | null;
+  vol_diff_pct: number | null;
+}
+
 export const Analytics = () => {
   const [tab, setTab] = useState<Tab>('trades');
   const [date, setDate] = useState(() => {
@@ -156,6 +173,7 @@ export const Analytics = () => {
   const [slippageStats, setSlippageStats] = useState<SlippageStats | null>(null);
   const [slippageByStrategy, setSlippageByStrategy] = useState<SlippageByStrategy[]>([]);
   const [slippageRows, setSlippageRows] = useState<SlippageRow[]>([]);
+  const [feedComparison, setFeedComparison] = useState<FeedComparisonRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -199,6 +217,10 @@ export const Analytics = () => {
           setSlippageStats(slippageData.stats);
           setSlippageByStrategy(slippageData.by_strategy);
           setSlippageRows(slippageData.rows);
+          break;
+        case 'feed_comparison':
+          const feedData = await fetchJSON<FeedComparisonRow[]>(`/api/analytics/feed_comparison/${date}`);
+          setFeedComparison(feedData);
           break;
       }
     } catch (err) {
@@ -679,6 +701,107 @@ export const Analytics = () => {
     </div>
   );
 
+  const renderFeedComparison = () => {
+    const fmtBp = (v: number | null) => v !== null ? `${v > 0 ? '+' : ''}${v.toFixed(1)} bp` : '-';
+    const fmtPct = (v: number | null) => v !== null ? `${v > 0 ? '+' : ''}${v.toFixed(1)}%` : '-';
+    const bpColor = (v: number | null) => {
+      if (v === null) return undefined;
+      const abs = Math.abs(v);
+      if (abs > 50) return 'var(--red)';
+      if (abs > 20) return '#f59e0b';
+      return 'var(--green)';
+    };
+
+    // Summary stats
+    const rows = feedComparison;
+    const bothPresent = rows.filter(r => r.tradier_close !== null && r.alpaca_close !== null);
+    const tradierOnly = rows.filter(r => r.tradier_close !== null && r.alpaca_close === null);
+    const alpacaOnly = rows.filter(r => r.tradier_close === null && r.alpaca_close !== null);
+    const diffs = bothPresent.map(r => r.close_diff_bp).filter((v): v is number => v !== null);
+    const avgDiff = diffs.length ? diffs.reduce((a, b) => a + b, 0) / diffs.length : null;
+    const absDiffs = diffs.map(Math.abs);
+    const avgAbsDiff = absDiffs.length ? absDiffs.reduce((a, b) => a + b, 0) / absDiffs.length : null;
+
+    return (
+      <div className="analytics-table-container">
+        {rows.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 24, padding: '10px 12px', flexWrap: 'wrap',
+            borderBottom: '1px solid var(--border)', fontSize: 12, marginBottom: 8,
+          }}>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Total Bars </span>
+              <strong>{rows.length}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Both Sources </span>
+              <strong>{bothPresent.length}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Tradier Only </span>
+              <strong style={{ color: tradierOnly.length > 0 ? '#f59e0b' : undefined }}>{tradierOnly.length}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Alpaca Only </span>
+              <strong style={{ color: alpacaOnly.length > 0 ? '#f59e0b' : undefined }}>{alpacaOnly.length}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Avg Close Diff </span>
+              <strong style={{ color: bpColor(avgDiff) }}>{fmtBp(avgDiff !== null ? Math.round(avgDiff * 10) / 10 : null)}</strong>
+            </div>
+            <div>
+              <span style={{ color: 'var(--text-muted)' }}>Avg |Diff| </span>
+              <strong style={{ color: bpColor(avgAbsDiff !== null ? avgAbsDiff : null) }}>{fmtBp(avgAbsDiff !== null ? Math.round(avgAbsDiff * 10) / 10 : null)}</strong>
+            </div>
+          </div>
+        )}
+        <table className="analytics-table">
+          <thead>
+            <tr>
+              <th>Bar Time</th>
+              <th>Ticker</th>
+              <th style={{ textAlign: 'right' }}>Tradier Close</th>
+              <th style={{ textAlign: 'right' }}>Tradier Vol</th>
+              <th style={{ textAlign: 'right' }}>Alpaca Close</th>
+              <th style={{ textAlign: 'right' }}>Alpaca Vol</th>
+              <th style={{ textAlign: 'right' }}>Close Δ (bp)</th>
+              <th style={{ textAlign: 'right' }}>Vol Δ (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i}>
+                <td>{r.bar_time}</td>
+                <td className="ticker-cell">{r.ticker}</td>
+                <td style={{ textAlign: 'right' }}>
+                  {r.tradier_close !== null ? `$${r.tradier_close.toFixed(2)}` : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  {r.tradier_volume !== null ? r.tradier_volume.toLocaleString() : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  {r.alpaca_close !== null ? `$${r.alpaca_close.toFixed(2)}` : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  {r.alpaca_volume !== null ? r.alpaca_volume.toLocaleString() : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                </td>
+                <td style={{ textAlign: 'right', fontWeight: 600, color: bpColor(r.close_diff_bp) }}>
+                  {fmtBp(r.close_diff_bp)}
+                </td>
+                <td style={{ textAlign: 'right', color: r.vol_diff_pct !== null && Math.abs(r.vol_diff_pct) > 20 ? '#f59e0b' : undefined }}>
+                  {fmtPct(r.vol_diff_pct)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {rows.length === 0 && !loading && (
+          <div className="empty-state">No feed comparison data for this date</div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="analytics-page">
       <div className="analytics-header">
@@ -746,6 +869,12 @@ export const Analytics = () => {
         >
           Slippage
         </button>
+        <button
+          className={`tab-btn ${tab === 'feed_comparison' ? 'active' : ''}`}
+          onClick={() => setTab('feed_comparison')}
+        >
+          Feed Comparison
+        </button>
       </div>
 
       <div className="analytics-content">
@@ -761,6 +890,7 @@ export const Analytics = () => {
             {tab === 'bars' && renderBars()}
             {tab === 'watchlist' && renderWatchlist()}
             {tab === 'slippage' && renderSlippage()}
+            {tab === 'feed_comparison' && renderFeedComparison()}
           </>
         )}
       </div>

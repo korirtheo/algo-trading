@@ -135,6 +135,8 @@ export interface Summary {
   losses: number;
   candidates_count: number;
   tracking_count: number;
+  active_feed?: string;
+  feed_fallback?: boolean;
 }
 
 export interface HaltEvent {

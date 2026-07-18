@@ -195,6 +195,11 @@ class CombinedEngine:
         self._pending_lock = threading.Lock()
         self.fill_stream = fill_stream  # FillStream instance, or None for legacy polling
 
+        # Data feed status — set by main.py after streamers are started
+        # Values: 'tradier', 'alpaca_iex', 'unknown'
+        self.active_feed = "unknown"
+        self.feed_fallback = False  # True if Tradier failed and IEX is driving engine
+
     def initialize_watchlist(self, candidates):
         """Set up from scanner candidates.
 
@@ -1167,6 +1172,23 @@ class CombinedEngine:
                 "entry_time": pending["signal_time"],
             }
 
+            # Patch simulator state so stop/target are calculated from FILL price,
+            # not the signal price. Without this, a $0.10 slippage on a $10 stock
+            # means the target and stop are wrong by 100bp on every exit decision.
+            if actual_avg != pending["signal_price"]:
+                for st in self.last_states.values() if hasattr(self.last_states, "values") else []:
+                    if isinstance(st, dict) and st.get("ticker") == ticker and st.get("entry_price") is not None:
+                        st["entry_price"] = actual_avg
+                # Also patch in all_states (per-strategy list)
+                for sub_list in self.all_states.values() if hasattr(self.all_states, "values") else []:
+                    for sub_st in (sub_list if isinstance(sub_list, list) else []):
+                        if sub_st.get("ticker") == ticker and sub_st.get("entry_price") is not None:
+                            sub_st["entry_price"] = actual_avg
+                log.info("FILL PRICE CORRECTION %s: signal=$%.4f → fill=$%.4f (Δ=%.2fbp); "
+                         "stop/target now anchored to fill price",
+                         ticker, pending["signal_price"], actual_avg,
+                         (actual_avg / pending["signal_price"] - 1) * 10_000)
+
             # Only log if this is new fills (not already logged)
             if delta_shares > 0.01:
                 pending["last_recorded_qty"] = cumulative_shares
@@ -1270,9 +1292,10 @@ class CombinedEngine:
             if remaining < 1 and not is_partial:
                 # Full exit
                 entry_price = float(pinfo.get("entry_price", 0))
-                # Compute realized PnL from actual fills (true vs expected)
-                pnl = (actual_avg - entry_price) * actual_sold
-                market_value = entry_price * actual_sold
+                # Use cumulative_sold (total filled qty) not delta — filled_avg_price is VWAP across all partials
+                total_sold = cumulative_sold
+                pnl = (actual_avg - entry_price) * total_sold
+                market_value = entry_price * total_sold
                 pnl_pct = (pnl / market_value * 100) if market_value > 0 else 0
                 self.active_positions.discard(ticker)
                 self.daily_pnl += pnl
@@ -1296,7 +1319,7 @@ class CombinedEngine:
                     "ticker": ticker, "strategy": strategy,
                     "entry_price": entry_price,
                     "exit_price": actual_avg,
-                    "shares": int(actual_sold),
+                    "shares": int(total_sold),
                     "market_value": round(market_value, 2),
                     "deployed_amount": round(market_value, 2),
                     "pnl": round(pnl, 2),
@@ -1322,7 +1345,7 @@ class CombinedEngine:
 
                 log.info("EXIT %s (%s) [STREAM]: PnL=$%s | $%.2f -> $%.3f  (sold %.0f shares)",
                          ticker, exit_reason, format(pnl, "+,.2f"),
-                         entry_price, actual_avg, actual_sold)
+                         entry_price, actual_avg, total_sold)
             else:
                 # Partial sell completed — log but stay in position
                 log.info("PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f sold, %.0f remaining",

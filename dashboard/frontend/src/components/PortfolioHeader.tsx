@@ -23,6 +23,10 @@ export function PortfolioHeader() {
   const pnlColor = a.daily_pnl >= 0 ? 'var(--green)' : 'var(--red)';
   const wr = s.trades_count > 0 ? ((s.wins / s.trades_count) * 100).toFixed(0) : '—';
 
+  const feedLabel = s.active_feed === 'tradier' ? 'Tradier SIP' : s.active_feed === 'alpaca_iex' ? 'Alpaca IEX' : 'Feed: —';
+  const feedColor = s.active_feed === 'tradier' ? 'var(--green)' : s.active_feed === 'alpaca_iex' ? '#f59e0b' : 'var(--text-muted)';
+  const feedSub = s.feed_fallback ? '⚠ fallback (Tradier down)' : s.active_feed === 'tradier' ? 'vol caps enabled' : s.active_feed ? 'vol caps disabled' : undefined;
+
   return (
     <div className="stats-grid animate-in">
       <StatCard
@@ -57,6 +61,13 @@ export function PortfolioHeader() {
         color={s.active_position ? 'var(--blue-bright)' : 'var(--text-muted)'}
         sub={`${s.candidates_count} candidates`}
         accent="purple"
+      />
+      <StatCard
+        label="Data Feed"
+        value={feedLabel}
+        color={feedColor}
+        sub={feedSub}
+        accent={s.active_feed === 'tradier' ? 'green' : 'red'}
       />
     </div>
   );

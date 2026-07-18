@@ -11,6 +11,11 @@ ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env o
 ALPACA_FEED = "iex"  # "iex" for live trading, "sip" for backtesting/logging only
 ALPACA_FEED_DELAYED = False  # Not used with IEX
 
+# --- Tradier API ---
+# Live brokerage account — used as primary market data source.
+# Trading execution stays on Alpaca; Tradier provides SIP-level real-time data.
+TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY", "o9vwR8VA1nPulvAo9A5Dk8FGvoJV")
+
 # Data Logging: Use SIP (delayed) for comprehensive bar logging and backtest validation
 # This logs all bar data with accurate volume for post-trade analysis and backtesting.
 # Live trading uses IEX (real-time but incomplete) until Tradier API integration.
@@ -53,22 +58,15 @@ LIVE_BRACKET_TARGET_PCT = 50.0         # generous so strategy target/trail fires
 # tail to 150bp. 1.5% catches most fills, blocks the worst tails.
 # Set to 0 to revert to MarketOrderRequest behavior.
 LIVE_BUY_LIMIT_BUFFER_PCT = 0  # CHANGED 2026-07-14: use MARKET orders (limit orders weren't filling on 2026-07-13)
-# Hard cap on position size: never more than this fraction of total EQUITY
-# per single trade. Equity-basis (not literal cash) is correct because:
-#   1. backtest's cash_box[0] accumulates wins — matches equity, not cash
-#   2. on margin accounts, cash can be near-zero while equity is healthy
-#   3. drawdowns eat cash first; cash-basis would lock the bot out
-# Prevents the bot from putting 100%+ of equity (via buying power) into
-# one microcap when position_cost arrives misconfigured.
-LIVE_MAX_POSITION_PCT_OF_CASH = 30.0  # REVERTED 2026-07-15: back to 30% with IEX feed
-# IEX undercounts volume (~2.5% coverage), so vol caps don't work correctly.
-# 30% equity cap is a proxy until real-time accurate feed (Tradier API) is integrated.
+# Hard equity cap — disabled now that Tradier SIP feed provides accurate volume
+# for participation caps. Participation caps (15% 2-min, 8% regime) now govern
+# position sizing. Set > 0 to re-enable as a secondary safety net.
+LIVE_MAX_POSITION_PCT_OF_CASH = 0  # Disabled: Tradier volume caps now primary size guard
 
-# --- VOLUME CAPS (disabled with IEX feed) ---
-# IEX feed under-counts volume by ~40-100x on hot gappers (~2-3% market coverage).
-# Vol caps disabled until real-time accurate feed (Tradier API) is integrated.
-# TODO: When Tradier API active, set LIVE_DISABLE_VOL_CAPS = False
-LIVE_DISABLE_VOL_CAPS = True  # Keep disabled with IEX feed
+# --- VOLUME CAPS ---
+# With Tradier as primary feed (SIP-level data), volume counts are accurate.
+# Volume caps are now re-enabled. Alpaca IEX runs in parallel for comparison only.
+LIVE_DISABLE_VOL_CAPS = False  # Re-enabled: Tradier SIP feed has accurate volume
 
 # --- PDT (Pattern Day Trader) — NO-OP'd 2026-06-17 ---
 # FINRA abolished the $25K minimum and the 4-day-trade-in-5-days counter

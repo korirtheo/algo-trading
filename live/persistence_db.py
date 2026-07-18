@@ -225,6 +225,26 @@ class TradingDatabase:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_bar_summaries_date ON bar_summaries(date)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_bar_summaries_ticker ON bar_summaries(ticker)")
 
+            # Feed comparison table - Tradier vs Alpaca IEX 2-min bars
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS feed_comparison (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    bar_time TEXT NOT NULL,
+                    ticker TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    open REAL NOT NULL,
+                    high REAL NOT NULL,
+                    low REAL NOT NULL,
+                    close REAL NOT NULL,
+                    volume INTEGER NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(date, bar_time, ticker, source)
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_feed_comp_date ON feed_comparison(date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_feed_comp_ticker ON feed_comparison(ticker, date)")
+
     # ===== TRADES =====
 
     def save_trade(self, trade_date, ticker, strategy, entry_price, exit_price, shares,
@@ -794,3 +814,78 @@ class TradingDatabase:
                 "watchlist_entries": watchlist_count,
                 "bar_summaries": bar_summaries_count,
             }
+
+    # ===== FEED COMPARISON =====
+
+    def log_feed_bar(self, date: str, bar_time: str, ticker: str, source: str,
+                     open_: float, high: float, low: float, close: float, volume: int):
+        """Insert or replace a 2-min bar row from one data source."""
+        with self._conn() as conn:
+            conn.execute("""
+                INSERT INTO feed_comparison
+                    (date, bar_time, ticker, source, open, high, low, close, volume)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, bar_time, ticker, source)
+                DO UPDATE SET
+                    open=excluded.open, high=excluded.high, low=excluded.low,
+                    close=excluded.close, volume=excluded.volume,
+                    created_at=CURRENT_TIMESTAMP
+            """, (date, bar_time, ticker, source, open_, high, low, close, volume))
+
+    def get_feed_comparison(self, date: str) -> list[dict]:
+        """
+        Return all bars for a date from both sources, joined so each row
+        has both tradier and alpaca_iex values side-by-side where available.
+        """
+        with self._conn() as conn:
+            cursor = conn.execute("""
+                SELECT
+                    bar_time, ticker,
+                    MAX(CASE WHEN source='tradier'    THEN open  END) AS t_open,
+                    MAX(CASE WHEN source='tradier'    THEN high  END) AS t_high,
+                    MAX(CASE WHEN source='tradier'    THEN low   END) AS t_low,
+                    MAX(CASE WHEN source='tradier'    THEN close END) AS t_close,
+                    MAX(CASE WHEN source='tradier'    THEN volume END) AS t_volume,
+                    MAX(CASE WHEN source='alpaca_iex' THEN open  END) AS a_open,
+                    MAX(CASE WHEN source='alpaca_iex' THEN high  END) AS a_high,
+                    MAX(CASE WHEN source='alpaca_iex' THEN low   END) AS a_low,
+                    MAX(CASE WHEN source='alpaca_iex' THEN close END) AS a_close,
+                    MAX(CASE WHEN source='alpaca_iex' THEN volume END) AS a_volume
+                FROM feed_comparison
+                WHERE date = ?
+                GROUP BY bar_time, ticker
+                ORDER BY bar_time ASC, ticker ASC
+            """, (date,))
+            rows = cursor.fetchall()
+
+        result = []
+        for row in rows:
+            (bar_time, ticker,
+             t_open, t_high, t_low, t_close, t_vol,
+             a_open, a_high, a_low, a_close, a_vol) = row
+
+            close_diff_bp = None
+            if t_close and a_close and a_close != 0:
+                close_diff_bp = round((t_close - a_close) / a_close * 10_000, 1)
+
+            vol_diff_pct = None
+            if t_vol and a_vol and a_vol != 0:
+                vol_diff_pct = round((t_vol - a_vol) / a_vol * 100, 1)
+
+            result.append({
+                "bar_time": bar_time,
+                "ticker": ticker,
+                "tradier_open": t_open,
+                "tradier_high": t_high,
+                "tradier_low": t_low,
+                "tradier_close": t_close,
+                "tradier_volume": t_vol,
+                "alpaca_open": a_open,
+                "alpaca_high": a_high,
+                "alpaca_low": a_low,
+                "alpaca_close": a_close,
+                "alpaca_volume": a_vol,
+                "close_diff_bp": close_diff_bp,
+                "vol_diff_pct": vol_diff_pct,
+            })
+        return result

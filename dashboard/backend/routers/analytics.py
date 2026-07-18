@@ -292,6 +292,12 @@ async def get_slippage_by_date(date: str):
         return {"stats": {}, "by_strategy": [], "rows": []}
 
 
+@router.get("/analytics/feed_comparison/{date}")
+async def get_feed_comparison(date: str):
+    """Get Tradier vs Alpaca IEX bar comparison for a date."""
+    return db.get_feed_comparison(date)
+
+
 @router.get("/analytics/trades/details/{date}")
 async def get_trade_details(date: str):
     """Get trades with execution details for a specific date."""
