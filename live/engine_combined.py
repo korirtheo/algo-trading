@@ -461,14 +461,22 @@ class CombinedEngine:
 
                 if ticker in self.active_positions:
                     log.debug("SIGNAL %s skipped — already in this ticker", ticker)
-                    self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'already_in_position', gap_pct=gap_pct)
+                    # Only log the first time we see this signal (prev had no entry_price).
+                    # Without this guard the same rejection is written every bar while
+                    # in position because last_states[ticker] is never updated on continue.
+                    if prev is None or prev.get("entry_price") is None:
+                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'already_in_position', gap_pct=gap_pct)
+                    self.last_states[ticker] = st  # prevent re-triggering next bar
                     continue
 
                 # Check if this strategy is already done for the day (timed out before crash/restart)
                 if self.db.is_done(ticker, strategy):
                     log.debug("SIGNAL %s (%s) skipped — strategy marked DONE (timed out or finished)",
                              ticker, strategy)
-                    self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'done', gap_pct=gap_pct)
+                    # Only log once: first bar where this signal appears
+                    if prev is None or prev.get("entry_price") is None:
+                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'done', gap_pct=gap_pct)
+                    self.last_states[ticker] = st  # prevent re-triggering next bar
                     continue
 
                 # Record first signal time for time limit enforcement
@@ -479,7 +487,10 @@ class CombinedEngine:
                 if last_exit is not None and entry_price <= last_exit * 1.01:
                     log.debug("SIGNAL %s (%s) skipped — price $%.3f not > last exit $%.3f * 1.01",
                              ticker, strategy, entry_price, last_exit)
-                    self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'reentry_floor', gap_pct=gap_pct)
+                    # Only log first occurrence — same bar-by-bar spam fix
+                    if prev is None or prev.get("entry_price") is None:
+                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'reentry_floor', gap_pct=gap_pct)
+                    self.last_states[ticker] = st
                     continue
                 trade_size = st.get("position_cost", cash)
                 cum_dollar = self._cum_dollar_vol(ticker)
