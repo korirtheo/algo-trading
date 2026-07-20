@@ -12,6 +12,7 @@ services:
       - LIVE_PARAMS_PATH=${LIVE_PARAMS_PATH:-config/trial_124_microcap_pump_extracted.json}
     volumes:
       - ./logs:/app/logs
+      - ./config:/app/config
     logging:
       driver: json-file
       options:

@@ -100,6 +100,8 @@ def set_strategy_params(params):
 
     # --- G (Big Gap Runner) ---
     tgc.G_TARGET_PCT = params["g_target_pct"]
+    tgc.G_TARGET2_PCT = params.get("g_target2_pct", 30.0)
+    tgc.G_PARTIAL_SELL_PCT = params.get("g_partial_sell_pct", 0.0)
     tgc.G_TIME_LIMIT_MINUTES = params["g_time_limit_min"]
     tgc.G_STOP_PCT = params["g_stop_pct"]
     tgc.G_TRAIL_PCT = params["g_trail_pct"]
@@ -883,7 +885,8 @@ def _build_param_snapshot():
         'E_STOP_PCT', 'E_TARGET1_PCT', 'E_TARGET2_PCT', 'E_TIME_LIMIT_MINUTES',
         'E_TRAIL_ACTIVATE_PCT', 'E_TRAIL_PCT',
         'F_STOP_PCT', 'F_TARGET_PCT', 'F_TIME_LIMIT_MINUTES', 'F_TRAIL_ACTIVATE_PCT', 'F_TRAIL_PCT',
-        'G_STOP_PCT', 'G_TARGET_PCT', 'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
+        'G_PARTIAL_SELL_PCT', 'G_STOP_PCT', 'G_TARGET_PCT', 'G_TARGET2_PCT',
+        'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
         'H_STOP_PCT', 'H_TARGET_PCT', 'H_TIME_LIMIT_MINUTES', 'H_TRAIL_ACTIVATE_PCT', 'H_TRAIL_PCT',
         'I_BREAKOUT_VOL_MULT', 'I_MAX_ENTRY_CANDLE', 'I_MIN_GAP_PCT', 'I_PARTIAL_SELL_PCT',
         'I_STOP_PCT', 'I_TARGET1_PCT', 'I_TARGET2_PCT', 'I_TIME_LIMIT_MINUTES',
@@ -1130,7 +1133,8 @@ _param_lock = __import__("threading").RLock()
 # Walk-forward harness or main() can set these to True before calling objective.
 USE_SHARPE_OBJECTIVE = False        # True => score = total_pnl * min(sharpe_pct, 4.0)
                                      # False => legacy score = total_pnl * min(pf, 3.0)
-ENABLE_2MIN_SLIPPAGE = False         # True => set tgc.USE_2MIN_SLIPPAGE before each trial
+ENABLE_2MIN_SLIPPAGE = False         # True => set tgc.USE_2MIN_SLIPPAGE before each trial (superseded by ENABLE_MULTIWINDOW_SLIPPAGE)
+ENABLE_MULTIWINDOW_SLIPPAGE = True   # True => set tgc.USE_MULTIWINDOW_SLIPPAGE before each trial (most realistic model)
 USE_CV_OBJECTIVE = False             # True => per-year-reset CV:
                                      # score = min(year_pnl * min(year_pf, 3.0) across all years)
                                      # Each year starts at fresh STARTING_CASH so per-year
@@ -1150,7 +1154,9 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
-        if ENABLE_2MIN_SLIPPAGE:
+        if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_MULTIWINDOW_SLIPPAGE = True
+        elif ENABLE_2MIN_SLIPPAGE:
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1224,7 +1230,9 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
-        if ENABLE_2MIN_SLIPPAGE:
+        if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_MULTIWINDOW_SLIPPAGE = True
+        elif ENABLE_2MIN_SLIPPAGE:
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1297,7 +1305,9 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
-        if ENABLE_2MIN_SLIPPAGE:
+        if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_MULTIWINDOW_SLIPPAGE = True
+        elif ENABLE_2MIN_SLIPPAGE:
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1358,7 +1368,9 @@ def objective(trial, daily_picks, all_dates):
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
-        if ENABLE_2MIN_SLIPPAGE:
+        if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_MULTIWINDOW_SLIPPAGE = True
+        elif ENABLE_2MIN_SLIPPAGE:
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 

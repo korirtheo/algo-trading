@@ -239,8 +239,8 @@ class TradierStreamer:
         try:
             price = float(event["price"])
             size = int(event.get("size", 0))
-            # Tradier timestamp is epoch milliseconds
-            ts_ms = int(event["timestamp"])
+            # Tradier uses "date" field (epoch milliseconds), not "timestamp"
+            ts_ms = int(event["date"])
             ts = datetime.fromtimestamp(ts_ms / 1000, tz=ET)
         except (KeyError, ValueError, TypeError) as e:
             log.debug(f"TradierStreamer: bad tick fields: {e} raw={raw_line[:120]}")

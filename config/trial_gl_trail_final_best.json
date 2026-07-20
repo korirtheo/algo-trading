@@ -1,0 +1,32 @@
+{
+  "trial_number": 800,
+  "objective": 273993252.1098232,
+  "params": {
+    "g_min_gap_pct": 5.0,
+    "g_require_2nd_green": true,
+    "g_require_2nd_new_high": true,
+    "g_stop_pct": 16.0,
+    "g_time_limit_min": 36,
+    "g_partial_sell_pct": 0.0,
+    "g_target_pct": 40.0,
+    "g_use_trail": true,
+    "g_trail_activate_pct": 5.0,
+    "g_trail_pct": 3.0,
+    "l_earliest_candle": 30,
+    "l_latest_candle": 150,
+    "l_max_float": 5000000,
+    "l_min_gap": 25,
+    "l_min_price_accel_pct": 1.5,
+    "l_partial_sell_pct": 75.0,
+    "l_stop_pct": 13.0,
+    "l_tier1_target1_pct": 20.0,
+    "l_tier1_target2_pct": 40.0,
+    "l_tier2_target1_pct": 22.0,
+    "l_tier2_target2_pct": 50.0,
+    "l_tier3_target1_pct": 11.0,
+    "l_tier3_target2_pct": 30.0,
+    "l_use_trail": true,
+    "l_trail_activate_pct": 4.0,
+    "l_trail_pct": 1.0
+  }
+}

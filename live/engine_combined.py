@@ -91,6 +91,10 @@ def load_trial_params(path=None):
             "LIVE_DISABLE_VOL_CAPS=False once SIP feed is active."
         )
 
+    # Enable multi-window liquidity-aware slippage (matches backtest/optuna)
+    tgc.USE_MULTIWINDOW_SLIPPAGE = True
+    log.info("USE_MULTIWINDOW_SLIPPAGE=True: multi-window liquidity slippage model active")
+
     # Log enabled strategies
     enabled = []
     for s in "HGAFDVPMRWOBKCEIJNL":

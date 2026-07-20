@@ -439,6 +439,8 @@ G_MIN_BODY_PCT = 0.0
 G_REQUIRE_2ND_GREEN = True
 G_REQUIRE_2ND_NEW_HIGH = True
 G_TARGET_PCT = 11.0
+G_TARGET2_PCT = 30.0          # Runner target after partial sell (used when G_PARTIAL_SELL_PCT > 0)
+G_PARTIAL_SELL_PCT = 0.0      # % of position to sell at G_TARGET_PCT (0 = sell all, legacy behavior)
 G_TIME_LIMIT_MINUTES = 10
 G_STOP_PCT = 0.0
 G_TRAIL_PCT = 0.0
@@ -884,7 +886,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             'E_STOP_PCT', 'E_TARGET1_PCT', 'E_TARGET2_PCT', 'E_TIME_LIMIT_MINUTES',
             'E_TRAIL_ACTIVATE_PCT', 'E_TRAIL_PCT',
             'F_STOP_PCT', 'F_TARGET_PCT', 'F_TIME_LIMIT_MINUTES', 'F_TRAIL_ACTIVATE_PCT', 'F_TRAIL_PCT',
-            'G_STOP_PCT', 'G_TARGET_PCT', 'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
+            'G_PARTIAL_SELL_PCT', 'G_STOP_PCT', 'G_TARGET_PCT', 'G_TARGET2_PCT',
+            'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
             'H_STOP_PCT', 'H_TARGET_PCT', 'H_TIME_LIMIT_MINUTES', 'H_TRAIL_ACTIVATE_PCT', 'H_TRAIL_PCT',
             'I_BREAKOUT_VOL_MULT', 'I_MAX_ENTRY_CANDLE', 'I_MIN_GAP_PCT', 'I_PARTIAL_SELL_PCT',
             'I_STOP_PCT', 'I_TARGET1_PCT', 'I_TARGET2_PCT', 'I_TIME_LIMIT_MINUTES',
@@ -971,7 +974,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     F_STOP_PCT = params['F_STOP_PCT']; F_TARGET_PCT = params['F_TARGET_PCT']
     F_TIME_LIMIT_MINUTES = params['F_TIME_LIMIT_MINUTES']
     F_TRAIL_ACTIVATE_PCT = params['F_TRAIL_ACTIVATE_PCT']; F_TRAIL_PCT = params['F_TRAIL_PCT']
-    G_STOP_PCT = params['G_STOP_PCT']; G_TARGET_PCT = params['G_TARGET_PCT']
+    G_PARTIAL_SELL_PCT = params['G_PARTIAL_SELL_PCT']
+    G_STOP_PCT = params['G_STOP_PCT']; G_TARGET_PCT = params['G_TARGET_PCT']; G_TARGET2_PCT = params['G_TARGET2_PCT']
     G_TIME_LIMIT_MINUTES = params['G_TIME_LIMIT_MINUTES']
     G_TRAIL_ACTIVATE_PCT = params['G_TRAIL_ACTIVATE_PCT']; G_TRAIL_PCT = params['G_TRAIL_PCT']
     H_STOP_PCT = params['H_STOP_PCT']; H_TARGET_PCT = params['H_TARGET_PCT']
@@ -1320,6 +1324,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             "x_trailing_active": False,
             # State — H/G/A/F trail tracking
             "hgaf_trail_stop": 0.0,
+            # State — G partial exit tracking
+            "g_partial_taken": False,
+            "g_partial_proceeds": 0.0,
+            "g_highest_since_entry": 0.0,
             # Position
             "entry_price": None,
             "entry_time": None,
@@ -1595,7 +1603,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 def _close_position(st, price, reason, ts_now):
                     sell_price = price * (1 - _exit_slip_pct(price, st["shares"], st, ts_now) / 100)
                     proceeds = st["shares"] * sell_price
-                    partial_procs = (st.get("p_partial_proceeds", 0)
+                    partial_procs = (st.get("g_partial_proceeds", 0)
+                                     + st.get("p_partial_proceeds", 0)
                                      + st.get("d_partial_proceeds", 0)
                                      + st.get("m_partial_proceeds", 0)
                                      + st.get("v_partial_proceeds", 0)
@@ -2095,10 +2104,74 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     continue
 
-                # ===== STRATEGIES H/G/A/F: target + stop + trail + time stop =====
+                # ===== STRATEGY G: Big Gap Runner (partial exit + trail/target2 + stop) =====
+                if st["strategy"] == "G":
+                    if c_high > st["g_highest_since_entry"]:
+                        st["g_highest_since_entry"] = c_high
+
+                    # Hard stop (always active, even before partial)
+                    if G_STOP_PCT > 0:
+                        stop_price = st["entry_price"] * (1 - G_STOP_PCT / 100)
+                        if c_low <= stop_price:
+                            _close_position(st, stop_price, "STOP", ts)
+                            continue
+
+                    # Trailing stop (active once trail_activate threshold reached)
+                    if G_TRAIL_PCT > 0:
+                        unrealized_pct = (st["g_highest_since_entry"] / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= G_TRAIL_ACTIVATE_PCT:
+                            trail_stop = st["g_highest_since_entry"] * (1 - G_TRAIL_PCT / 100)
+                            if trail_stop > st.get("hgaf_trail_stop", 0):
+                                st["hgaf_trail_stop"] = trail_stop
+                        if st.get("hgaf_trail_stop", 0) > 0 and c_low <= st["hgaf_trail_stop"]:
+                            _close_position(st, st["hgaf_trail_stop"], "TRAIL", ts)
+                            continue
+
+                    # Partial sell at target1 (G_TARGET_PCT)
+                    if G_PARTIAL_SELL_PCT > 0 and not st["g_partial_taken"]:
+                        tgt1_price = st["entry_price"] * (1 + G_TARGET_PCT / 100)
+                        if c_high >= tgt1_price:
+                            sell_shares = int(st["shares"] * G_PARTIAL_SELL_PCT / 100)
+                            if sell_shares > 0:
+                                sell_price = tgt1_price * (1 - _exit_slip_pct(tgt1_price, sell_shares, st, ts) / 100)
+                                proceeds = sell_shares * sell_price
+                                st["shares"] -= sell_shares
+                                st["g_partial_proceeds"] += proceeds
+                                _receive_proceeds(proceeds)
+                            st["g_partial_taken"] = True
+                            if st["shares"] <= 0.001:
+                                st["pnl"] = st["g_partial_proceeds"] - st["position_cost"]
+                                st["exit_price"] = tgt1_price
+                                st["exit_time"] = ts
+                                st["exit_reason"] = "TARGET"
+                                st["entry_price"] = None
+                                st["shares"] = 0
+                                st["done"] = True
+                                continue
+                    elif G_PARTIAL_SELL_PCT == 0:
+                        # No partial: sell all at target1 (legacy behavior)
+                        target_price = st["entry_price"] * (1 + G_TARGET_PCT / 100)
+                        if c_high >= target_price:
+                            _close_position(st, target_price, "TARGET", ts)
+                            continue
+
+                    # Runner: exit at target2 (only after partial was taken)
+                    if st["g_partial_taken"] and G_TARGET2_PCT > 0:
+                        tgt2_price = st["entry_price"] * (1 + G_TARGET2_PCT / 100)
+                        if c_high >= tgt2_price:
+                            _close_position(st, tgt2_price, "TARGET", ts)
+                            continue
+
+                    # Time stop
+                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGIES H/A/F: target + stop + trail + time stop =====
                 strat_map = {
                     "H": (H_TARGET_PCT, H_TIME_LIMIT_MINUTES, H_STOP_PCT, H_TRAIL_PCT, H_TRAIL_ACTIVATE_PCT),
-                    "G": (G_TARGET_PCT, G_TIME_LIMIT_MINUTES, G_STOP_PCT, G_TRAIL_PCT, G_TRAIL_ACTIVATE_PCT),
                     "A": (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, A_STOP_PCT, A_TRAIL_PCT, A_TRAIL_ACTIVATE_PCT),
                     "F": (F_TARGET_PCT, F_TIME_LIMIT_MINUTES, F_STOP_PCT, F_TRAIL_PCT, F_TRAIL_ACTIVATE_PCT),
                 }
