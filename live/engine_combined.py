@@ -92,8 +92,9 @@ def load_trial_params(path=None):
         )
 
     # Enable multi-window liquidity-aware slippage (matches backtest/optuna)
+    tgc.USE_DYNAMIC_SLIPPAGE = True
     tgc.USE_MULTIWINDOW_SLIPPAGE = True
-    log.info("USE_MULTIWINDOW_SLIPPAGE=True: multi-window liquidity slippage model active")
+    log.info("Slippage model: USE_DYNAMIC_SLIPPAGE=True, USE_MULTIWINDOW_SLIPPAGE=True")
 
     # Log enabled strategies
     enabled = []
