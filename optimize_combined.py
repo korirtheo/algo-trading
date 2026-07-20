@@ -1155,8 +1155,10 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
     with _param_lock:
         set_strategy_params(params)
         if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_MULTIWINDOW_SLIPPAGE = True
         elif ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1231,8 +1233,10 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
     with _param_lock:
         set_strategy_params(params)
         if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_MULTIWINDOW_SLIPPAGE = True
         elif ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1306,8 +1310,10 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
     with _param_lock:
         set_strategy_params(params)
         if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_MULTIWINDOW_SLIPPAGE = True
         elif ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
@@ -1369,8 +1375,10 @@ def objective(trial, daily_picks, all_dates):
     with _param_lock:
         set_strategy_params(params)
         if ENABLE_MULTIWINDOW_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_MULTIWINDOW_SLIPPAGE = True
         elif ENABLE_2MIN_SLIPPAGE:
+            tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
