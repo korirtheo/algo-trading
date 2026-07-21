@@ -73,7 +73,7 @@
     "g_target_pct": 15.0,
     "g_time_limit_min": 12,
     "g_trail_activate_pct": 0.0,
-    "g_trail_pct": 0.0,
+    "g_trail_pct": 0.5,
     "h_stop_pct": 8.0,
     "h_target_pct": 5.0,
     "h_time_limit_min": 24,

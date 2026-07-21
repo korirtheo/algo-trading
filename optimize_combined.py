@@ -53,6 +53,18 @@ DATA_DIRS = [
 ]
 DATE_RANGE = ("2021-01-01", "2026-05-31")
 
+GL_TRAIL_DATA_DIRS = [
+    "stored_data_2022", "stored_data_2023",
+    "stored_data_jan_mar_2024", "stored_data_apr_jun_2024",
+    "stored_data_jul_sep_2024", "stored_data_oct_dec_2024",
+    "stored_data_jan_mar_2025", "stored_data_apr_jun_2025",
+    "stored_data_jul_2025", "stored_data_oos",
+    "stored_data", "stored_data_mar_may_2026",
+    "stored_data_jun_2026",
+]
+GL_TRAIL_DATE_LO = "2024-01-01"
+GL_TRAIL_DATE_HI = "2026-02-28"
+
 ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
 
@@ -1151,6 +1163,8 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
     W16/W17 trap where no-stop / loose-gap trials had high val_pnl but
     catastrophic DD that Sharpe didn't catch (and PF too leniently penalized).
     """
+    assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
+        "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
@@ -1229,6 +1243,8 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
     regime-specific overfit (the W16 trap: 38-day window had no DD event,
     so no-stop config looked free).
     """
+    assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
+        "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
@@ -1306,6 +1322,8 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
     The true blind OOS window (everything after val-end) stays untouched
     during optimization — used only for final forward-test verification.
     """
+    assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
+        "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
@@ -1371,6 +1389,8 @@ def objective(trial, daily_picks, all_dates):
     passed explicitly to the simulator — no shared state during the long
     backtest phase. Optuna's parallelism is thus correct AND fully utilized.
     """
+    assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
+        "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
     params = suggest_all_params(trial)
     with _param_lock:
         set_strategy_params(params)
@@ -1678,6 +1698,289 @@ def make_callback(start_time):
     return callback
 
 
+# ===========================================================================
+# G+L Trail study — self-contained functions (--study-type gl_trail)
+# ===========================================================================
+
+def configure_gl_trail_simulator():
+    tgc.USE_DYNAMIC_SLIPPAGE = True
+    tgc.USE_MULTIWINDOW_SLIPPAGE = True
+    tgc.USE_VOLATILITY_ADJUSTMENT = True
+    tgc.SLIP_IMPACT_K = 3.0
+    tgc.VOL_CAP_PCT = 5.0
+    tgc.MAX_2MIN_PARTICIPATION = 0.15
+    tgc.MAX_REGIME_PARTICIPATION = 0.08
+    tgc.NEWS_MODULATOR_ENABLED = False
+
+
+def configure_gl_trail_for_optimization():
+    tgc.MIN_PRICE = 0.0
+    tgc.MAX_MODELED_SLIP_BP = 0.0
+    tgc.MAX_CUM_DVOL_AT_ENTRY_M = 0.0
+    tgc.MIN_ATR_PCT = 0.0
+    tgc.MIN_FAVORABILITY_THRESHOLD = 0.0
+    tgc.NEWS_FILTER_ENABLED = False
+
+
+def run_gl_trail_backtest(dates, picks_by_date, snapshot):
+    cash = float(25_000)
+    all_trades = []
+
+    for d in dates:
+        picks = picks_by_date.get(d, [])
+        if not picks:
+            continue
+        cash_account = cash < MARGIN_THRESHOLD
+        try:
+            states, cash, unsettled, _ = tgc.simulate_day_combined(
+                picks, cash, cash_account, params=snapshot
+            )
+        except Exception:
+            continue
+        effective_cash = cash + (unsettled if cash_account else 0)
+        for st in states:
+            if st.get("exit_reason") is not None and st.get("position_cost", 0) > 0:
+                pnl = st.get("pnl", 0)
+                if pnl is not None:
+                    all_trades.append({
+                        "strategy": st.get("strategy"),
+                        "pnl": pnl,
+                        "position_cost": st.get("position_cost", 0),
+                        "exit_reason": st.get("exit_reason"),
+                    })
+        cash = effective_cash
+
+    n = len(all_trades)
+    if n == 0:
+        return {"n": 0, "total_pnl": -9999, "pf": 0.0, "equity": cash,
+                "gross_win": 0, "gross_loss": 1e-9, "wr": 0.0}
+
+    total_pnl = sum(t["pnl"] for t in all_trades)
+    wins = [t["pnl"] for t in all_trades if t["pnl"] > 0]
+    losses = [t["pnl"] for t in all_trades if t["pnl"] <= 0]
+    gross_win = sum(wins) if wins else 0
+    gross_loss = abs(sum(losses)) if losses else 1e-9
+    pf = gross_win / gross_loss
+    wr = len(wins) / n * 100
+    return {"n": n, "total_pnl": total_pnl, "pf": pf, "wr": wr,
+            "equity": cash, "gross_win": gross_win, "gross_loss": gross_loss}
+
+
+def suggest_gl_trail_params(trial, base_params):
+    """Suggest G+L params (30 suggest calls). Returns merged param dict."""
+    p = dict(base_params)
+
+    # ---- G strategy params ----
+    p["g_min_gap_pct"] = trial.suggest_float("g_min_gap_pct", 5.0, 50.0, step=5.0)
+    p["g_require_2nd_green"] = trial.suggest_categorical("g_require_2nd_green", [True, False])
+    p["g_require_2nd_new_high"] = trial.suggest_categorical("g_require_2nd_new_high", [True, False])
+    p["g_stop_pct"] = trial.suggest_float("g_stop_pct", 5.0, 30.0, step=1.0)
+    p["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 6, 60, step=3)
+
+    g_partial = trial.suggest_float("g_partial_sell_pct", 0.0, 75.0, step=25.0)
+    p["g_partial_sell_pct"] = g_partial
+    p["g_target_pct"] = trial.suggest_float("g_target_pct", 5.0, 40.0, step=5.0)
+
+    # Trail params always suggested unconditionally — avoids train/eval mismatch
+    # where "no trail" branch would set 0.0 in training but a different base value
+    # could leak in during forward test (bug in v2 study).
+    p["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 40.0, step=5.0)
+    p["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 20.0, step=0.5)
+
+    if g_partial > 0:
+        p["g_target2_pct"] = trial.suggest_float("g_target2_pct", 20.0, 100.0, step=10.0)
+    else:
+        p["g_target2_pct"] = 999.0
+
+    # ---- L strategy params ----
+    p["l_earliest_candle"] = trial.suggest_int("l_earliest_candle", 3, 30, step=3)
+    p["l_latest_candle"] = trial.suggest_int("l_latest_candle", 30, 180, step=15)
+    p["l_max_float"] = trial.suggest_int("l_max_float", 5_000_000, 25_000_000, step=5_000_000)
+    p["l_min_gap"] = trial.suggest_int("l_min_gap", 10, 80, step=5)
+    p["l_min_price_accel_pct"] = trial.suggest_float("l_min_price_accel_pct", 0.5, 3.0, step=0.5)
+    p["l_partial_sell_pct"] = trial.suggest_float("l_partial_sell_pct", 0.0, 75.0, step=25.0)
+    p["l_stop_pct"] = trial.suggest_float("l_stop_pct", 10.0, 30.0, step=1.0)
+    p["l_tier1_target1_pct"] = trial.suggest_float("l_tier1_target1_pct", 15.0, 50.0, step=5.0)
+    p["l_tier1_target2_pct"] = trial.suggest_float("l_tier1_target2_pct", 20.0, 80.0, step=5.0)
+    p["l_tier2_target1_pct"] = trial.suggest_float("l_tier2_target1_pct", 10.0, 30.0, step=2.0)
+    p["l_tier2_target2_pct"] = trial.suggest_float("l_tier2_target2_pct", 20.0, 60.0, step=5.0)
+    p["l_tier3_target1_pct"] = trial.suggest_float("l_tier3_target1_pct", 5.0, 25.0, step=2.0)
+    p["l_tier3_target2_pct"] = trial.suggest_float("l_tier3_target2_pct", 10.0, 50.0, step=5.0)
+
+    # Trail params always suggested unconditionally — same fix as G.
+    # l_trail_activate_pct=9999 effectively disables the trail (never activates).
+    p["l_trail_activate_pct"] = trial.suggest_float("l_trail_activate_pct", 1.0, 200.0, step=1.0)
+    p["l_trail_pct"] = trial.suggest_float("l_trail_pct", 1.0, 15.0, step=1.0)
+
+    # Force trailing off for all other strategies
+    for prefix in "vhafdrwobkcsexijn":
+        p[f"{prefix}_trail_pct"] = 0.0
+        p[f"{prefix}_trail_activate_pct"] = 0.0
+
+    # Only G and L enabled; disable everything else
+    for s in "vhafdrwobkcsexijn":
+        p[f"enable_{s}"] = False
+    p["enable_g"] = True
+    p["enable_l"] = True
+
+    return p
+
+
+def objective_gl_trail(trial, data):
+    """G+L trail objective."""
+    assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
+        "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
+
+    dates = data["dates"]
+    picks_by_date = data["picks_by_date"]
+
+    p = suggest_gl_trail_params(trial, data["base_params"])
+
+    with _param_lock:
+        set_strategy_params(p)
+        configure_gl_trail_for_optimization()
+        snapshot = _build_param_snapshot()
+
+    result = run_gl_trail_backtest(dates, picks_by_date, snapshot)
+
+    if result["n"] < 100 or result["total_pnl"] <= 0 or result["pf"] < 0.5:
+        return -9999
+
+    import math as _math
+    score = result["total_pnl"] * min(result["pf"], 3.0)
+    if _math.isnan(score) or _math.isinf(score):
+        return -9999
+    score = max(-9.9e12, min(9.9e12, float(score)))
+
+    trial.set_user_attr("total_pnl", round(result["total_pnl"], 2))
+    trial.set_user_attr("pf", round(result["pf"], 3))
+    trial.set_user_attr("wr", round(result["wr"], 1))
+    trial.set_user_attr("n", result["n"])
+    trial.set_user_attr("equity", round(result["equity"], 0))
+
+    return score
+
+
+def worker_loop_gl_trail(data, args):
+    storage = optuna.storages.RDBStorage(
+        url=args.db,
+        engine_kwargs={"pool_size": 2, "max_overflow": 1, "pool_pre_ping": True, "pool_recycle": 300},
+    )
+    study = optuna.create_study(
+        direction="maximize",
+        study_name=args.study,
+        storage=storage,
+        load_if_exists=True,
+        sampler=TPESampler(n_startup_trials=args.startup_trials),
+    )
+
+    completed = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+    running = len([t for t in study.trials if t.state == optuna.trial.TrialState.RUNNING])
+    failed = len([t for t in study.trials if t.state == optuna.trial.TrialState.FAIL])
+    print(f"\nStudy state: {completed} complete, {running} running, {failed} failed "
+          f"(target: {args.trials})", flush=True)
+
+    if completed >= args.trials:
+        print(f"Target {args.trials} trials already complete — nothing to do.", flush=True)
+        return
+
+    t_start = time.time()
+    my_count = 0
+    last_report = 0
+
+    while True:
+        completed = len([t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE])
+        if completed >= args.trials:
+            break
+
+        try:
+            trial = study.ask()
+        except Exception as e:
+            print(f"  ask() error: {e} — retrying in 5s", flush=True)
+            time.sleep(5)
+            continue
+
+        try:
+            value = objective_gl_trail(trial, data)
+            study.tell(trial, value)
+            my_count += 1
+        except KeyboardInterrupt:
+            try:
+                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            except Exception:
+                pass
+            print(f"\n[worker] KeyboardInterrupt after {my_count} trials", flush=True)
+            break
+        except Exception as e:
+            import traceback as _tb
+            print(f"  [worker] trial exception: {e}", flush=True)
+            _tb.print_exc()
+            try:
+                study.tell(trial, state=optuna.trial.TrialState.FAIL)
+            except Exception:
+                pass
+            continue
+
+        if my_count % 20 == 0 or my_count == last_report + 1:
+            completed_now = len([t for t in study.trials
+                                 if t.state == optuna.trial.TrialState.COMPLETE])
+            elapsed = time.time() - t_start
+            try:
+                bt = study.best_trial
+                print(f"  [{completed_now}/{args.trials}] {elapsed/60:.1f}m | "
+                      f"best ${bt.value:,.0f} (#{bt.number}) | "
+                      f"PnL=${bt.user_attrs.get('total_pnl',0):,.0f} "
+                      f"PF={bt.user_attrs.get('pf',0):.2f} "
+                      f"WR={bt.user_attrs.get('wr',0):.1f}%",
+                      flush=True)
+            except Exception:
+                print(f"  [{completed_now}/{args.trials}] {elapsed/60:.1f}m | "
+                      f"no completed trials yet", flush=True)
+            last_report = my_count
+
+    total_elapsed = time.time() - t_start
+    print(f"\n[worker] Done: {my_count} trials in {total_elapsed/60:.1f}m", flush=True)
+
+
+def dump_best_gl_trail(study, args):
+    completed = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+    if not completed:
+        print("No completed trials.", flush=True)
+        return
+
+    best = study.best_trial
+    ua = best.user_attrs
+
+    print(f"\n{'='*60}", flush=True)
+    print(f"BEST TRIAL #{best.number} (G+L TRAIL SEARCH)", flush=True)
+    print(f"{'='*60}", flush=True)
+    print(f"  Score:        ${best.value:,.0f}", flush=True)
+    print(f"  PnL:          ${ua.get('total_pnl',0):,.0f}", flush=True)
+    print(f"  PF:           {ua.get('pf',0):.3f}", flush=True)
+    print(f"  WR:           {ua.get('wr',0):.1f}%", flush=True)
+    print(f"  n:            {ua.get('n')}", flush=True)
+    print(f"  Equity:       ${ua.get('equity',0):,.0f}", flush=True)
+    print(f"\n  Params:", flush=True)
+    for k, v in sorted(best.params.items()):
+        print(f"    {k}: {v}", flush=True)
+
+    if args.params_out:
+        out = {
+            "label": f"G+L trail search (optuna #{best.number})",
+            "study": args.study,
+            "trial": best.number,
+            "score": best.value,
+            "total_pnl": ua.get("total_pnl"),
+            "pf": ua.get("pf"),
+            "wr": ua.get("wr"),
+            "n": ua.get("n"),
+            "params": dict(best.params),
+        }
+        with open(args.params_out, "w") as f:
+            json.dump(out, f, indent=2)
+        print(f"\n  Saved to {args.params_out}", flush=True)
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1737,7 +2040,88 @@ def main():
                         help="Filter daily picks to ONLY days where the regime gate "
                              "classifies as the given regime. Used to train regime "
                              "specialists. Requires strategies/regime_gate.py.")
+    parser.add_argument("--study-type", default="combined",
+                        choices=["combined", "gl_trail"],
+                        help="Study type: 'combined' (default, 20-strategy optimizer) or "
+                             "'gl_trail' (G+L trail specialist with PostgreSQL backend).")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Parallel worker processes for gl_trail mode (default: 1).")
     args = parser.parse_args()
+
+    # ------------------------------------------------------------------
+    # GL_TRAIL dispatch — independent entrypoint, exits when done
+    # ------------------------------------------------------------------
+    if args.study_type == "gl_trail":
+        configure_gl_trail_simulator()
+
+        # Default db to PostgreSQL for gl_trail unless overridden
+        gl_db = args.db if args.db != "optuna_combined_v8.db" \
+            else "postgresql://postgres@127.0.0.1:5432/optuna_gl_trail"
+        gl_study = args.study if args.study != "combined_v8_20strats_2024_2026" \
+            else "gl_trail"
+        gl_params_out = args.params_out or "config/trial_gl_trail_best.json"
+
+        # Reconstruct a simple namespace for the worker/dump helpers
+        import types as _types
+        gl_args = _types.SimpleNamespace(
+            db=gl_db,
+            study=gl_study,
+            trials=args.trials,
+            startup_trials=args.startup_trials,
+            params_out=gl_params_out,
+            workers=args.workers,
+        )
+
+        print("Loading G+L trail training data...", flush=True)
+        dirs = [d for d in GL_TRAIL_DATA_DIRS if os.path.exists(d)]
+        all_dates_gl, picks_by_date_gl = load_all_picks(dirs)
+        dates_gl = sorted([d for d in all_dates_gl
+                           if GL_TRAIL_DATE_LO <= d <= GL_TRAIL_DATE_HI])
+        print(f"  Training window: {GL_TRAIL_DATE_LO} to {GL_TRAIL_DATE_HI} "
+              f"({len(dates_gl)} days)", flush=True)
+        if len(dates_gl) == 0:
+            print("ERROR: no trading days in range!", flush=True)
+            sys.exit(1)
+
+        base_path = "config/trial_w21b_511_deploy.json"
+        with open(base_path) as _f:
+            _base_data = json.load(_f)
+        base_params_gl = dict(_base_data.get("params", {}))
+        print(f"  Base config: {base_path} ({len(base_params_gl)} params)", flush=True)
+
+        gl_data = {"dates": dates_gl, "picks_by_date": picks_by_date_gl,
+                   "base_params": base_params_gl}
+
+        if gl_args.workers > 1:
+            # Launch each worker as an independent subprocess with --workers 1.
+            # This avoids Windows multiprocessing spawn issues where child processes
+            # re-enter main() and cascade into data loading + more spawns.
+            import subprocess as _sp
+            _worker_cmd = [
+                sys.executable, __file__,
+                "--study-type", "gl_trail",
+                "--db", gl_args.db,
+                "--study", gl_args.study,
+                "--trials", str(gl_args.trials),
+                "--startup-trials", str(gl_args.startup_trials),
+                "--workers", "1",
+                "--params-out", gl_args.params_out or "config/trial_gl_trail_best.json",
+            ]
+            procs = [_sp.Popen(_worker_cmd) for _ in range(gl_args.workers)]
+            for _p in procs:
+                _p.wait()
+        else:
+            worker_loop_gl_trail(gl_data, gl_args)
+
+        _gl_storage = optuna.storages.RDBStorage(url=gl_args.db)
+        _gl_study = optuna.load_study(study_name=gl_args.study, storage=_gl_storage)
+        dump_best_gl_trail(_gl_study, gl_args)
+        print("\nG+L Trail Search complete.", flush=True)
+        return
+
+    # ------------------------------------------------------------------
+    # COMBINED mode (legacy default)
+    # ------------------------------------------------------------------
     n_trials = args.trials
 
     db_path = args.db

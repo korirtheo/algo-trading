@@ -1,0 +1,107 @@
+============================================================
+BACKTEST: Re-Entry Analysis 2024-2026
+============================================================
+
+Starting cash: $25,000
+Params: config/trial_g511_l626_v3_overlay.json
+
+Data directories found: ['stored_data']
+
+
+============================================================
+RUNNING: WITH RE-ENTRY
+============================================================
+
+============================================================
+BASELINE: With Re-Entry
+============================================================
+
+Re-entry: ENABLED
+
+
+Processing stored_data...
+  Loading cached picks from stored_data\fulltest_picks_gap2_vol250k.pkl...
+
+Completed: 38 trading days
+Final cash: $1,401,726.53
+Total PnL: $1,376,726.53
+Multiplier: 56.07x
+
+============================================================
+RUNNING: WITHOUT RE-ENTRY
+============================================================
+
+============================================================
+COMPARISON: Without Re-Entry
+============================================================
+
+Re-entry: DISABLED
+
+
+Processing stored_data...
+  Loading cached picks from stored_data\fulltest_picks_gap2_vol250k.pkl...
+
+Completed: 38 trading days
+Final cash: $798,448.21
+Total PnL: $773,448.21
+Multiplier: 31.94x
+
+============================================================
+DIRECT COMPARISON
+============================================================
+
+WITH RE-ENTRY:
+  Trades: 143
+  Final cash: $1,401,726.53
+  Multiplier: 56.07x
+
+WITHOUT RE-ENTRY:
+  Trades: 120
+  Final cash: $798,448.21
+  Multiplier: 31.94x
+
+DIFFERENCE:
+  Cash delta: +$603,278.32
+  Trade delta: +23
+  Result: Re-entry HELPS (+$603,278.32, +75.6%)
+
+============================================================
+PERFORMANCE COMPARISON
+============================================================
+
+WITH RE-ENTRY (baseline):
+  Trades: 143
+  Wins: 107 | Losses: 36
+  Win rate: 74.8%
+  Total PnL: $1,376,726.53
+  Final cash: $1,401,726.53
+  Multiplier: 56.07x
+
+WITHOUT RE-ENTRY (blocked):
+  Trades: 113
+  Wins: 83 | Losses: 30
+  Win rate: 73.5%
+  Total PnL: $1,291,414.81
+  Estimated final: $1,316,414.81
+  Estimated multiplier: 52.66x
+
+RE-ENTRY IMPACT:
+  Blocked trades: 30
+  PnL from blocked: $85,311.72
+  Net impact: +$85,311.72
+  Result: Re-entry HELPS (+$85,311.72)
+
+RE-ENTRIES BREAKDOWN:
+  Winners: 24 ($89,956.86)
+  Losers: 6 ($-4,645.14)
+  Win rate: 80.0%
+  Avg PnL: $2843.72
+
+Re-entry PnL by strategy:
+  G: 30 trades (24W/6L), $85,311.72
+
+Saved results to backtest_reentry_20260716_181549_*.csv
+
+============================================================
+ANALYSIS COMPLETE
+============================================================
