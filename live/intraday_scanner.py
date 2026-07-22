@@ -75,7 +75,7 @@ class IntradayScanner:
                 if (
                     _is_warrant_or_unit(ticker)
                     or ticker in self.discovered_today
-                    or ticker in self.engine.watchlist
+                    or ticker in self.engine.active_positions
                 ):
                     continue
 
