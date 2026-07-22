@@ -31,6 +31,7 @@ Usage:
   python -m live.main --dry-run    # process bars but don't place orders
   python -m live.main --no-dash    # run without dashboard
 """
+
 import sys
 import time
 import logging
@@ -44,6 +45,7 @@ from live.streamer import BarStreamer
 from live.engine_combined import CombinedEngine
 from live.executor import OrderExecutor
 from live.halt_monitor import HaltMonitor
+from live.intraday_scanner import IntradayScanner
 
 ET = ZoneInfo("America/New_York")
 
@@ -67,7 +69,9 @@ def recover_open_positions(engine, executor, candidates, log):
         return candidates
 
     # Reconcile with persistent state file
-    log.info(f"RECOVERY: Found {len(open_positions)} open Alpaca positions — reconciling with state file")
+    log.info(
+        f"RECOVERY: Found {len(open_positions)} open Alpaca positions — reconciling with state file"
+    )
     recovered = engine.position_state.reconcile_with_alpaca(open_positions)
 
     if not recovered:
@@ -92,22 +96,28 @@ def recover_open_positions(engine, executor, candidates, log):
         has_metadata = state["has_metadata"]
         change_pct = (current_price / entry_price - 1) * 100
 
-        log.info(f"RECOVERY: {ticker} ({strategy}) | "
-                 f"entry=${entry_price:.2f} current=${current_price:.2f} ({change_pct:+.1f}%) | "
-                 f"metadata={'YES' if has_metadata else 'NO (orphan)'}")
+        log.info(
+            f"RECOVERY: {ticker} ({strategy}) | "
+            f"entry=${entry_price:.2f} current=${current_price:.2f} ({change_pct:+.1f}%) | "
+            f"metadata={'YES' if has_metadata else 'NO (orphan)'}"
+        )
 
         # Check if stop/target already breached during downtime
         stop_price = state.get("stop_price", entry_price * 0.95)
         target_price = state.get("target_price", entry_price * 1.10)
 
         if current_price <= stop_price:
-            log.warning(f"RECOVERY: {ticker} STOP BREACHED (${current_price:.2f} <= ${stop_price:.2f}) — selling immediately")
+            log.warning(
+                f"RECOVERY: {ticker} STOP BREACHED (${current_price:.2f} <= ${stop_price:.2f}) — selling immediately"
+            )
             executor.sell(ticker, reason="RECOVERY_STOP")
             engine.position_state.remove_position(ticker)
             continue
 
         if current_price >= target_price:
-            log.info(f"RECOVERY: {ticker} TARGET REACHED (${current_price:.2f} >= ${target_price:.2f}) — taking profit")
+            log.info(
+                f"RECOVERY: {ticker} TARGET REACHED (${current_price:.2f} >= ${target_price:.2f}) — taking profit"
+            )
             executor.sell(ticker, reason="RECOVERY_TARGET")
             engine.position_state.remove_position(ticker)
             continue
@@ -133,14 +143,16 @@ def recover_open_positions(engine, executor, candidates, log):
                 t = row["timestamp"]
                 if hasattr(t, "to_pydatetime"):
                     t = t.to_pydatetime()
-                engine.bar_data.setdefault(ticker, []).append({
-                    "timestamp": t,
-                    "Open": float(row["open"]),
-                    "High": float(row["high"]),
-                    "Low": float(row["low"]),
-                    "Close": float(row["close"]),
-                    "Volume": float(row["volume"]),
-                })
+                engine.bar_data.setdefault(ticker, []).append(
+                    {
+                        "timestamp": t,
+                        "Open": float(row["open"]),
+                        "High": float(row["high"]),
+                        "Low": float(row["low"]),
+                        "Close": float(row["close"]),
+                        "Volume": float(row["volume"]),
+                    }
+                )
 
         # Restore engine runtime state
         engine.active_positions.add(ticker)
@@ -165,47 +177,58 @@ def recover_open_positions(engine, executor, candidates, log):
 
         # Add to candidates if not already there
         if ticker not in candidate_tickers:
-            candidates = list(candidates) + [{
-                "ticker": ticker,
-                "gap_pct": 0,
-                "pm_volume": 0,
-                "premarket_high": entry_price,
-                "prev_close": entry_price,
-                "float_shares": None,
-            }]
-            engine.picks.append({
-                "ticker": ticker,
-                "gap_pct": 0,
-                "market_open": entry_price,
-                "premarket_high": entry_price,
-                "prev_close": entry_price,
-                "pm_volume": 0,
-                "market_hour_candles": None,
-            })
+            candidates = list(candidates) + [
+                {
+                    "ticker": ticker,
+                    "gap_pct": 0,
+                    "pm_volume": 0,
+                    "premarket_high": entry_price,
+                    "prev_close": entry_price,
+                    "float_shares": None,
+                }
+            ]
+            engine.picks.append(
+                {
+                    "ticker": ticker,
+                    "gap_pct": 0,
+                    "market_open": entry_price,
+                    "premarket_high": entry_price,
+                    "prev_close": entry_price,
+                    "pm_volume": 0,
+                    "market_hour_candles": None,
+                }
+            )
             candidate_tickers.add(ticker)
 
         if has_metadata:
-            log.info(f"RECOVERY: {ticker} restored with full monitoring | "
-                    f"strategy={strategy} stop=${stop_price:.2f} target=${target_price:.2f} "
-                    f"trail={state.get('trail_pct', 0):.1f}% peak=${state.get('peak_price', 0):.2f}")
+            log.info(
+                f"RECOVERY: {ticker} restored with full monitoring | "
+                f"strategy={strategy} stop=${stop_price:.2f} target=${target_price:.2f} "
+                f"trail={state.get('trail_pct', 0):.1f}% peak=${state.get('peak_price', 0):.2f}"
+            )
         else:
-            log.warning(f"RECOVERY: {ticker} orphan — defensive monitoring | "
-                       f"stop=${stop_price:.2f} (-5%) target=${target_price:.2f} (+10%) trail=1%")
+            log.warning(
+                f"RECOVERY: {ticker} orphan — defensive monitoring | "
+                f"stop=${stop_price:.2f} (-5%) target=${target_price:.2f} (+10%) trail=1%"
+            )
 
     # Save account snapshot after recovery
     try:
         account = executor.get_account()
         engine.db.save_account_snapshot(
-            'recovery',
+            "recovery",
             cash=account.cash,
             equity=account.equity,
             buying_power=account.buying_power,
             portfolio_value=account.portfolio_value,
-            positions_count=len(recovered)
+            positions_count=len(recovered),
         )
         # Log recovery event
-        engine.db.log_system_event('recovery', 'warning' if recovered else 'info',
-                                   f'Recovery completed: {len(recovered)} positions restored')
+        engine.db.log_system_event(
+            "recovery",
+            "warning" if recovered else "info",
+            f"Recovery completed: {len(recovered)} positions restored",
+        )
     except Exception as e:
         log.warning(f"Failed to save recovery snapshot: {e}")
 
@@ -214,8 +237,10 @@ def recover_open_positions(engine, executor, candidates, log):
 
 class _ETFormatter(logging.Formatter):
     """Logging formatter that stamps times in US/Eastern (ET)."""
+
     def formatTime(self, record, datefmt=None):
         from datetime import datetime as _dt
+
         ct = _dt.fromtimestamp(record.created, tz=ET)
         return ct.strftime(datefmt or "%H:%M:%S")
 
@@ -228,6 +253,7 @@ def setup_logging():
     today = datetime.now(ET).strftime("%Y-%m-%d")
     log_dir = "logs"
     import os
+
     os.makedirs(log_dir, exist_ok=True)
 
     fmt = "%(asctime)s ET [%(levelname)s] %(name)s: %(message)s"
@@ -267,8 +293,10 @@ def _rotate_log_for_new_day():
     new_fh.setFormatter(_ETFormatter(fmt, datefmt=datefmt))
     root = logging.getLogger()
     root.removeHandler(_FILE_HANDLER)
-    try: _FILE_HANDLER.close()
-    except Exception: pass
+    try:
+        _FILE_HANDLER.close()
+    except Exception:
+        pass
     root.addHandler(new_fh)
     _FILE_HANDLER = new_fh
 
@@ -282,7 +310,7 @@ def wait_until(target_time, log):
     if target <= now:
         return
     wait_secs = (target - now).total_seconds()
-    log.info(f"Waiting {wait_secs/60:.1f} minutes until {target_time}...")
+    log.info(f"Waiting {wait_secs / 60:.1f} minutes until {target_time}...")
     time.sleep(max(0, wait_secs))
 
 
@@ -294,6 +322,7 @@ def _next_trading_day_prep_time(executor, log):
     7:00 / 7:30 / 8:30 / 9:00 / 9:25 / 9:27 / 9:30 sweep.
     """
     from datetime import time as dt_time
+
     try:
         clock = executor.client.get_clock()
         next_open = clock.next_open
@@ -304,7 +333,9 @@ def _next_trading_day_prep_time(executor, log):
         log.info(f"Next session opens at {next_open_et}; waking at {wake_at}")
         return wake_at
     except Exception as e:
-        log.warning(f"Alpaca clock fetch failed ({e}); falling back to next weekday 7:00 ET")
+        log.warning(
+            f"Alpaca clock fetch failed ({e}); falling back to next weekday 7:00 ET"
+        )
         now = datetime.now(ET)
         nxt = now.date() + timedelta(days=1)
         while nxt.weekday() >= 5:  # 5=Sat, 6=Sun
@@ -371,13 +402,20 @@ def _run_one_day(executor, args, log):
             return []
         if c:
             for x in c:
-                float_str = f"{x['float_shares']/1e6:.1f}M" if x.get('float_shares') else "N/A"
-                log.info(f"  {x['ticker']}: gap={x['gap_pct']:.1f}%, "
-                         f"PM vol={x['pm_volume']:,}, float={float_str}")
+                float_str = (
+                    f"{x['float_shares'] / 1e6:.1f}M"
+                    if x.get("float_shares")
+                    else "N/A"
+                )
+                log.info(
+                    f"  {x['ticker']}: gap={x['gap_pct']:.1f}%, "
+                    f"PM vol={x['pm_volume']:,}, float={float_str}"
+                )
             # Update dashboard with latest scan results immediately
             if not args.no_dash:
                 try:
                     from dashboard.backend.app import bridge
+
                     bridge.scanner_candidates = c
                 except Exception:
                     pass
@@ -387,10 +425,10 @@ def _run_one_day(executor, args, log):
 
     # Scan schedule: 7:00, 7:30, 9:00, 9:25, 9:27, 9:30
     scan_times = [
-        (dt_time(7, 0),  "7:00"),
+        (dt_time(7, 0), "7:00"),
         (dt_time(7, 30), "7:30"),
         (dt_time(8, 30), "8:30"),
-        (dt_time(9, 0),  "9:00"),
+        (dt_time(9, 0), "9:00"),
         (dt_time(9, 25), "9:25"),
         (dt_time(9, 27), "9:27 FINAL"),
         (dt_time(9, 30), "9:30"),
@@ -423,8 +461,10 @@ def _run_one_day(executor, args, log):
         return None
 
     if not candidates:
-        log.info("No candidates after all scans for %s — will retry next trading day.",
-                 datetime.now(ET).strftime("%Y-%m-%d"))
+        log.info(
+            "No candidates after all scans for %s — will retry next trading day.",
+            datetime.now(ET).strftime("%Y-%m-%d"),
+        )
         return None
 
     trading_day = datetime.now(ET).date()
@@ -437,11 +477,15 @@ def _run_one_day(executor, args, log):
     try:
         from live.trading_stream import FillStream
         from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+
         fill_stream = FillStream(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
         fill_stream.start_async()
         log.info("FillStream: started — fills will be tracked via Alpaca TradingStream")
     except Exception as e:
-        log.error(f"FillStream init failed, falling back to legacy 30s polling: {e}", exc_info=True)
+        log.error(
+            f"FillStream init failed, falling back to legacy 30s polling: {e}",
+            exc_info=True,
+        )
         fill_stream = None
 
     engine = CombinedEngine(executor, fill_stream=fill_stream)
@@ -451,8 +495,11 @@ def _run_one_day(executor, args, log):
     engine.db.save_watchlist(candidates, scan_time=datetime.now(ET))
 
     # Log system startup event
-    engine.db.log_system_event('startup', 'info',
-                               f'Engine started with {len(candidates)} candidates for {trading_day}')
+    engine.db.log_system_event(
+        "startup",
+        "info",
+        f"Engine started with {len(candidates)} candidates for {trading_day}",
+    )
 
     # Recover any open positions from a previous session/crash
     candidates = recover_open_positions(engine, executor, candidates, log)
@@ -463,6 +510,7 @@ def _run_one_day(executor, args, log):
     # Phase 3: Wire engine into dashboard bridge
     if not args.no_dash:
         from dashboard.backend.app import bridge
+
         bridge.engine = engine
         bridge.scanner_candidates = candidates
         bridge.scan_date = trading_day
@@ -478,6 +526,7 @@ def _run_one_day(executor, args, log):
 
     # Feed comparison logger — writes to feed_comparison DB table
     from live.feed_logger import FeedLogger, SOURCE_TRADIER, SOURCE_ALPACA_IEX
+
     feed_logger = FeedLogger(engine.db)
 
     def on_bar_with_ws(symbol, bar):
@@ -485,16 +534,25 @@ def _run_one_day(executor, args, log):
         engine.on_bar(symbol, bar)
         try:
             from dashboard.backend.services.ws_manager import ws_manager
-            ws_manager.broadcast_sync({
-                "type": "bar",
-                "symbol": symbol,
-                "data": {k: (str(v) if hasattr(v, 'isoformat') else v) for k, v in bar.items()},
-            })
+
+            ws_manager.broadcast_sync(
+                {
+                    "type": "bar",
+                    "symbol": symbol,
+                    "data": {
+                        k: (str(v) if hasattr(v, "isoformat") else v)
+                        for k, v in bar.items()
+                    },
+                }
+            )
         except Exception:
             pass
 
+    _last_bar_time = {}
+
     def on_tradier_bar(symbol, bar):
         """Tradier bar: drives the engine + log for comparison."""
+        _last_bar_time[symbol] = bar["timestamp"]
         feed_logger.log(SOURCE_TRADIER, symbol, bar)
         on_bar_with_ws(symbol, bar) if not args.no_dash else engine.on_bar(symbol, bar)
 
@@ -505,14 +563,20 @@ def _run_one_day(executor, args, log):
     # Primary feed: Tradier (SIP-level real-time)
     tradier_streamer = None
     from config.settings import TRADIER_API_KEY
+
     try:
         from live.tradier_streamer import TradierStreamer
-        tradier_streamer = TradierStreamer(api_key=TRADIER_API_KEY, on_2min_bar=on_tradier_bar)
+
+        tradier_streamer = TradierStreamer(
+            api_key=TRADIER_API_KEY, on_2min_bar=on_tradier_bar
+        )
         tradier_streamer.subscribe(symbols)
         tradier_stream_thread = tradier_streamer.start_async()
         log.info("TradierStreamer: started as primary data feed")
     except Exception as e:
-        log.error(f"TradierStreamer failed to start, falling back to Alpaca IEX as primary: {e}")
+        log.error(
+            f"TradierStreamer failed to start, falling back to Alpaca IEX as primary: {e}"
+        )
         tradier_streamer = None
 
     # Secondary feed: Alpaca IEX — comparison logging only when Tradier is up,
@@ -520,8 +584,12 @@ def _run_one_day(executor, args, log):
     if tradier_streamer is not None:
         alpaca_streamer = BarStreamer(on_2min_bar=on_alpaca_bar)
     else:
-        alpaca_streamer = BarStreamer(on_2min_bar=on_bar_with_ws if not args.no_dash else engine.on_bar)
-        log.warning("Tradier unavailable — Alpaca IEX is driving the engine (volume caps unreliable)")
+        alpaca_streamer = BarStreamer(
+            on_2min_bar=on_bar_with_ws if not args.no_dash else engine.on_bar
+        )
+        log.warning(
+            "Tradier unavailable — Alpaca IEX is driving the engine (volume caps unreliable)"
+        )
 
     # Keep `streamer` pointing at whichever streamer owns the engine feed
     # (halt-resume monitor calls streamer.add_symbol)
@@ -544,8 +612,12 @@ def _run_one_day(executor, args, log):
     halt_monitor = None
     try:
         from config.settings import (
-            HALT_MONITOR_ENABLED, HALT_MIN_PRICE, HALT_MAX_PRICE,
-            HALT_MAX_FLOAT, HALT_REASONS_TRADED, HALT_POLL_INTERVAL_SECS,
+            HALT_MONITOR_ENABLED,
+            HALT_MIN_PRICE,
+            HALT_MAX_PRICE,
+            HALT_MAX_FLOAT,
+            HALT_REASONS_TRADED,
+            HALT_POLL_INTERVAL_SECS,
             FLOAT_DATA,
         )
     except ImportError:
@@ -579,13 +651,19 @@ def _run_one_day(executor, args, log):
                     if not args.no_dash:
                         try:
                             from dashboard.backend.app import bridge
+
                             evs = getattr(bridge, "halt_events", [])
-                            evs.append({
-                                "ticker": ticker, "reason": ev.reason,
-                                "halt_price": ev.halt_price,
-                                "resume_price": ev.resume_price,
-                                "resume_ts": str(ev.resume_dt) if ev.resume_dt else None,
-                            })
+                            evs.append(
+                                {
+                                    "ticker": ticker,
+                                    "reason": ev.reason,
+                                    "halt_price": ev.halt_price,
+                                    "resume_price": ev.resume_price,
+                                    "resume_ts": str(ev.resume_dt)
+                                    if ev.resume_dt
+                                    else None,
+                                }
+                            )
                             bridge.halt_events = evs[-200:]
                         except Exception:
                             pass
@@ -601,84 +679,80 @@ def _run_one_day(executor, args, log):
         if not args.no_dash:
             try:
                 from dashboard.backend.app import bridge
+
                 bridge.halt_monitor = halt_monitor
             except Exception:
                 pass
-        log.info("Halt-resume monitor enabled (reasons=%s, $%g-$%g, max_float=%dM)",
-                 sorted(_whitelist), HALT_MIN_PRICE, HALT_MAX_PRICE,
-                 HALT_MAX_FLOAT // 1_000_000)
+        log.info(
+            "Halt-resume monitor enabled (reasons=%s, $%g-$%g, max_float=%dM)",
+            sorted(_whitelist),
+            HALT_MIN_PRICE,
+            HALT_MAX_PRICE,
+            HALT_MAX_FLOAT // 1_000_000,
+        )
     else:
         log.info("Halt-resume monitor DISABLED (HALT_MONITOR_ENABLED=false)")
+
+    intraday_scanner = IntradayScanner(engine)
 
     # REST polling fallback: fetch 2-min bars for tickers that the IEX stream misses
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.requests import StockBarsRequest
     from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
     from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED
-    _hist_client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
-    _last_poll_bar = {}   # ticker -> last bar timestamp seen via REST
-    _last_poll_time = datetime.now(ET)
 
-    def _poll_missing_bars():
-        """Fetch 2-min bars via REST for tickers that the WS hasn't delivered recently."""
-        nonlocal _last_poll_time
+    _last_warn_time = 0
+
+    def check_feed_health():
+        """Check if Tradier WebSocket feed has missed recently expected bars."""
+        nonlocal _last_warn_time
         now_et = datetime.now(ET)
-        today = now_et.date()
-        market_open_dt = datetime.combine(today, dt_time(9, 30)).replace(tzinfo=ET)
-        # Fetch last 10 minutes worth of bars
-        start_dt = now_et - timedelta(minutes=10)
-        if start_dt < market_open_dt:
-            start_dt = market_open_dt
-        try:
-            req = StockBarsRequest(
-                symbol_or_symbols=symbols,
-                timeframe=TimeFrame(2, TimeFrameUnit.Minute),
-                start=start_dt,
-                end=now_et,
-                adjustment="raw",
-                feed=ALPACA_FEED,
-            )
-            bars_resp = _hist_client.get_stock_bars(req)
-            if bars_resp.df.empty:
-                return
-            df = bars_resp.df.reset_index()
-            # FIX 2026-06-24: skip PARTIAL bars (still in progress). Alpaca returns
-            # the in-progress 2-min slot's data even before it's complete, e.g. at
-            # 09:33:33 we get the 09:32-09:34 bar with only 1.5 min of data. Injecting
-            # this caused CCXI to fire G entry 30s BEFORE the bar closed, beating
-            # ABSI/WEN to the slot purely by REST iteration order (non-deterministic).
-            # Only inject bars whose period has fully ended.
-            for sym in df["symbol"].unique():
-                tdf = df[df["symbol"] == sym].sort_values("timestamp")
-                for _, row in tdf.iterrows():
-                    ts = row["timestamp"]
-                    # Convert ts to a tz-aware datetime if needed and check completion
-                    bar_end = ts + timedelta(minutes=2)
-                    if bar_end > now_et:
-                        # Bar still in progress — skip. Wait until next poll after slot ends.
-                        log.debug(f"REST poll: {sym} skipping partial bar @ {ts} (ends {bar_end} > now {now_et})")
-                        continue
-                    last_seen = _last_poll_bar.get(sym)
-                    if last_seen is not None and ts <= last_seen:
-                        continue  # already processed
-                    bar = {
-                        "Open": float(row["open"]),
-                        "High": float(row["high"]),
-                        "Low": float(row["low"]),
-                        "Close": float(row["close"]),
-                        "Volume": int(row["volume"]),
-                        "timestamp": ts,
-                    }
-                    on_bar_with_ws(sym, bar)
-                    _last_poll_bar[sym] = ts
-                    log.debug(f"REST poll injected bar: {sym} @ {ts}")
-        except Exception as e:
-            log.debug(f"REST poll failed: {e}")
-        _last_poll_time = now_et
+
+        # Only check during market hours (9:30 to 16:00 ET)
+        from datetime import time as dt_time
+
+        if not (dt_time(9, 30) <= now_et.time() <= dt_time(16, 0)):
+            return
+
+        stale_symbols = []
+        for sym in symbols:
+            last_seen = _last_bar_time.get(sym)
+            if last_seen is None:
+                stale_symbols.append(sym)
+                continue
+            try:
+                last_seen_et = last_seen.astimezone(ET)
+            except Exception:
+                last_seen_et = last_seen
+            if now_et - last_seen_et > timedelta(minutes=6):
+                stale_symbols.append(sym)
+
+        if len(symbols) > 0 and (len(stale_symbols) / len(symbols)) > 0.5:
+            now_ts = time.time()
+            if now_ts - _last_warn_time > 120:  # throttle warning to every 2 minutes
+                _last_warn_time = now_ts
+                msg = f"Tradier feed warning: {len(stale_symbols)}/{len(symbols)} symbols are stale (>6 min without bars)"
+                log.warning(msg)
+                import json
+
+                engine.db.log_system_event(
+                    "feed_warning",
+                    "warning",
+                    msg,
+                    details=json.dumps({"stale_symbols": stale_symbols}),
+                )
 
     # Phase 6: Main loop - monitor until EOD
-    stop_keys = [v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0]
-    target_keys = [v for k, v in engine.params.items() if k.endswith("_target_pct") or k.endswith("_target1_pct") or k.endswith("_target2_pct")]
+    stop_keys = [
+        v for k, v in engine.params.items() if k.endswith("_stop_pct") and v > 0
+    ]
+    target_keys = [
+        v
+        for k, v in engine.params.items()
+        if k.endswith("_target_pct")
+        or k.endswith("_target1_pct")
+        or k.endswith("_target2_pct")
+    ]
     RECOVERY_STOP = -(max(stop_keys) if stop_keys else 12.0)
     RECOVERY_TARGET = max(target_keys) if target_keys else 23.0
     _loop_count = 0
@@ -689,8 +763,11 @@ def _run_one_day(executor, args, log):
             # Sanity: trading day rolled over while we were still in the loop —
             # something is very wrong; abort so the outer rollover can re-init.
             if now.date() != trading_day:
-                log.error("DATE MISMATCH: trading_day=%s but now=%s — exiting loop",
-                          trading_day, now.date())
+                log.error(
+                    "DATE MISMATCH: trading_day=%s but now=%s — exiting loop",
+                    trading_day,
+                    now.date(),
+                )
                 break
 
             # EOD close at 3:45 PM
@@ -702,16 +779,18 @@ def _run_one_day(executor, args, log):
                 try:
                     account = executor.get_account()
                     engine.db.save_account_snapshot(
-                        'market_close',
+                        "market_close",
                         cash=account.cash,
                         equity=account.equity,
                         buying_power=account.buying_power,
                         portfolio_value=account.portfolio_value,
                         daily_pnl=engine.daily_pnl,
                         trades_count=len(engine.trades_today),
-                        positions_count=len(engine.active_positions)
+                        positions_count=len(engine.active_positions),
                     )
-                    log.info(f"EOD snapshot saved: equity=${account.equity:.2f} P&L=${engine.daily_pnl:.2f}")
+                    log.info(
+                        f"EOD snapshot saved: equity=${account.equity:.2f} P&L=${engine.daily_pnl:.2f}"
+                    )
                 except Exception as e:
                     log.warning(f"Failed to save EOD snapshot: {e}")
 
@@ -722,8 +801,11 @@ def _run_one_day(executor, args, log):
                     log.warning(f"Failed to save bar summaries: {e}")
 
                 # Log shutdown event
-                engine.db.log_system_event('shutdown', 'info',
-                                          f'Market close: {len(engine.trades_today)} trades, P&L=${engine.daily_pnl:.2f}')
+                engine.db.log_system_event(
+                    "shutdown",
+                    "info",
+                    f"Market close: {len(engine.trades_today)} trades, P&L=${engine.daily_pnl:.2f}",
+                )
 
                 break
 
@@ -731,10 +813,10 @@ def _run_one_day(executor, args, log):
             if now.hour >= 16:
                 break
 
-            # REST polling fallback every 2 minutes
+            # Check Tradier feed health every 2 minutes
             _loop_count += 1
             if _loop_count % 4 == 0:  # every 4 × 30s = 2 min
-                _poll_missing_bars()
+                check_feed_health()
 
             # Monitor recovered positions with hard stop/target
             for active in engine.active_positions:
@@ -747,15 +829,21 @@ def _run_one_day(executor, args, log):
                                 current = float(pos.current_price)
                                 chg = (current / entry - 1) * 100
                                 if chg <= RECOVERY_STOP:
-                                    log.warning(f"RECOVERY STOP HIT: {active} {chg:+.1f}% — selling")
+                                    log.warning(
+                                        f"RECOVERY STOP HIT: {active} {chg:+.1f}% — selling"
+                                    )
                                     executor.sell(active, reason="RECOVERY_STOP")
                                     engine.active_positions.discard(active)
                                 elif chg >= RECOVERY_TARGET:
-                                    log.info(f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling")
+                                    log.info(
+                                        f"RECOVERY TARGET HIT: {active} {chg:+.1f}% — selling"
+                                    )
                                     executor.sell(active, reason="RECOVERY_TARGET")
                                     engine.active_positions.discard(active)
                     except Exception:
                         pass
+
+            intraday_scanner.poll()
 
             time.sleep(30)
 
@@ -776,8 +864,10 @@ def _run_one_day(executor, args, log):
     log.info(f"  Losses: {summary['losses']}")
     log.info(f"  PnL:    ${summary['daily_pnl']:+,.2f}")
     for t in summary["trade_details"]:
-        log.info(f"    {t['ticker']} ({t.get('strategy','?')}): ${t['pnl']:+,.2f} "
-                 f"({t['reason']}) ${t['entry_price']:.2f} -> ${t['exit_price']:.2f}")
+        log.info(
+            f"    {t['ticker']} ({t.get('strategy', '?')}): ${t['pnl']:+,.2f} "
+            f"({t['reason']}) ${t['entry_price']:.2f} -> ${t['exit_price']:.2f}"
+        )
     log.info("=" * 60)
     return summary
 
@@ -795,8 +885,10 @@ def run(args):
     # Check account
     executor = OrderExecutor()
     acct = executor.get_account()
-    log.info(f"Account: cash=${float(acct.cash):,.2f}, "
-             f"buying_power=${float(acct.buying_power):,.2f}")
+    log.info(
+        f"Account: cash=${float(acct.cash):,.2f}, "
+        f"buying_power=${float(acct.buying_power):,.2f}"
+    )
 
     # Start dashboard once — it persists across trading days
     if not args.no_dash:
@@ -835,9 +927,15 @@ def run(args):
 def main():
     parser = argparse.ArgumentParser(description="Combined Strategy Live Paper Trading")
     parser.add_argument("--scan-only", action="store_true", help="Only run scanner")
-    parser.add_argument("--dry-run", action="store_true", help="Process bars but don't trade")
-    parser.add_argument("--no-dash", action="store_true", help="Disable dashboard server")
-    parser.add_argument("--port", type=int, default=8000, help="Dashboard port (default: 8000)")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Process bars but don't trade"
+    )
+    parser.add_argument(
+        "--no-dash", action="store_true", help="Disable dashboard server"
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Dashboard port (default: 8000)"
+    )
     args = parser.parse_args()
     try:
         run(args)
