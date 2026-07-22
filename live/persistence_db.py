@@ -1242,10 +1242,10 @@ class TradingDatabase:
             )
 
     def get_intraday_discoveries_by_date(self, date):
-        """Get all intraday discoveries for a date."""
+        """Get intraday top gainers for a date, sorted by % change descending."""
         with self._conn() as conn:
             cursor = conn.execute(
-                "SELECT * FROM intraday_discoveries WHERE date=? ORDER BY timestamp",
+                "SELECT * FROM intraday_discoveries WHERE date=? ORDER BY percent_change DESC",
                 (date,),
             )
             return [dict(row) for row in cursor.fetchall()]

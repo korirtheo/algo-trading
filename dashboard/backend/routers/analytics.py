@@ -350,7 +350,12 @@ async def get_feed_comparison(date: str):
 
 
 @router.get("/analytics/trades/details/{date}")
+async def get_trade_details(date: str):
+    """Get detailed trade information for a specific date."""
+    return db.get_trades_by_date(date)
+
+
 @router.get("/analytics/intraday_discoveries/{date}")
 async def get_intraday_discoveries(date: str):
-    """Get all intraday discoveries for a specific date."""
+    """Get intraday top gainers for a specific date, sorted by % change."""
     return db.get_intraday_discoveries_by_date(date)
