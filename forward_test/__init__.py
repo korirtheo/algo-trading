@@ -1,10 +1,3 @@
-"""
-Wide forward test: top-50 + 50-random trials from g511_l626_v3_full_no_trail
-on three OOS windows: 2022, 2023, 2026-Mar+
-
-Usage:
-    python oos_wide_forward_test.py [--workers N]
-"""
 import argparse
 import csv
 import os
@@ -19,43 +12,38 @@ import optuna
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
 
-STORAGE_URL = "postgresql://postgres@127.0.0.1:5432/optuna_g511_l626_v3_full_no_trail"
-STUDY_NAME = "g511_l626_v3_full_no_trail"
-STARTING_CASH = 25_000
-OUT_CSV = "oos_wide_forward_test_results.csv"
-
-# Data directories per window
-DIRS_2022 = ["stored_data_2022"]
-DIRS_2023 = ["stored_data_2023"]
-DIRS_2026 = ["stored_data_mar_may_2026", "stored_data_jun_2026", "stored_data_oos"]
-
 
 def _run_single(trial_number, params, window_label, dates, picks_by_date):
     """Run a backtest for one trial on one window. Must be importable at top level."""
-    import test_green_candle_combined as tgc
+    from backtest.engine import simulate_day_combined
     from test_full import MARGIN_THRESHOLD
-    from optimize_combined import set_strategy_params, _build_param_snapshot, _param_lock
+    from optimize_combined import (
+        set_strategy_params,
+        _build_param_snapshot,
+        _param_lock,
+    )
 
     # Configure simulator (same as training)
-    tgc.USE_DYNAMIC_SLIPPAGE = True
-    tgc.USE_MULTIWINDOW_SLIPPAGE = True
-    tgc.USE_VOLATILITY_ADJUSTMENT = True
-    tgc.SLIP_IMPACT_K = 3.0
-    tgc.VOL_CAP_PCT = 5.0
-    tgc.MAX_2MIN_PARTICIPATION = 0.15
-    tgc.MAX_REGIME_PARTICIPATION = 0.08
-    tgc.NEWS_MODULATOR_ENABLED = False
-    tgc.MIN_PRICE = 0.0
-    tgc.MAX_MODELED_SLIP_BP = 0.0
-    tgc.MAX_CUM_DVOL_AT_ENTRY_M = 0.0
-    tgc.MIN_ATR_PCT = 0.0
-    tgc.MIN_FAVORABILITY_THRESHOLD = 0.0
-    tgc.NEWS_FILTER_ENABLED = False
+    USE_DYNAMIC_SLIPPAGE = True
+    USE_MULTIWINDOW_SLIPPAGE = True
+    USE_VOLATILITY_ADJUSTMENT = True
+    SLIP_IMPACT_K = 3.0
+    VOL_CAP_PCT = 5.0
+    MAX_2MIN_PARTICIPATION = 0.15
+    MAX_REGIME_PARTICIPATION = 0.08
+    NEWS_MODULATOR_ENABLED = False
+    MIN_PRICE = 0.0
+    MAX_MODELED_SLIP_BP = 0.0
+    MAX_CUM_DVOL_AT_ENTRY_M = 0.0
+    MIN_ATR_PCT = 0.0
+    MIN_FAVORABILITY_THRESHOLD = 0.0
+    NEWS_FILTER_ENABLED = False
 
     # Load complete baseline param dict from a known-good deployed config
     # Then override only G/L/V params from the trial
     import json
-    base_config_path = "config/trial_w21b_511_deploy.json"
+
+    base_config_path = "config/trial_gl_trail_final_best.json"
     if os.path.exists(base_config_path):
         with open(base_config_path) as f:
             base_data = json.load(f)
@@ -71,37 +59,49 @@ def _run_single(trial_number, params, window_label, dates, picks_by_date):
             p = {}
 
     # Apply trial params (G, L, V only — these override)
+    # Set default values for all possible parameters
+    for s in "hgafdvmrpwobkcsexijnl":
+        p.setdefault(f"{s}_enabled", False)
+        p.setdefault(f"{s}_min_gap_pct", 0.0)
+        p.setdefault(f"{s}_min_body_pct", 0.0)
+        p.setdefault(f"{s}_require_2nd_green", False)
+        p.setdefault(f"{s}_require_2nd_new_high", False)
+        p.setdefault(f"{s}_require_vol_confirm", False)
+        p.setdefault(f"{s}_target_pct", 0.0)
+        p.setdefault(f"{s}_target2_pct", 0.0)
+        p.setdefault(f"{s}_partial_sell_pct", 0.0)
+        p.setdefault(f"{s}_time_limit_minutes", 0)
+        p.setdefault(f"{s}_stop_pct", 0.0)
+        p.setdefault(f"{s}_trail_pct", 0.0)
+        p.setdefault(f"{s}_trail_activate_pct", 0.0)
+
     p.update(params)
 
-    # Force trailing off (ensure all strategies have 0 trail)
-    for prefix in ("g", "l", "v", "h", "a", "f", "d", "r", "w", "o", "b", "k", "c", "s", "e", "x", "i", "j", "n"):
-        p[f"{prefix}_trail_pct"] = 0.0
-        p[f"{prefix}_trail_activate_pct"] = 0.0
+    # Disable all strategies by default
+    for prefix in "hgafdvmrpwobkcsexijnl":
+        p[f"{prefix}_enabled"] = False
 
-    # Disable unused strategies (only G, L, V enabled)
-    for s in "hafdrwobkcsexijn":
-        p[f"{s}_enabled"] = False
-
-    # Explicitly enable G, L, V
+    # Explicitly enable G, L
     p["g_enabled"] = True
     p["l_enabled"] = True
-    p["v_enabled"] = True
 
     with _param_lock:
         set_strategy_params(p)
         snapshot = _build_param_snapshot()
+        print(f"Snapshot for trial {trial_number}: {snapshot}")
 
     # Run backtest
-    cash = float(STARTING_CASH)
+    cash = float(25000)
     all_trades = []
 
     for d in dates:
         picks = picks_by_date.get(d, [])
+        print(f"Picks for {d}: {picks}")
         if not picks:
             continue
-        cash_account = cash < MARGIN_THRESHOLD
+        cash_account = cash < 100000
         try:
-            states, cash, unsettled, _ = tgc.simulate_day_combined(
+            states, cash, unsettled, _ = simulate_day_combined(
                 picks, cash, cash_account, params=snapshot
             )
         except Exception:
@@ -116,8 +116,14 @@ def _run_single(trial_number, params, window_label, dates, picks_by_date):
 
     n = len(all_trades)
     if n == 0:
-        return {"trial": trial_number, "window": window_label,
-                "n": 0, "pnl": 0.0, "pf": 0.0, "wr": 0.0}
+        return {
+            "trial": trial_number,
+            "window": window_label,
+            "n": 0,
+            "pnl": 0.0,
+            "pf": 0.0,
+            "wr": 0.0,
+        }
 
     total_pnl = sum(t["pnl"] for t in all_trades)
     wins = [t["pnl"] for t in all_trades if t["pnl"] > 0]
@@ -142,48 +148,61 @@ def worker(args):
     try:
         return _run_single(trial_number, params, window_label, dates, picks_by_date)
     except Exception as e:
-        return {"trial": trial_number, "window": window_label,
-                "n": -1, "pnl": 0.0, "pf": 0.0, "wr": 0.0, "error": str(e)}
+        print(f"Error in trial {trial_number}: {e}")
+        return {
+            "trial": trial_number,
+            "window": window_label,
+            "n": -1,
+            "pnl": 0.0,
+            "pf": 0.0,
+            "wr": 0.0,
+            "error": str(e),
+        }
 
 
 def load_window(dirs, date_lo, date_hi):
     from test_full import load_all_picks
+
     all_dirs = [d for d in dirs if os.path.exists(d)]
     all_dates, picks_by_date = load_all_picks(all_dirs)
     dates = sorted([d for d in all_dates if date_lo <= d <= date_hi])
     return dates, picks_by_date
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--workers", type=int, default=4)
-    parser.add_argument("--top", type=int, default=50, help="Top N trials by training score")
-    parser.add_argument("--random", type=int, default=50, help="Random trials to sample")
-    args = parser.parse_args()
+def main(config, args):
+    study_name = config["study"]
+    storage = "postgresql://postgres@127.0.0.1:5432/optuna_gl_trail"
 
     print("Loading study...", flush=True)
-    study = optuna.load_study(study_name=STUDY_NAME, storage=STORAGE_URL)
-    completed = [t for t in study.trials if t.state.name == "COMPLETE" and t.value and t.value > 0]
+    study = optuna.load_study(study_name=study_name, storage=storage)
+    completed = [
+        t
+        for t in study.trials
+        if t.state.name == "COMPLETE" and t.value and t.value > 0
+    ]
     print(f"  {len(completed)} completed trials with positive score", flush=True)
 
     # Top N by training score
-    top_n = sorted(completed, key=lambda t: t.value, reverse=True)[:args.top]
+    top_n = sorted(completed, key=lambda t: t.value, reverse=True)[:50]
     top_ids = {t.number for t in top_n}
 
     # Random sample from the rest
     rest = [t for t in completed if t.number not in top_ids]
     random.seed(42)
-    rand_n = random.sample(rest, min(args.random, len(rest)))
+    rand_n = random.sample(rest, min(50, len(rest)))
 
     selected = top_n + rand_n
-    print(f"  Selected: {len(top_n)} top + {len(rand_n)} random = {len(selected)} trials", flush=True)
+    print(
+        f"  Selected: {len(top_n)} top + {len(rand_n)} random = {len(selected)} trials",
+        flush=True,
+    )
 
     # Load data windows
     print("Loading data windows...", flush=True)
     windows = {
-        "2022": load_window(DIRS_2022, "2022-01-01", "2022-12-31"),
-        "2023": load_window(DIRS_2023, "2023-01-01", "2023-12-31"),
-        "2026_oos": load_window(DIRS_2026, "2026-03-01", "2099-12-31"),
+        "2026_oos": load_window(
+            config["data_dirs"]["2026"], "2026-03-01", "2099-12-31"
+        ),
     }
     for wname, (dates, _) in windows.items():
         print(f"  {wname}: {len(dates)} trading days", flush=True)
@@ -208,20 +227,25 @@ def main():
             if done % 50 == 0 or done == len(jobs):
                 elapsed = time.time() - t0
                 eta = (elapsed / done) * (len(jobs) - done)
-                print(f"  {done}/{len(jobs)} done  ({elapsed:.0f}s elapsed, ~{eta:.0f}s left)", flush=True)
+                print(
+                    f"  {done}/{len(jobs)} done  ({elapsed:.0f}s elapsed, ~{eta:.0f}s left)",
+                    flush=True,
+                )
 
     # Write CSV
+    output_filename = f"forward_test_results_{study_name}_top50_rand50.csv"
     fieldnames = ["trial", "window", "n", "pnl", "pf", "wr"]
-    with open(OUT_CSV, "w", newline="") as f:
+    with open(output_filename, "w", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames, extrasaction="ignore")
         w.writeheader()
         for r in sorted(results, key=lambda x: (x["trial"], x["window"])):
             w.writerow(r)
-    print(f"\nResults saved to {OUT_CSV}", flush=True)
+    print(f"\nResults saved to {output_filename}", flush=True)
 
     # ---- Summary table ----
     # Pivot: trial -> {window: result}
     from collections import defaultdict
+
     by_trial = defaultdict(dict)
     for r in results:
         by_trial[r["trial"]][r["window"]] = r
@@ -233,53 +257,41 @@ def main():
     train_n = {t.number: t.user_attrs.get("n", 0) for t in selected}
     top_set = {t.number for t in top_n}
 
-    WINDOWS = ["2022", "2023", "2026_oos"]
-
     # Print top 20 by 2026 OOS PnL
-    print("\n" + "="*110)
-    print(f"{'#':>5} {'src':>4}  {'train_score':>12} {'train_pnl':>10} {'train_pf':>8} "
-          f"{'2022_pnl':>10} {'22_pf':>6} {'22_n':>5} "
-          f"{'2023_pnl':>10} {'23_pf':>6} {'23_n':>5} "
-          f"{'2026_pnl':>10} {'26_pf':>6} {'26_n':>5}")
-    print("-"*110)
+    print("\n" + "=" * 110)
+    print(
+        f"{'#':>5} {'src':>4}  {'train_score':>12} {'train_pnl':>10} {'train_pf':>8} "
+        f"{'2026_pnl':>10} {'26_pf':>6} {'26_n':>5}"
+    )
+    print("-" * 110)
 
     def row_summary(tnum):
-        r22 = by_trial[tnum].get("2022", {})
-        r23 = by_trial[tnum].get("2023", {})
         r26 = by_trial[tnum].get("2026_oos", {})
         src = "TOP" if tnum in top_set else "RND"
         ts = train_score.get(tnum, 0)
         tp = train_pnl.get(tnum, 0)
         tf = train_pf.get(tnum, 0)
-        return (tnum, src, ts, tp, tf,
-                r22.get("pnl", 0), r22.get("pf", 0), r22.get("n", 0),
-                r23.get("pnl", 0), r23.get("pf", 0), r23.get("n", 0),
-                r26.get("pnl", 0), r26.get("pf", 0), r26.get("n", 0))
+        return (
+            tnum,
+            src,
+            ts,
+            tp,
+            tf,
+            r26.get("pnl", 0),
+            r26.get("pf", 0),
+            r26.get("n", 0),
+        )
 
     all_rows = [row_summary(t.number) for t in selected]
 
     # Sort by 2026 OOS PnL descending
-    all_rows.sort(key=lambda x: x[11], reverse=True)
+    all_rows.sort(key=lambda x: x[5], reverse=True)
 
     for row in all_rows[:30]:
-        tnum, src, ts, tp, tf, p22, f22, n22, p23, f23, n23, p26, f26, n26 = row
-        print(f"{tnum:>5} {src:>4}  {ts:>12,.0f} {tp:>10,.0f} {tf:>8.3f} "
-              f"{p22:>10,.0f} {f22:>6.2f} {n22:>5} "
-              f"{p23:>10,.0f} {f23:>6.2f} {n23:>5} "
-              f"{p26:>10,.0f} {f26:>6.2f} {n26:>5}")
+        tnum, src, ts, tp, tf, p26, f26, n26 = row
+        print(
+            f"{tnum:>5} {src:>4}  {ts:>12,.0f} {tp:>10,.0f} {tf:>8.3f} "
+            f"{p26:>10,.0f} {f26:>6.2f} {n26:>5}"
+        )
 
-    print("\n--- Consistent top 10 (sum of all 3 OOS windows, trials with n>0 on all windows) ---")
-    consistent = [(r, r[5]+r[8]+r[11]) for r in all_rows
-                  if r[7] > 0 and r[10] > 0 and r[13] > 0]
-    consistent.sort(key=lambda x: x[1], reverse=True)
-    for row, total_oos in consistent[:10]:
-        tnum, src, ts, tp, tf, p22, f22, n22, p23, f23, n23, p26, f26, n26 = row
-        print(f"  #{tnum:3d} {src}  train={ts:>12,.0f}  OOS_total={total_oos:>10,.0f}  "
-              f"2022={p22:>8,.0f}({f22:.2f}pf)  2023={p23:>8,.0f}({f23:.2f}pf)  "
-              f"2026={p26:>8,.0f}({f26:.2f}pf)")
-
-    print(f"\nTotal runtime: {time.time()-t0:.0f}s")
-
-
-if __name__ == "__main__":
-    main()
+    print(f"\nTotal runtime: {time.time() - t0:.0f}s")

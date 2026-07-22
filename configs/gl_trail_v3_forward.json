@@ -1,0 +1,11 @@
+{
+    "study": "gl_trail_v3",
+    "strategy": "default",
+    "data_dirs": {
+        "2026": [
+            "stored_data_mar_may_2026",
+            "stored_data_jun_2026",
+            "stored_data_oos"
+        ]
+    }
+}

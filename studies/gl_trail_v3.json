@@ -1,0 +1,102 @@
+{
+    "name": "gl_trail_v3",
+    "description": "Optimization for Green/Liquid Candle strategy with trailing stop",
+    "params": {
+        "g_min_gap_pct": [
+            20.0,
+            80.0
+        ],
+        "g_partial_sell_pct": [
+            0.0,
+            0.5
+        ],
+        "g_require_2nd_green": [
+            true,
+            false
+        ],
+        "g_require_2nd_new_high": [
+            true,
+            false
+        ],
+        "g_stop_pct": [
+            10.0,
+            40.0
+        ],
+        "g_target_pct": [
+            5.0,
+            20.0
+        ],
+        "g_time_limit_min": [
+            5,
+            15
+        ],
+        "g_trail_activate_pct": [
+            5.0,
+            20.0
+        ],
+        "g_trail_pct": [
+            1.0,
+            5.0
+        ],
+        "l_earliest_candle": [
+            1,
+            30
+        ],
+        "l_latest_candle": [
+            1,
+            60
+        ],
+        "l_max_float": [
+            1000000,
+            50000000
+        ],
+        "l_min_gap": [
+            10,
+            100
+        ],
+        "l_min_price_accel_pct": [
+            1.0,
+            10.0
+        ],
+        "l_partial_sell_pct": [
+            0.0,
+            0.5
+        ],
+        "l_stop_pct": [
+            10.0,
+            40.0
+        ],
+        "l_tier1_target1_pct": [
+            20.0,
+            80.0
+        ],
+        "l_tier1_target2_pct": [
+            40.0,
+            120.0
+        ],
+        "l_tier2_target1_pct": [
+            10.0,
+            60.0
+        ],
+        "l_tier2_target2_pct": [
+            20.0,
+            100.0
+        ],
+        "l_tier3_target1_pct": [
+            5.0,
+            40.0
+        ],
+        "l_tier3_target2_pct": [
+            10.0,
+            80.0
+        ],
+        "l_trail_activate_pct": [
+            10.0,
+            150.0
+        ],
+        "l_trail_pct": [
+            1.0,
+            10.0
+        ]
+    }
+}

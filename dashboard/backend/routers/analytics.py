@@ -1,11 +1,14 @@
 """Analytics API - Database query endpoints."""
+
 from fastapi import APIRouter
 from datetime import datetime
 import sys
 import os
 
 # Add project root to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", "..")))
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..", ".."))
+)
 
 from live.persistence_db import TradingDatabase
 
@@ -18,27 +21,32 @@ async def get_signals(date: str):
     """Get all signals for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, date, ticker, strategy, signal_price, action, reason, order_id, gap_pct
             FROM signals
             WHERE date = ?
             ORDER BY date DESC
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     signals = []
     for row in rows:
-        signals.append({
-            "id": row[0],
-            "date": row[1],
-            "ticker": row[2],
-            "strategy": row[3],
-            "signal_price": row[4],
-            "action": row[5],
-            "reason": row[6],
-            "order_id": row[7],
-            "gap_pct": row[8]
-        })
+        signals.append(
+            {
+                "id": row[0],
+                "date": row[1],
+                "ticker": row[2],
+                "strategy": row[3],
+                "signal_price": row[4],
+                "action": row[5],
+                "reason": row[6],
+                "order_id": row[7],
+                "gap_pct": row[8],
+            }
+        )
 
     return signals
 
@@ -48,31 +56,36 @@ async def get_orders(date: str):
     """Get all order events for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, timestamp, order_id, ticker, strategy, side, event_type,
                    signal_price, fill_price, filled_qty, slip_bp, status
             FROM order_events
             WHERE DATE(timestamp) = ?
             ORDER BY timestamp DESC
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     orders = []
     for row in rows:
-        orders.append({
-            "id": row[0],
-            "timestamp": row[1],
-            "order_id": row[2],
-            "ticker": row[3],
-            "strategy": row[4],
-            "side": row[5],
-            "event_type": row[6],
-            "signal_price": row[7],
-            "fill_price": row[8],
-            "filled_qty": row[9],
-            "slip_bp": row[10],
-            "status": row[11]
-        })
+        orders.append(
+            {
+                "id": row[0],
+                "timestamp": row[1],
+                "order_id": row[2],
+                "ticker": row[3],
+                "strategy": row[4],
+                "side": row[5],
+                "event_type": row[6],
+                "signal_price": row[7],
+                "fill_price": row[8],
+                "filled_qty": row[9],
+                "slip_bp": row[10],
+                "status": row[11],
+            }
+        )
 
     return orders
 
@@ -82,29 +95,34 @@ async def get_snapshots(date: str):
     """Get all account snapshots for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, timestamp, snapshot_type, cash, equity, buying_power,
                    portfolio_value, daily_pnl, trades_count, positions_count
             FROM account_snapshots
             WHERE DATE(timestamp) = ?
             ORDER BY timestamp ASC
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     snapshots = []
     for row in rows:
-        snapshots.append({
-            "id": row[0],
-            "timestamp": row[1],
-            "snapshot_type": row[2],
-            "cash": row[3],
-            "equity": row[4],
-            "buying_power": row[5],
-            "portfolio_value": row[6],
-            "daily_pnl": row[7],
-            "trades_count": row[8],
-            "positions_count": row[9]
-        })
+        snapshots.append(
+            {
+                "id": row[0],
+                "timestamp": row[1],
+                "snapshot_type": row[2],
+                "cash": row[3],
+                "equity": row[4],
+                "buying_power": row[5],
+                "portfolio_value": row[6],
+                "daily_pnl": row[7],
+                "trades_count": row[8],
+                "positions_count": row[9],
+            }
+        )
 
     return snapshots
 
@@ -114,24 +132,29 @@ async def get_events(date: str):
     """Get all system events for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, timestamp, event_type, severity, message, details
             FROM system_events
             WHERE DATE(timestamp) = ?
             ORDER BY timestamp DESC
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     events = []
     for row in rows:
-        events.append({
-            "id": row[0],
-            "timestamp": row[1],
-            "event_type": row[2],
-            "severity": row[3],
-            "message": row[4],
-            "details": row[5]
-        })
+        events.append(
+            {
+                "id": row[0],
+                "timestamp": row[1],
+                "event_type": row[2],
+                "severity": row[3],
+                "message": row[4],
+                "details": row[5],
+            }
+        )
 
     return events
 
@@ -141,28 +164,33 @@ async def get_bars(date: str):
     """Get all bar summaries for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, date, ticker, open, high, low, close, volume, vwap, bar_count
             FROM bar_summaries
             WHERE date = ?
             ORDER BY ticker ASC
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     bars = []
     for row in rows:
-        bars.append({
-            "id": row[0],
-            "date": row[1],
-            "ticker": row[2],
-            "open": row[3],
-            "high": row[4],
-            "low": row[5],
-            "close": row[6],
-            "volume": row[7],
-            "vwap": row[8],
-            "bar_count": row[9]
-        })
+        bars.append(
+            {
+                "id": row[0],
+                "date": row[1],
+                "ticker": row[2],
+                "open": row[3],
+                "high": row[4],
+                "low": row[5],
+                "close": row[6],
+                "volume": row[7],
+                "vwap": row[8],
+                "bar_count": row[9],
+            }
+        )
 
     return bars
 
@@ -172,25 +200,30 @@ async def get_watchlist(date: str):
     """Get watchlist for a specific date."""
     with db._conn() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(
+            """
             SELECT id, date, ticker, gap_pct, pm_volume, float_shares, scan_time
             FROM watchlist
             WHERE date = ?
             ORDER BY gap_pct DESC NULLS LAST
-        """, (date,))
+        """,
+            (date,),
+        )
         rows = cursor.fetchall()
 
     watchlist = []
     for row in rows:
-        watchlist.append({
-            "id": row[0],
-            "date": row[1],
-            "ticker": row[2],
-            "gap_pct": row[3],
-            "pm_volume": row[4],
-            "float_shares": row[5],
-            "scan_time": row[6]
-        })
+        watchlist.append(
+            {
+                "id": row[0],
+                "date": row[1],
+                "ticker": row[2],
+                "gap_pct": row[3],
+                "pm_volume": row[4],
+                "float_shares": row[5],
+                "scan_time": row[6],
+            }
+        )
 
     return watchlist
 
@@ -204,40 +237,46 @@ async def get_slippage_by_date(date: str):
     try:
         with db._conn() as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT id, timestamp, order_id, ticker, strategy, side, event_type,
                        signal_price, fill_price, filled_qty, slip_bp, status
                 FROM order_events
                 WHERE DATE(timestamp) = ? AND event_type IN ('fill', 'partial_fill')
                       AND slip_bp IS NOT NULL
                 ORDER BY timestamp DESC
-            """, (date,))
+            """,
+                (date,),
+            )
             rows = cursor.fetchall()
 
         # Build result rows
         result_rows = []
         for row in rows:
-            result_rows.append({
-                "id": row[0],
-                "timestamp": row[1],
-                "order_id": row[2],
-                "ticker": row[3],
-                "strategy": row[4],
-                "side": row[5],
-                "event_type": row[6],
-                "signal_price": row[7],
-                "fill_price": row[8],
-                "filled_qty": row[9],
-                "slip_bp": row[10],
-                "status": row[11],
-                "dollar_amount": (row[8] or 0) * (row[9] or 0),
-            })
+            result_rows.append(
+                {
+                    "id": row[0],
+                    "timestamp": row[1],
+                    "order_id": row[2],
+                    "ticker": row[3],
+                    "strategy": row[4],
+                    "side": row[5],
+                    "event_type": row[6],
+                    "signal_price": row[7],
+                    "fill_price": row[8],
+                    "filled_qty": row[9],
+                    "slip_bp": row[10],
+                    "status": row[11],
+                    "dollar_amount": (row[8] or 0) * (row[9] or 0),
+                }
+            )
 
         # Aggregate stats
         slips = [r["slip_bp"] for r in result_rows if r["slip_bp"] is not None]
         dollar_total = sum(r["dollar_amount"] for r in result_rows)
-        dollar_slip_cost = sum((r["slip_bp"] or 0) / 10_000 * r["dollar_amount"]
-                              for r in result_rows)
+        dollar_slip_cost = sum(
+            (r["slip_bp"] or 0) / 10_000 * r["dollar_amount"] for r in result_rows
+        )
 
         stats = {
             "date": date,
@@ -246,7 +285,9 @@ async def get_slippage_by_date(date: str):
             "median_slip_bp": median(slips) if slips else None,
             "max_slip_bp": max(slips) if slips else None,
             "min_slip_bp": min(slips) if slips else None,
-            "p95_slip_bp": (sorted(slips)[int(len(slips) * 0.95)] if len(slips) >= 20 else None),
+            "p95_slip_bp": (
+                sorted(slips)[int(len(slips) * 0.95)] if len(slips) >= 20 else None
+            ),
             "dollar_volume": dollar_total,
             "realized_cost": dollar_slip_cost,
         }
@@ -262,22 +303,31 @@ async def get_slippage_by_date(date: str):
             buys = [it for it in items if it["side"] == "buy"]
             sells = [it for it in items if it["side"] == "sell"]
             dvol = sum(it["dollar_amount"] for it in items)
-            cost = sum((it["slip_bp"] or 0) / 10_000 * it["dollar_amount"]
-                      for it in items)
-            by_strategy.append({
-                "strategy": strat,
-                "n": len(items),
-                "n_buys": len(buys),
-                "n_sells": len(sells),
-                "avg_slip_bp": sum(s) / len(s) if s else None,
-                "median_slip_bp": median(s) if s else None,
-                "min_slip_bp": min(s) if s else None,
-                "max_slip_bp": max(s) if s else None,
-                "avg_buy_slip_bp": (sum(it["slip_bp"] for it in buys) / len(buys)) if buys else None,
-                "avg_sell_slip_bp": (sum(it["slip_bp"] for it in sells) / len(sells)) if sells else None,
-                "dollar_volume": dvol,
-                "realized_cost": cost,
-            })
+            cost = sum(
+                (it["slip_bp"] or 0) / 10_000 * it["dollar_amount"] for it in items
+            )
+            by_strategy.append(
+                {
+                    "strategy": strat,
+                    "n": len(items),
+                    "n_buys": len(buys),
+                    "n_sells": len(sells),
+                    "avg_slip_bp": sum(s) / len(s) if s else None,
+                    "median_slip_bp": median(s) if s else None,
+                    "min_slip_bp": min(s) if s else None,
+                    "max_slip_bp": max(s) if s else None,
+                    "avg_buy_slip_bp": (sum(it["slip_bp"] for it in buys) / len(buys))
+                    if buys
+                    else None,
+                    "avg_sell_slip_bp": (
+                        sum(it["slip_bp"] for it in sells) / len(sells)
+                    )
+                    if sells
+                    else None,
+                    "dollar_volume": dvol,
+                    "realized_cost": cost,
+                }
+            )
 
         by_strategy.sort(key=lambda x: -x["dollar_volume"])
 
@@ -288,6 +338,7 @@ async def get_slippage_by_date(date: str):
         }
     except Exception as e:
         import logging
+
         logging.getLogger(__name__).error(f"Failed to get slippage: {e}")
         return {"stats": {}, "by_strategy": [], "rows": []}
 
@@ -299,41 +350,7 @@ async def get_feed_comparison(date: str):
 
 
 @router.get("/analytics/trades/details/{date}")
-async def get_trade_details(date: str):
-    """Get trades with execution details for a specific date."""
-    with db._conn() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, ticker, strategy, entry_price, exit_price, shares, pnl, pnl_pct,
-                   reason, entry_time, exit_time, deployed_amount, stop_price, target_price,
-                   peak_price, trail_pct, time_limit_min, hold_time_min
-            FROM trades
-            WHERE date = ?
-            ORDER BY entry_time DESC
-        """, (date,))
-        rows = cursor.fetchall()
-
-    trades = []
-    for row in rows:
-        trades.append({
-            "id": row[0],
-            "ticker": row[1],
-            "strategy": row[2],
-            "entry_price": row[3],
-            "exit_price": row[4],
-            "shares": row[5],
-            "pnl": row[6],
-            "pnl_pct": row[7],
-            "reason": row[8],
-            "entry_time": row[9],
-            "exit_time": row[10],
-            "deployed_amount": row[11],
-            "stop_price": row[12],
-            "target_price": row[13],
-            "peak_price": row[14],
-            "trail_pct": row[15],
-            "time_limit_min": row[16],
-            "hold_time_min": row[17]
-        })
-
-    return trades
+@router.get("/analytics/intraday_discoveries/{date}")
+async def get_intraday_discoveries(date: str):
+    """Get all intraday discoveries for a specific date."""
+    return db.get_intraday_discoveries_by_date(date)

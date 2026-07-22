@@ -5,6 +5,7 @@ Survives crashes, restarts, and container recreation.
 All timestamps stored in ET timezone.
 Database located at logs/trading.db (mounted volume, persists across restarts)
 """
+
 import sqlite3
 import json
 import os
@@ -69,7 +70,9 @@ class TradingDatabase:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_ticker ON trades(ticker)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_trades_ticker ON trades(ticker)"
+            )
 
             # Daily state table (exit prices, done strategies, signal times)
             conn.execute("""
@@ -85,7 +88,9 @@ class TradingDatabase:
                     UNIQUE(date, ticker, strategy)
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_daily_state_date ON daily_state(date)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_state_date ON daily_state(date)"
+            )
 
             # Position state table (open positions with metadata)
             conn.execute("""
@@ -121,8 +126,12 @@ class TradingDatabase:
                     UNIQUE(date, ticker)
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_date ON watchlist(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_watchlist_ticker ON watchlist(ticker)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_watchlist_date ON watchlist(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_watchlist_ticker ON watchlist(ticker)"
+            )
 
             # Signals table - all entry signals (taken and rejected)
             conn.execute("""
@@ -141,8 +150,12 @@ class TradingDatabase:
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_signals_date ON signals(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_signals_ticker ON signals(ticker, date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_signals_action ON signals(action)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_signals_ticker ON signals(ticker, date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_signals_action ON signals(action)"
+            )
 
             # Order events table - full order lifecycle
             conn.execute("""
@@ -165,9 +178,15 @@ class TradingDatabase:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_order_events_date ON order_events(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_order_events_ticker ON order_events(ticker, date)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_order_events_date ON order_events(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_order_events_order ON order_events(order_id)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_order_events_ticker ON order_events(ticker, date)"
+            )
 
             # Account snapshots table - equity curve
             conn.execute("""
@@ -186,8 +205,12 @@ class TradingDatabase:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_account_snapshots_date ON account_snapshots(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_account_snapshots_type ON account_snapshots(snapshot_type)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_account_snapshots_date ON account_snapshots(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_account_snapshots_type ON account_snapshots(snapshot_type)"
+            )
 
             # System events table - crashes, restarts, recoveries
             conn.execute("""
@@ -201,8 +224,12 @@ class TradingDatabase:
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_events_timestamp ON system_events(timestamp)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_system_events_type ON system_events(event_type)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_system_events_timestamp ON system_events(timestamp)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_system_events_type ON system_events(event_type)"
+            )
 
             # Bar summaries table - daily OHLCV per ticker
             conn.execute("""
@@ -222,8 +249,12 @@ class TradingDatabase:
                     UNIQUE(date, ticker)
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_bar_summaries_date ON bar_summaries(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_bar_summaries_ticker ON bar_summaries(ticker)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_bar_summaries_date ON bar_summaries(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_bar_summaries_ticker ON bar_summaries(ticker)"
+            )
 
             # Feed comparison table - Tradier vs Alpaca IEX 2-min bars
             conn.execute("""
@@ -242,21 +273,59 @@ class TradingDatabase:
                     UNIQUE(date, bar_time, ticker, source)
                 )
             """)
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_feed_comp_date ON feed_comparison(date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_feed_comp_ticker ON feed_comparison(ticker, date)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feed_comp_date ON feed_comparison(date)"
+            )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_feed_comp_ticker ON feed_comparison(ticker, date)"
+            )
+
+            # Intraday discoveries table
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS intraday_discoveries (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    ticker TEXT NOT NULL,
+                    price REAL NOT NULL,
+                    percent_change REAL NOT NULL,
+                    source TEXT NOT NULL,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(date, ticker)
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_intraday_discoveries_date ON intraday_discoveries(date)"
+            )
 
     # ===== TRADES =====
 
-    def save_trade(self, trade_date, ticker, strategy, entry_price, exit_price, shares,
-                   pnl, pnl_pct, reason, entry_time, exit_time, deployed_amount=None,
-                   stop_price=None, target_price=None, peak_price=None, trail_pct=None,
-                   time_limit_min=None):
+    def save_trade(
+        self,
+        trade_date,
+        ticker,
+        strategy,
+        entry_price,
+        exit_price,
+        shares,
+        pnl,
+        pnl_pct,
+        reason,
+        entry_time,
+        exit_time,
+        deployed_amount=None,
+        stop_price=None,
+        target_price=None,
+        peak_price=None,
+        trail_pct=None,
+        time_limit_min=None,
+    ):
         """Save a completed trade with execution details."""
         # Ensure times are in ET
         if isinstance(entry_time, str):
-            entry_time = datetime.fromisoformat(entry_time.replace('+00:00', ''))
+            entry_time = datetime.fromisoformat(entry_time.replace("+00:00", ""))
         if isinstance(exit_time, str):
-            exit_time = datetime.fromisoformat(exit_time.replace('+00:00', ''))
+            exit_time = datetime.fromisoformat(exit_time.replace("+00:00", ""))
 
         if entry_time.tzinfo is None:
             entry_time = ET.localize(entry_time)
@@ -272,25 +341,48 @@ class TradingDatabase:
         hold_time_min = (exit_time - entry_time).total_seconds() / 60.0
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO trades (
                     date, ticker, strategy, entry_price, exit_price, shares,
                     pnl, pnl_pct, reason, entry_time, exit_time, deployed_amount,
                     stop_price, target_price, peak_price, trail_pct, time_limit_min, hold_time_min
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                trade_date, ticker, strategy, entry_price, exit_price, shares,
-                pnl, pnl_pct, reason, entry_time.isoformat(), exit_time.isoformat(), deployed_amount,
-                stop_price, target_price, peak_price, trail_pct, time_limit_min, hold_time_min
-            ))
-        log.info(f"Trade saved: {ticker} ({strategy}) {reason} P&L=${pnl:.2f} hold={hold_time_min:.1f}min")
+            """,
+                (
+                    trade_date,
+                    ticker,
+                    strategy,
+                    entry_price,
+                    exit_price,
+                    shares,
+                    pnl,
+                    pnl_pct,
+                    reason,
+                    entry_time.isoformat(),
+                    exit_time.isoformat(),
+                    deployed_amount,
+                    stop_price,
+                    target_price,
+                    peak_price,
+                    trail_pct,
+                    time_limit_min,
+                    hold_time_min,
+                ),
+            )
+        log.info(
+            f"Trade saved: {ticker} ({strategy}) {reason} P&L=${pnl:.2f} hold={hold_time_min:.1f}min"
+        )
 
     def get_trades_by_date(self, trade_date):
         """Get all trades for a specific date."""
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT * FROM trades WHERE date = ? ORDER BY exit_time DESC
-            """, (trade_date,))
+            """,
+                (trade_date,),
+            )
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
@@ -305,34 +397,43 @@ class TradingDatabase:
         """Record exit price for re-entry floor."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO daily_state (date, ticker, strategy, exit_price)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(date, ticker, strategy)
                 DO UPDATE SET exit_price=?, updated_at=CURRENT_TIMESTAMP
-            """, (today, ticker, strategy, exit_price, exit_price))
+            """,
+                (today, ticker, strategy, exit_price, exit_price),
+            )
 
     def mark_done(self, ticker, strategy):
         """Mark a strategy as done for the day."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO daily_state (date, ticker, strategy, is_done)
                 VALUES (?, ?, ?, 1)
                 ON CONFLICT(date, ticker, strategy)
                 DO UPDATE SET is_done=1, updated_at=CURRENT_TIMESTAMP
-            """, (today, ticker, strategy))
+            """,
+                (today, ticker, strategy),
+            )
 
     def is_done(self, ticker, strategy):
         """Check if strategy is done for the day."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT is_done FROM daily_state
                 WHERE date=? AND ticker=? AND strategy=?
-            """, (today, ticker, strategy))
+            """,
+                (today, ticker, strategy),
+            )
             row = cursor.fetchone()
-            return row and row['is_done'] == 1
+            return row and row["is_done"] == 1
 
     def record_signal_time(self, ticker, strategy, timestamp):
         """Record first signal time for time limit enforcement."""
@@ -340,7 +441,7 @@ class TradingDatabase:
 
         # Convert to ET
         if isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('+00:00', ''))
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
         if timestamp.tzinfo is None:
             timestamp = ET.localize(timestamp)
         else:
@@ -348,7 +449,8 @@ class TradingDatabase:
 
         with self._conn() as conn:
             # Only insert if not exists (first signal only)
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO daily_state (date, ticker, strategy, signal_time)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(date, ticker, strategy)
@@ -356,85 +458,129 @@ class TradingDatabase:
                     WHEN signal_time IS NULL THEN ?
                     ELSE signal_time
                 END
-            """, (today, ticker, strategy, timestamp.isoformat(), timestamp.isoformat()))
+            """,
+                (today, ticker, strategy, timestamp.isoformat(), timestamp.isoformat()),
+            )
 
     def get_signal_time(self, ticker, strategy):
         """Get first signal time for time limit check."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT signal_time FROM daily_state
                 WHERE date=? AND ticker=? AND strategy=?
-            """, (today, ticker, strategy))
+            """,
+                (today, ticker, strategy),
+            )
             row = cursor.fetchone()
-            if row and row['signal_time']:
-                return datetime.fromisoformat(row['signal_time'])
+            if row and row["signal_time"]:
+                return datetime.fromisoformat(row["signal_time"])
             return None
 
     def get_exit_price(self, ticker, strategy):
         """Get exit price for re-entry floor check."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT exit_price FROM daily_state
                 WHERE date=? AND ticker=? AND strategy=?
-            """, (today, ticker, strategy))
+            """,
+                (today, ticker, strategy),
+            )
             row = cursor.fetchone()
-            return row['exit_price'] if row and row['exit_price'] else None
+            return row["exit_price"] if row and row["exit_price"] else None
 
     def get_daily_state_summary(self):
         """Get summary of today's state."""
         today = datetime.now(ET).date().isoformat()
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN exit_price IS NOT NULL THEN 1 ELSE 0 END) as exits,
                     SUM(CASE WHEN is_done = 1 THEN 1 ELSE 0 END) as done,
                     SUM(CASE WHEN signal_time IS NOT NULL THEN 1 ELSE 0 END) as signals
                 FROM daily_state WHERE date=?
-            """, (today,))
+            """,
+                (today,),
+            )
             row = cursor.fetchone()
-            return dict(row) if row else {"total": 0, "exits": 0, "done": 0, "signals": 0}
+            return (
+                dict(row) if row else {"total": 0, "exits": 0, "done": 0, "signals": 0}
+            )
 
     # ===== POSITION STATE =====
 
-    def save_position(self, ticker, strategy, entry_price, shares, cost, peak_price,
-                     stop_price, target_price, trail_pct, time_limit_min, entry_time):
+    def save_position(
+        self,
+        ticker,
+        strategy,
+        entry_price,
+        shares,
+        cost,
+        peak_price,
+        stop_price,
+        target_price,
+        trail_pct,
+        time_limit_min,
+        entry_time,
+    ):
         """Save open position state."""
         if isinstance(entry_time, str):
-            entry_time = datetime.fromisoformat(entry_time.replace('+00:00', ''))
+            entry_time = datetime.fromisoformat(entry_time.replace("+00:00", ""))
         if entry_time.tzinfo is None:
             entry_time = ET.localize(entry_time)
         else:
             entry_time = entry_time.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO position_state (
                     ticker, strategy, entry_price, shares, cost, peak_price,
                     stop_price, target_price, trail_pct, time_limit_min, entry_time
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(ticker) DO UPDATE SET
                     strategy=?, shares=?, peak_price=?, updated_at=CURRENT_TIMESTAMP
-            """, (
-                ticker, strategy, entry_price, shares, cost, peak_price,
-                stop_price, target_price, trail_pct, time_limit_min, entry_time.isoformat(),
-                strategy, shares, peak_price
-            ))
+            """,
+                (
+                    ticker,
+                    strategy,
+                    entry_price,
+                    shares,
+                    cost,
+                    peak_price,
+                    stop_price,
+                    target_price,
+                    trail_pct,
+                    time_limit_min,
+                    entry_time.isoformat(),
+                    strategy,
+                    shares,
+                    peak_price,
+                ),
+            )
 
     def update_position_peak(self, ticker, new_peak):
         """Update peak price for trailing stop."""
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 UPDATE position_state SET peak_price=?, updated_at=CURRENT_TIMESTAMP
                 WHERE ticker=?
-            """, (new_peak, ticker))
+            """,
+                (new_peak, ticker),
+            )
 
     def get_position(self, ticker):
         """Get position state."""
         with self._conn() as conn:
-            cursor = conn.execute("SELECT * FROM position_state WHERE ticker=?", (ticker,))
+            cursor = conn.execute(
+                "SELECT * FROM position_state WHERE ticker=?", (ticker,)
+            )
             row = cursor.fetchone()
             return dict(row) if row else None
 
@@ -465,31 +611,53 @@ class TradingDatabase:
 
         with self._conn() as conn:
             for cand in candidates:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO watchlist (date, ticker, gap_pct, pm_volume, premarket_high,
                                          prev_close, float_shares, scan_time)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(date, ticker) DO UPDATE SET
                         gap_pct=?, pm_volume=?, premarket_high=?, prev_close=?, float_shares=?
-                """, (
-                    today, cand["ticker"], cand["gap_pct"], cand["pm_volume"],
-                    cand["premarket_high"], cand["prev_close"], cand.get("float_shares"),
-                    scan_time.isoformat(),
-                    cand["gap_pct"], cand["pm_volume"], cand["premarket_high"],
-                    cand["prev_close"], cand.get("float_shares")
-                ))
+                """,
+                    (
+                        today,
+                        cand["ticker"],
+                        cand["gap_pct"],
+                        cand["pm_volume"],
+                        cand["premarket_high"],
+                        cand["prev_close"],
+                        cand.get("float_shares"),
+                        scan_time.isoformat(),
+                        cand["gap_pct"],
+                        cand["pm_volume"],
+                        cand["premarket_high"],
+                        cand["prev_close"],
+                        cand.get("float_shares"),
+                    ),
+                )
         log.info(f"Watchlist saved: {len(candidates)} candidates for {today}")
 
     def get_watchlist_by_date(self, date):
         """Get watchlist for a specific date."""
         with self._conn() as conn:
-            cursor = conn.execute("SELECT * FROM watchlist WHERE date=? ORDER BY gap_pct DESC", (date,))
+            cursor = conn.execute(
+                "SELECT * FROM watchlist WHERE date=? ORDER BY gap_pct DESC", (date,)
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     # ===== SIGNALS =====
 
-    def log_signal(self, ticker, strategy, signal_price, action, reason=None, order_id=None,
-                   gap_pct=None, timestamp=None):
+    def log_signal(
+        self,
+        ticker,
+        strategy,
+        signal_price,
+        action,
+        reason=None,
+        order_id=None,
+        gap_pct=None,
+        timestamp=None,
+    ):
         """Log an entry signal (taken or rejected).
 
         Args:
@@ -500,19 +668,31 @@ class TradingDatabase:
         if timestamp is None:
             timestamp = datetime.now(ET)
         elif isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('+00:00', ''))
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
         if timestamp.tzinfo is None:
             timestamp = ET.localize(timestamp)
         else:
             timestamp = timestamp.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO signals (date, timestamp, ticker, strategy, signal_price,
                                    gap_pct, action, reason, order_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (today, timestamp.isoformat(), ticker, strategy, signal_price,
-                  gap_pct, action, reason, order_id))
+            """,
+                (
+                    today,
+                    timestamp.isoformat(),
+                    ticker,
+                    strategy,
+                    signal_price,
+                    gap_pct,
+                    action,
+                    reason,
+                    order_id,
+                ),
+            )
 
     def get_signals_by_date(self, date, action=None):
         """Get all signals for a date, optionally filtered by action."""
@@ -520,19 +700,19 @@ class TradingDatabase:
             if action:
                 cursor = conn.execute(
                     "SELECT * FROM signals WHERE date=? AND action=? ORDER BY timestamp",
-                    (date, action)
+                    (date, action),
                 )
             else:
                 cursor = conn.execute(
-                    "SELECT * FROM signals WHERE date=? ORDER BY timestamp",
-                    (date,)
+                    "SELECT * FROM signals WHERE date=? ORDER BY timestamp", (date,)
                 )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_signal_stats(self, date):
         """Get signal statistics for a date."""
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT
                     action,
                     COUNT(*) as count,
@@ -540,14 +720,29 @@ class TradingDatabase:
                 FROM signals
                 WHERE date=?
                 GROUP BY action
-            """, (date,))
+            """,
+                (date,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     # ===== ORDER EVENTS =====
 
-    def log_order_event(self, order_id, ticker, strategy, side, event_type,
-                       signal_price=None, fill_price=None, qty=None, filled_qty=None,
-                       status=None, slip_bp=None, cum_dollar_vol=None, timestamp=None):
+    def log_order_event(
+        self,
+        order_id,
+        ticker,
+        strategy,
+        side,
+        event_type,
+        signal_price=None,
+        fill_price=None,
+        qty=None,
+        filled_qty=None,
+        status=None,
+        slip_bp=None,
+        cum_dollar_vol=None,
+        timestamp=None,
+    ):
         """Log an order lifecycle event.
 
         Args:
@@ -558,28 +753,44 @@ class TradingDatabase:
         if timestamp is None:
             timestamp = datetime.now(ET)
         elif isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('+00:00', ''))
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
         if timestamp.tzinfo is None:
             timestamp = ET.localize(timestamp)
         else:
             timestamp = timestamp.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO order_events (date, timestamp, order_id, ticker, strategy, side,
                                         event_type, signal_price, fill_price, qty, filled_qty,
                                         status, slip_bp, cum_dollar_vol)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (today, timestamp.isoformat(), order_id, ticker, strategy, side,
-                  event_type, signal_price, fill_price, qty, filled_qty,
-                  status, slip_bp, cum_dollar_vol))
+            """,
+                (
+                    today,
+                    timestamp.isoformat(),
+                    order_id,
+                    ticker,
+                    strategy,
+                    side,
+                    event_type,
+                    signal_price,
+                    fill_price,
+                    qty,
+                    filled_qty,
+                    status,
+                    slip_bp,
+                    cum_dollar_vol,
+                ),
+            )
 
     def get_order_events(self, order_id):
         """Get all events for a specific order."""
         with self._conn() as conn:
             cursor = conn.execute(
                 "SELECT * FROM order_events WHERE order_id=? ORDER BY timestamp",
-                (order_id,)
+                (order_id,),
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -589,19 +800,20 @@ class TradingDatabase:
             if side:
                 cursor = conn.execute(
                     "SELECT * FROM order_events WHERE date=? AND side=? ORDER BY timestamp",
-                    (date, side)
+                    (date, side),
                 )
             else:
                 cursor = conn.execute(
                     "SELECT * FROM order_events WHERE date=? ORDER BY timestamp",
-                    (date,)
+                    (date,),
                 )
             return [dict(row) for row in cursor.fetchall()]
 
     def get_slippage_stats(self, date):
         """Get slippage statistics for a date."""
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT
                     side,
                     COUNT(*) as fills,
@@ -614,14 +826,25 @@ class TradingDatabase:
                 FROM order_events
                 WHERE date=? AND event_type IN ('fill', 'partial_fill') AND slip_bp IS NOT NULL
                 GROUP BY side
-            """, (date,))
+            """,
+                (date,),
+            )
             return [dict(row) for row in cursor.fetchall()]
 
     # ===== ACCOUNT SNAPSHOTS =====
 
-    def save_account_snapshot(self, snapshot_type, cash, equity, buying_power,
-                             portfolio_value, daily_pnl=None, trades_count=None,
-                             positions_count=None, timestamp=None):
+    def save_account_snapshot(
+        self,
+        snapshot_type,
+        cash,
+        equity,
+        buying_power,
+        portfolio_value,
+        daily_pnl=None,
+        trades_count=None,
+        positions_count=None,
+        timestamp=None,
+    ):
         """Save an account snapshot.
 
         Args:
@@ -631,27 +854,40 @@ class TradingDatabase:
         if timestamp is None:
             timestamp = datetime.now(ET)
         elif isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('+00:00', ''))
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
         if timestamp.tzinfo is None:
             timestamp = ET.localize(timestamp)
         else:
             timestamp = timestamp.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO account_snapshots (date, timestamp, snapshot_type, cash, equity,
                                               buying_power, portfolio_value, daily_pnl,
                                               trades_count, positions_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (today, timestamp.isoformat(), snapshot_type, cash, equity,
-                  buying_power, portfolio_value, daily_pnl, trades_count, positions_count))
+            """,
+                (
+                    today,
+                    timestamp.isoformat(),
+                    snapshot_type,
+                    cash,
+                    equity,
+                    buying_power,
+                    portfolio_value,
+                    daily_pnl,
+                    trades_count,
+                    positions_count,
+                ),
+            )
 
     def get_account_snapshots_by_date(self, date):
         """Get all account snapshots for a date."""
         with self._conn() as conn:
             cursor = conn.execute(
                 "SELECT * FROM account_snapshots WHERE date=? ORDER BY timestamp",
-                (date,)
+                (date,),
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -659,19 +895,25 @@ class TradingDatabase:
         """Get equity curve data."""
         with self._conn() as conn:
             if start_date and end_date:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT date, snapshot_type, equity, daily_pnl
                     FROM account_snapshots
                     WHERE date >= ? AND date <= ?
                     ORDER BY timestamp
-                """, (start_date, end_date))
+                """,
+                    (start_date, end_date),
+                )
             elif start_date:
-                cursor = conn.execute("""
+                cursor = conn.execute(
+                    """
                     SELECT date, snapshot_type, equity, daily_pnl
                     FROM account_snapshots
                     WHERE date >= ?
                     ORDER BY timestamp
-                """, (start_date,))
+                """,
+                    (start_date,),
+                )
             else:
                 cursor = conn.execute("""
                     SELECT date, snapshot_type, equity, daily_pnl
@@ -682,7 +924,9 @@ class TradingDatabase:
 
     # ===== SYSTEM EVENTS =====
 
-    def log_system_event(self, event_type, severity, message, details=None, timestamp=None):
+    def log_system_event(
+        self, event_type, severity, message, details=None, timestamp=None
+    ):
         """Log a system event.
 
         Args:
@@ -692,19 +936,24 @@ class TradingDatabase:
         if timestamp is None:
             timestamp = datetime.now(ET)
         elif isinstance(timestamp, str):
-            timestamp = datetime.fromisoformat(timestamp.replace('+00:00', ''))
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
         if timestamp.tzinfo is None:
             timestamp = ET.localize(timestamp)
         else:
             timestamp = timestamp.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO system_events (timestamp, event_type, severity, message, details)
                 VALUES (?, ?, ?, ?, ?)
-            """, (timestamp.isoformat(), event_type, severity, message, details))
+            """,
+                (timestamp.isoformat(), event_type, severity, message, details),
+            )
 
-    def get_system_events(self, start_time=None, end_time=None, event_type=None, severity=None):
+    def get_system_events(
+        self, start_time=None, end_time=None, event_type=None, severity=None
+    ):
         """Get system events with optional filters."""
         with self._conn() as conn:
             query = "SELECT * FROM system_events WHERE 1=1"
@@ -712,10 +961,16 @@ class TradingDatabase:
 
             if start_time:
                 query += " AND timestamp >= ?"
-                params.append(start_time if isinstance(start_time, str) else start_time.isoformat())
+                params.append(
+                    start_time
+                    if isinstance(start_time, str)
+                    else start_time.isoformat()
+                )
             if end_time:
                 query += " AND timestamp <= ?"
-                params.append(end_time if isinstance(end_time, str) else end_time.isoformat())
+                params.append(
+                    end_time if isinstance(end_time, str) else end_time.isoformat()
+                )
             if event_type:
                 query += " AND event_type = ?"
                 params.append(event_type)
@@ -729,16 +984,30 @@ class TradingDatabase:
 
     # ===== BAR SUMMARIES =====
 
-    def save_bar_summary(self, ticker, open_price, high, low, close, volume, vwap,
-                        bar_count, first_bar_time, last_bar_time, date=None):
+    def save_bar_summary(
+        self,
+        ticker,
+        open_price,
+        high,
+        low,
+        close,
+        volume,
+        vwap,
+        bar_count,
+        first_bar_time,
+        last_bar_time,
+        date=None,
+    ):
         """Save daily bar summary for a ticker."""
         if date is None:
             date = datetime.now(ET).date().isoformat()
 
         if isinstance(first_bar_time, str):
-            first_bar_time = datetime.fromisoformat(first_bar_time.replace('+00:00', ''))
+            first_bar_time = datetime.fromisoformat(
+                first_bar_time.replace("+00:00", "")
+            )
         if isinstance(last_bar_time, str):
-            last_bar_time = datetime.fromisoformat(last_bar_time.replace('+00:00', ''))
+            last_bar_time = datetime.fromisoformat(last_bar_time.replace("+00:00", ""))
 
         if first_bar_time.tzinfo is None:
             first_bar_time = ET.localize(first_bar_time)
@@ -751,24 +1020,44 @@ class TradingDatabase:
             last_bar_time = last_bar_time.astimezone(ET)
 
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO bar_summaries (date, ticker, open, high, low, close, volume,
                                           vwap, bar_count, first_bar_time, last_bar_time)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(date, ticker) DO UPDATE SET
                     open=?, high=?, low=?, close=?, volume=?, vwap=?, bar_count=?,
                     first_bar_time=?, last_bar_time=?
-            """, (date, ticker, open_price, high, low, close, volume, vwap, bar_count,
-                  first_bar_time.isoformat(), last_bar_time.isoformat(),
-                  open_price, high, low, close, volume, vwap, bar_count,
-                  first_bar_time.isoformat(), last_bar_time.isoformat()))
+            """,
+                (
+                    date,
+                    ticker,
+                    open_price,
+                    high,
+                    low,
+                    close,
+                    volume,
+                    vwap,
+                    bar_count,
+                    first_bar_time.isoformat(),
+                    last_bar_time.isoformat(),
+                    open_price,
+                    high,
+                    low,
+                    close,
+                    volume,
+                    vwap,
+                    bar_count,
+                    first_bar_time.isoformat(),
+                    last_bar_time.isoformat(),
+                ),
+            )
 
     def get_bar_summary(self, ticker, date):
         """Get bar summary for a specific ticker and date."""
         with self._conn() as conn:
             cursor = conn.execute(
-                "SELECT * FROM bar_summaries WHERE ticker=? AND date=?",
-                (ticker, date)
+                "SELECT * FROM bar_summaries WHERE ticker=? AND date=?", (ticker, date)
             )
             row = cursor.fetchone()
             return dict(row) if row else None
@@ -777,8 +1066,7 @@ class TradingDatabase:
         """Get all bar summaries for a date."""
         with self._conn() as conn:
             cursor = conn.execute(
-                "SELECT * FROM bar_summaries WHERE date=? ORDER BY ticker",
-                (date,)
+                "SELECT * FROM bar_summaries WHERE date=? ORDER BY ticker", (date,)
             )
             return [dict(row) for row in cursor.fetchall()]
 
@@ -793,14 +1081,28 @@ class TradingDatabase:
         """Get database statistics."""
         with self._conn() as conn:
             trades_count = conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
-            daily_state_count = conn.execute("SELECT COUNT(*) FROM daily_state").fetchone()[0]
-            positions_count = conn.execute("SELECT COUNT(*) FROM position_state").fetchone()[0]
+            daily_state_count = conn.execute(
+                "SELECT COUNT(*) FROM daily_state"
+            ).fetchone()[0]
+            positions_count = conn.execute(
+                "SELECT COUNT(*) FROM position_state"
+            ).fetchone()[0]
             signals_count = conn.execute("SELECT COUNT(*) FROM signals").fetchone()[0]
-            order_events_count = conn.execute("SELECT COUNT(*) FROM order_events").fetchone()[0]
-            snapshots_count = conn.execute("SELECT COUNT(*) FROM account_snapshots").fetchone()[0]
-            system_events_count = conn.execute("SELECT COUNT(*) FROM system_events").fetchone()[0]
-            watchlist_count = conn.execute("SELECT COUNT(*) FROM watchlist").fetchone()[0]
-            bar_summaries_count = conn.execute("SELECT COUNT(*) FROM bar_summaries").fetchone()[0]
+            order_events_count = conn.execute(
+                "SELECT COUNT(*) FROM order_events"
+            ).fetchone()[0]
+            snapshots_count = conn.execute(
+                "SELECT COUNT(*) FROM account_snapshots"
+            ).fetchone()[0]
+            system_events_count = conn.execute(
+                "SELECT COUNT(*) FROM system_events"
+            ).fetchone()[0]
+            watchlist_count = conn.execute("SELECT COUNT(*) FROM watchlist").fetchone()[
+                0
+            ]
+            bar_summaries_count = conn.execute(
+                "SELECT COUNT(*) FROM bar_summaries"
+            ).fetchone()[0]
 
             return {
                 "db_path": self.db_path,
@@ -817,11 +1119,22 @@ class TradingDatabase:
 
     # ===== FEED COMPARISON =====
 
-    def log_feed_bar(self, date: str, bar_time: str, ticker: str, source: str,
-                     open_: float, high: float, low: float, close: float, volume: int):
+    def log_feed_bar(
+        self,
+        date: str,
+        bar_time: str,
+        ticker: str,
+        source: str,
+        open_: float,
+        high: float,
+        low: float,
+        close: float,
+        volume: int,
+    ):
         """Insert or replace a 2-min bar row from one data source."""
         with self._conn() as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO feed_comparison
                     (date, bar_time, ticker, source, open, high, low, close, volume)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -830,7 +1143,9 @@ class TradingDatabase:
                     open=excluded.open, high=excluded.high, low=excluded.low,
                     close=excluded.close, volume=excluded.volume,
                     created_at=CURRENT_TIMESTAMP
-            """, (date, bar_time, ticker, source, open_, high, low, close, volume))
+            """,
+                (date, bar_time, ticker, source, open_, high, low, close, volume),
+            )
 
     def get_feed_comparison(self, date: str) -> list[dict]:
         """
@@ -838,7 +1153,8 @@ class TradingDatabase:
         has both tradier and alpaca_iex values side-by-side where available.
         """
         with self._conn() as conn:
-            cursor = conn.execute("""
+            cursor = conn.execute(
+                """
                 SELECT
                     bar_time, ticker,
                     MAX(CASE WHEN source='tradier'    THEN open  END) AS t_open,
@@ -855,14 +1171,27 @@ class TradingDatabase:
                 WHERE date = ?
                 GROUP BY bar_time, ticker
                 ORDER BY bar_time ASC, ticker ASC
-            """, (date,))
+            """,
+                (date,),
+            )
             rows = cursor.fetchall()
 
         result = []
         for row in rows:
-            (bar_time, ticker,
-             t_open, t_high, t_low, t_close, t_vol,
-             a_open, a_high, a_low, a_close, a_vol) = row
+            (
+                bar_time,
+                ticker,
+                t_open,
+                t_high,
+                t_low,
+                t_close,
+                t_vol,
+                a_open,
+                a_high,
+                a_low,
+                a_close,
+                a_vol,
+            ) = row
 
             close_diff_bp = None
             if t_close and a_close and a_close != 0:
@@ -872,20 +1201,51 @@ class TradingDatabase:
             if t_vol and a_vol and a_vol != 0:
                 vol_diff_pct = round((t_vol - a_vol) / a_vol * 100, 1)
 
-            result.append({
-                "bar_time": bar_time,
-                "ticker": ticker,
-                "tradier_open": t_open,
-                "tradier_high": t_high,
-                "tradier_low": t_low,
-                "tradier_close": t_close,
-                "tradier_volume": t_vol,
-                "alpaca_open": a_open,
-                "alpaca_high": a_high,
-                "alpaca_low": a_low,
-                "alpaca_close": a_close,
-                "alpaca_volume": a_vol,
-                "close_diff_bp": close_diff_bp,
-                "vol_diff_pct": vol_diff_pct,
-            })
+            result.append(
+                {
+                    "bar_time": bar_time,
+                    "ticker": ticker,
+                    "tradier_open": t_open,
+                    "tradier_high": t_high,
+                    "tradier_low": t_low,
+                    "tradier_close": t_close,
+                    "tradier_volume": t_vol,
+                    "alpaca_open": a_open,
+                    "alpaca_high": a_high,
+                    "alpaca_low": a_low,
+                    "alpaca_close": a_close,
+                    "alpaca_volume": a_vol,
+                    "close_diff_bp": close_diff_bp,
+                    "vol_diff_pct": vol_diff_pct,
+                }
+            )
         return result
+
+    def log_intraday_discovery(self, ticker, price, percent_change, timestamp, source):
+        """Log an intraday discovery."""
+        today = datetime.now(ET).date().isoformat()
+        if isinstance(timestamp, str):
+            timestamp = datetime.fromisoformat(timestamp.replace("+00:00", ""))
+        if timestamp.tzinfo is None:
+            timestamp = ET.localize(timestamp)
+        else:
+            timestamp = timestamp.astimezone(ET)
+
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO intraday_discoveries (date, timestamp, ticker, price, percent_change, source)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, ticker) DO NOTHING
+            """,
+                (today, timestamp.isoformat(), ticker, price, percent_change, source),
+            )
+
+    def get_intraday_discoveries_by_date(self, date):
+        """Get all intraday discoveries for a date."""
+        with self._conn() as conn:
+            cursor = conn.execute(
+                "SELECT * FROM intraday_discoveries WHERE date=? ORDER BY timestamp",
+                (date,),
+            )
+            return [dict(row) for row in cursor.fetchall()]

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchJSON } from '../api/client';
 
-type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage' | 'feed_comparison';
+type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage' | 'feed_comparison' | 'intraday_discoveries';
 
 interface Signal {
   id: number;
@@ -156,6 +156,15 @@ interface FeedComparisonRow {
   vol_diff_pct: number | null;
 }
 
+interface IntradayDiscovery {
+  id: number;
+  timestamp: string;
+  ticker: string;
+  price: number;
+  percent_change: number;
+  source: string;
+}
+
 export const Analytics = () => {
   const [tab, setTab] = useState<Tab>('trades');
   const [date, setDate] = useState(() => {
@@ -174,6 +183,7 @@ export const Analytics = () => {
   const [slippageByStrategy, setSlippageByStrategy] = useState<SlippageByStrategy[]>([]);
   const [slippageRows, setSlippageRows] = useState<SlippageRow[]>([]);
   const [feedComparison, setFeedComparison] = useState<FeedComparisonRow[]>([]);
+  const [intradayDiscoveries, setIntradayDiscoveries] = useState<IntradayDiscovery[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -184,44 +194,58 @@ export const Analytics = () => {
     setLoading(true);
     try {
       switch (tab) {
-        case 'trades':
+        case 'trades': {
           const tradesData = await fetchJSON<TradeDetail[]>(`/api/analytics/trades/details/${date}`);
           setTradeDetails(tradesData);
           break;
-        case 'signals':
+        }
+        case 'signals': {
           const signalsData = await fetchJSON<Signal[]>(`/api/analytics/signals/${date}`);
           setSignals(signalsData);
           break;
-        case 'orders':
+        }
+        case 'orders': {
           const ordersData = await fetchJSON<OrderEvent[]>(`/api/analytics/orders/${date}`);
           setOrders(ordersData);
           break;
-        case 'snapshots':
+        }
+        case 'snapshots': {
           const snapshotsData = await fetchJSON<AccountSnapshot[]>(`/api/analytics/snapshots/${date}`);
           setSnapshots(snapshotsData);
           break;
-        case 'events':
+        }
+        case 'events': {
           const eventsData = await fetchJSON<SystemEvent[]>(`/api/analytics/events/${date}`);
           setEvents(eventsData);
           break;
-        case 'bars':
+        }
+        case 'bars': {
           const barsData = await fetchJSON<BarSummary[]>(`/api/analytics/bars/${date}`);
           setBars(barsData);
           break;
-        case 'watchlist':
+        }
+        case 'watchlist': {
           const watchlistData = await fetchJSON<WatchlistItem[]>(`/api/analytics/watchlist/${date}`);
           setWatchlist(watchlistData);
           break;
-        case 'slippage':
+        }
+        case 'slippage': {
           const slippageData = await fetchJSON<{ stats: SlippageStats; by_strategy: SlippageByStrategy[]; rows: SlippageRow[] }>(`/api/analytics/slippage/${date}`);
           setSlippageStats(slippageData.stats);
           setSlippageByStrategy(slippageData.by_strategy);
           setSlippageRows(slippageData.rows);
           break;
-        case 'feed_comparison':
+        }
+        case 'feed_comparison': {
           const feedData = await fetchJSON<FeedComparisonRow[]>(`/api/analytics/feed_comparison/${date}`);
           setFeedComparison(feedData);
           break;
+        }
+        case 'intraday_discoveries': {
+          const discoveriesData = await fetchJSON<IntradayDiscovery[]>(`/api/analytics/intraday_discoveries/${date}`);
+          setIntradayDiscoveries(discoveriesData);
+          break;
+        }
       }
     } catch (err) {
       console.error('Failed to load analytics:', err);
@@ -431,11 +455,11 @@ export const Analytics = () => {
               <td>{new Date(e.timestamp).toLocaleTimeString()}</td>
               <td>{e.event_type}</td>
               <td>
-                <span className={`badge ${
+                <span className={`badge ${{
                   e.severity === 'critical' ? 'badge-error' :
                   e.severity === 'warning' ? 'badge-warning' :
                   'badge-info'
-                }`}>
+                }}`}>
                   {e.severity.toUpperCase()}
                 </span>
               </td>
@@ -512,6 +536,34 @@ export const Analytics = () => {
         </tbody>
       </table>
       {watchlist.length === 0 && !loading && <div className="empty-state">No watchlist for this date</div>}
+    </div>
+  );
+
+  const renderIntradayDiscoveries = () => (
+    <div className="analytics-table-container">
+      <table className="analytics-table">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Ticker</th>
+            <th>Price</th>
+            <th>% Change</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody>
+          {intradayDiscoveries.map((d) => (
+            <tr key={d.id}>
+              <td>{new Date(d.timestamp).toLocaleTimeString()}</td>
+              <td className="ticker-cell">{d.ticker}</td>
+              <td>${d.price.toFixed(2)}</td>
+              <td className="positive">+{d.percent_change.toFixed(1)}%</td>
+              <td>{d.source}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {intradayDiscoveries.length === 0 && !loading && <div className="empty-state">No intraday discoveries for this date</div>}
     </div>
   );
 
@@ -875,6 +927,12 @@ export const Analytics = () => {
         >
           Feed Comparison
         </button>
+        <button
+          className={`tab-btn ${tab === 'intraday_discoveries' ? 'active' : ''}`}
+          onClick={() => setTab('intraday_discoveries')}
+        >
+          Intraday Discoveries
+        </button>
       </div>
 
       <div className="analytics-content">
@@ -891,6 +949,7 @@ export const Analytics = () => {
             {tab === 'watchlist' && renderWatchlist()}
             {tab === 'slippage' && renderSlippage()}
             {tab === 'feed_comparison' && renderFeedComparison()}
+            {tab === 'intraday_discoveries' && renderIntradayDiscoveries()}
           </>
         )}
       </div>

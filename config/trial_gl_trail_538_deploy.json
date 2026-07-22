@@ -130,7 +130,7 @@
     "l_tier3_target2_pct": 40.0,
     "l_time_limit_min": 110,
     "l_trail_activate_pct": 1.0,
-    "l_trail_pct": 1.0,
+    "l_trail_pct": 0.0,
     "l_vol_surge_mult": 1.0,
     "m_consolidation_len": 60,
     "m_max_entry_candle": 170,
@@ -284,8 +284,6 @@
     "enable_x": false,
     "g_require_2nd_green": true,
     "g_partial_sell_pct": 25.0,
-    "g_target2_pct": 60.0,
-    "g_use_trail": false,
-    "l_use_trail": true
+    "g_target2_pct": 60.0
   }
 }

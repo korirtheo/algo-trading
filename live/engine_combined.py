@@ -11,6 +11,7 @@ For live trading, it:
 3. At each bar, runs simulate_day_combined() on the accumulated bars
 4. Detects new entries/exits by comparing state changes
 """
+
 import json
 import logging
 import os
@@ -38,8 +39,11 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # changes. Path is resolved relative to the project root if not absolute.
 _env_params = os.environ.get("LIVE_PARAMS_PATH")
 if _env_params:
-    PARAMS_PATH = _env_params if os.path.isabs(_env_params) \
+    PARAMS_PATH = (
+        _env_params
+        if os.path.isabs(_env_params)
         else os.path.join(_PROJECT_ROOT, _env_params)
+    )
 else:
     PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_432_params.json")
 
@@ -63,9 +67,13 @@ def load_trial_params(path=None):
             baseline = json.load(bf)
         params = dict(baseline)
         params.update(raw["params"])
-        log.info("Loaded extracted trial #%s (study=%s): %d tuned params merged over %d baseline keys",
-                 raw.get("trial_number", "?"), raw.get("study", "?"),
-                 len(raw["params"]), len(baseline))
+        log.info(
+            "Loaded extracted trial #%s (study=%s): %d tuned params merged over %d baseline keys",
+            raw.get("trial_number", "?"),
+            raw.get("study", "?"),
+            len(raw["params"]),
+            len(baseline),
+        )
     else:
         params = raw
     set_strategy_params(params)
@@ -108,7 +116,9 @@ def load_trial_params(path=None):
     return params
 
 
-TRADE_LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs")
+TRADE_LOG_DIR = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "logs"
+)
 BARS_LOG_DIR = os.path.join(TRADE_LOG_DIR, "bars")
 
 # Ensure logging directories exist at module load time
@@ -138,7 +148,9 @@ def _append_trade(trade):
     os.makedirs(TRADE_LOG_DIR, exist_ok=True)
     path = _trade_log_path()
     trades = _load_today_trades()
-    trades.append({k: str(v) if hasattr(v, 'isoformat') else v for k, v in trade.items()})
+    trades.append(
+        {k: str(v) if hasattr(v, "isoformat") else v for k, v in trade.items()}
+    )
     with open(path, "w") as f:
         json.dump(trades, f, indent=2, default=str)
 
@@ -152,6 +164,7 @@ class CombinedEngine:
 
         # Database persistence - replaces JSON files
         from live.persistence_db import TradingDatabase
+
         self.db = TradingDatabase()
         log.info("Database initialized: %s", self.db.get_stats())
 
@@ -169,36 +182,49 @@ class CombinedEngine:
             if isinstance(_raw, dict) and "v3_overlay" in _raw:
                 self.v3_params = _raw["v3_overlay"]
                 if self.v3_params.get("enabled", False):
-                    log.info("v3 OVERLAY enabled: target=%.0f%% stop=%.0f%% time=%dmin trail=%.1f%%",
-                             self.v3_params.get("target_pct", 0),
-                             self.v3_params.get("stop_pct", 0),
-                             self.v3_params.get("time_limit_min", 0),
-                             self.v3_params.get("trail_pct", 0))
+                    log.info(
+                        "v3 OVERLAY enabled: target=%.0f%% stop=%.0f%% time=%dmin trail=%.1f%%",
+                        self.v3_params.get("target_pct", 0),
+                        self.v3_params.get("stop_pct", 0),
+                        self.v3_params.get("time_limit_min", 0),
+                        self.v3_params.get("trail_pct", 0),
+                    )
         except Exception as e:
             log.debug("No v3 overlay in config: %s", e)
-        self.bar_data = {}      # ticker -> list of (timestamp, OHLCV dict)
-        self.picks = []         # list of pick dicts (scanner output)
-        self.last_states = {}   # ticker -> last known state from simulate (for entry/exit detection)
-        self.all_states = {}    # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
+        self.bar_data = {}  # ticker -> list of (timestamp, OHLCV dict)
+        self.picks = []  # list of pick dicts (scanner output)
+        self.last_states = {}  # ticker -> last known state from simulate (for entry/exit detection)
+        self.all_states = {}  # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
         self.active_positions = set()  # set of tickers currently in position
-        self.position_entry = {}     # ticker -> {entry_price, shares, cost}
+        self.position_entry = {}  # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
         # Load today's trades from database
         self.trades_today = self.db.get_trades_today()
-        self.daily_pnl = sum(t.get("pnl", 0) for t in self.trades_today if isinstance(t.get("pnl"), (int, float)))
-        log.info("Restored %d trades from database (P&L: $%.2f)", len(self.trades_today), self.daily_pnl)
+        self.daily_pnl = sum(
+            t.get("pnl", 0)
+            for t in self.trades_today
+            if isinstance(t.get("pnl"), (int, float))
+        )
+        log.info(
+            "Restored %d trades from database (P&L: $%.2f)",
+            len(self.trades_today),
+            self.daily_pnl,
+        )
 
         # Halt-resume scanner state: tickers added mid-day by the halt monitor.
         # These run a SEPARATE evaluator (strategies.halt_resume) and never
         # touch simulate_day_combined.
-        self.halt_states = {}        # ticker -> state dict from hr.create_state
+        self.halt_states = {}  # ticker -> state dict from hr.create_state
+        self.intraday_discoveries = []  # list of tickers discovered intraday
 
         # Pending orders awaiting fill notification via TradingStream.
         # Replaces the 15s polling that caused 85 duplicate fills on GITS 2026-06-23.
         # Format: order_id -> {ticker, strategy, signal_price, signal_time, side}
         self.pending_orders = {}
         self._pending_lock = threading.Lock()
-        self.fill_stream = fill_stream  # FillStream instance, or None for legacy polling
+        self.fill_stream = (
+            fill_stream  # FillStream instance, or None for legacy polling
+        )
 
         # Data feed status — set by main.py after streamers are started
         # Values: 'tradier', 'alpaca_iex', 'unknown'
@@ -227,16 +253,18 @@ class CombinedEngine:
         for cand in candidates:
             ticker = cand["ticker"]
             self.bar_data[ticker] = []
-            self.picks.append({
-                "ticker": ticker,
-                "gap_pct": cand["gap_pct"],
-                "market_open": None,  # Will be set from first bar
-                "premarket_high": cand["premarket_high"],
-                "prev_close": cand["prev_close"],
-                "pm_volume": cand["pm_volume"],
-                "float_shares": cand.get("float_shares"),  # needed for L strategy
-                "market_hour_candles": None,  # Built incrementally
-            })
+            self.picks.append(
+                {
+                    "ticker": ticker,
+                    "gap_pct": cand["gap_pct"],
+                    "market_open": None,  # Will be set from first bar
+                    "premarket_high": cand["premarket_high"],
+                    "prev_close": cand["prev_close"],
+                    "pm_volume": cand["pm_volume"],
+                    "float_shares": cand.get("float_shares"),  # needed for L strategy
+                    "market_hour_candles": None,  # Built incrementally
+                }
+            )
 
         log.info("Initialized %d candidates for combined strategy", len(self.picks))
 
@@ -249,9 +277,14 @@ class CombinedEngine:
             existing = self.executor.client.get_all_positions()
             for p in existing:
                 qty = float(p.qty)
-                if qty < 1: continue
-                log.warning("ORPHAN POSITION at startup: %s qty=%.0f avg=$%.4f — closing",
-                            p.symbol, qty, float(p.avg_entry_price))
+                if qty < 1:
+                    continue
+                log.warning(
+                    "ORPHAN POSITION at startup: %s qty=%.0f avg=$%.4f — closing",
+                    p.symbol,
+                    qty,
+                    float(p.avg_entry_price),
+                )
                 try:
                     self.executor._cancel_bracket_legs_for_ticker(p.symbol)
                     self.executor.client.close_position(p.symbol)
@@ -260,38 +293,75 @@ class CombinedEngine:
         except Exception as e:
             log.warning("Orphan-position check failed: %s", e)
 
-    def on_intraday_addition(self, ticker, halt_event, source="halt_resume"):
-        """Register a ticker discovered mid-day (e.g. via halt-resume scanner).
+    def on_intraday_addition(self, ticker, event, source="halt_resume"):
+        """Register a ticker discovered mid-day (e.g. via halt-resume or intraday gainer scanner).
 
-        Initializes per-ticker bar tracking and a halt-resume strategy state.
-        Does NOT add to self.picks — the halt-resume path runs separately from
-        simulate_day_combined.
+        For halt-resume, initializes a halt-resume strategy state.
+        For intraday gainers, it just adds them to a separate watchlist for tracking.
 
         Args:
             ticker: symbol string
-            halt_event: object exposing .reason, .resume_dt, .resume_price,
-                        .halt_price (see live.halt_monitor.HaltEvent)
-            source: tag for logs/diagnostics. Currently only "halt_resume".
+            event: object exposing details about the discovery event
+            source: tag for logs/diagnostics ('halt_resume' or 'intraday_gainer').
         """
         ticker = ticker.upper()
-        if ticker in self.halt_states:
+        if ticker in self.halt_states or ticker in self.intraday_discoveries:
             log.debug("on_intraday_addition: %s already tracked (skip)", ticker)
             return False
 
-        float_shares = FLOAT_DATA.get(ticker)  # None if unknown — permissive
-        if not hr.is_eligible(halt_event, float_shares=float_shares):
-            log.info("on_intraday_addition: %s ineligible (reason=%s resume=%s float=%s)",
-                     ticker, halt_event.reason, halt_event.resume_price, float_shares)
-            return False
+        if source == "halt_resume":
+            float_shares = FLOAT_DATA.get(ticker)  # None if unknown — permissive
+            if not hr.is_eligible(event, float_shares=float_shares):
+                log.info(
+                    "on_intraday_addition: %s ineligible (reason=%s resume=%s float=%s)",
+                    ticker,
+                    event.reason,
+                    event.resume_price,
+                    float_shares,
+                )
+                return False
 
-        self.bar_data.setdefault(ticker, [])
-        self.halt_states[ticker] = hr.create_state(ticker, halt_event,
-                                                   float_shares=float_shares)
-        log.info("INTRADAY-ADD %s (source=%s): reason=%s resume=$%.3f float=%s",
-                 ticker, source, halt_event.reason,
-                 halt_event.resume_price or 0.0,
-                 (f"{float_shares/1e6:.1f}M" if float_shares else "N/A"))
-        return True
+            self.bar_data.setdefault(ticker, [])
+            self.halt_states[ticker] = hr.create_state(
+                ticker, event, float_shares=float_shares
+            )
+            log.info(
+                "INTRADAY-ADD %s (source=%s): reason=%s resume=$%.3f float=%s",
+                ticker,
+                source,
+                event.reason,
+                event.resume_price or 0.0,
+                (f"{float_shares / 1e6:.1f}M" if float_shares else "N/A"),
+            )
+            return True
+        elif source == "intraday_gainer":
+            self.intraday_discoveries.append(
+                {
+                    "ticker": ticker,
+                    "price": event["price"],
+                    "percent_change": event["percent_change"],
+                    "timestamp": event["timestamp"],
+                    "source": source,
+                }
+            )
+            self.bar_data.setdefault(ticker, [])
+            log.info(
+                "INTRADAY-ADD %s (source=%s): price=$%.3f change=%.2f%%",
+                ticker,
+                source,
+                event["price"],
+                event["percent_change"],
+            )
+            # Log to DB
+            self.db.log_intraday_discovery(
+                ticker,
+                event["price"],
+                event["percent_change"],
+                event["timestamp"],
+                source,
+            )
+            return True
+        return False
 
     def _log_bar_to_csv(self, symbol, bar):
         """Append each 2-min bar to a per-ticker CSV for backtest-vs-live audit.
@@ -303,6 +373,7 @@ class CombinedEngine:
         from SIP-vs-IEX or resample boundary differences).
         """
         import csv
+
         try:
             today = datetime.now(ET).strftime("%Y-%m-%d")
             bars_date_dir = os.path.join(BARS_LOG_DIR, "intraday", today)
@@ -313,10 +384,16 @@ class CombinedEngine:
                 w = csv.writer(f)
                 if new_file:
                     w.writerow(["timestamp", "Open", "High", "Low", "Close", "Volume"])
-                w.writerow([
-                    bar["timestamp"], bar["Open"], bar["High"],
-                    bar["Low"], bar["Close"], bar["Volume"],
-                ])
+                w.writerow(
+                    [
+                        bar["timestamp"],
+                        bar["Open"],
+                        bar["High"],
+                        bar["Low"],
+                        bar["Close"],
+                        bar["Volume"],
+                    ]
+                )
         except Exception as e:
             log.warning("Failed to log bar for %s: %s", symbol, e)
 
@@ -342,7 +419,7 @@ class CombinedEngine:
                 target_price=trade.get("target_price"),
                 peak_price=trade.get("peak_price"),
                 trail_pct=trade.get("trail_pct"),
-                time_limit_min=trade.get("time_limit_min")
+                time_limit_min=trade.get("time_limit_min"),
             )
             # Also write to JSON for backward compatibility during transition
             _append_trade(trade)
@@ -369,14 +446,16 @@ class CombinedEngine:
         self._log_bar_to_csv(symbol, bar)
 
         ts = bar["timestamp"]
-        self.bar_data[symbol].append({
-            "timestamp": ts,
-            "Open": bar["Open"],
-            "High": bar["High"],
-            "Low": bar["Low"],
-            "Close": bar["Close"],
-            "Volume": bar["Volume"],
-        })
+        self.bar_data[symbol].append(
+            {
+                "timestamp": ts,
+                "Open": bar["Open"],
+                "High": bar["High"],
+                "Low": bar["Low"],
+                "Close": bar["Close"],
+                "Volume": bar["Volume"],
+            }
+        )
 
         # Rebuild DataFrames for all tickers with data
         picks_with_data = []
@@ -389,6 +468,7 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
+            df.index = df.index.floor("2min")
             df = df[~df.index.duplicated(keep="last")]
 
             pick_copy = dict(pick)
@@ -402,14 +482,24 @@ class CombinedEngine:
 
         # Run the backtest simulation on accumulated bars
         cash = self.executor.get_buying_power()
-        log.debug("on_bar %s | cash=$%.0f | %d picks with data", symbol, cash, len(picks_with_data))
+        log.debug(
+            "on_bar %s | cash=$%.0f | %d picks with data",
+            symbol,
+            cash,
+            len(picks_with_data),
+        )
         states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash, is_live=True)
 
         # Log any state that has an entry (for diagnostics)
         for st in states:
             if st.get("entry_price") is not None:
-                log.debug("  sim-entry: %s strat=%s entry=$%.3f cost=$%.0f",
-                          st["ticker"], st.get("strategy"), st.get("entry_price"), st.get("position_cost", 0))
+                log.debug(
+                    "  sim-entry: %s strat=%s entry=$%.3f cost=$%.0f",
+                    st["ticker"],
+                    st.get("strategy"),
+                    st.get("entry_price"),
+                    st.get("position_cost", 0),
+                )
 
         # FIX 2026-06-24: comprehensive per-bar reconciliation with Alpaca.
         # Fixes 4 bugs from 2026-06-24 CCXI incident:
@@ -429,9 +519,11 @@ class CombinedEngine:
                     self.position_state.update_peak(symbol, new_peak)
 
         # --- v3 overlay exit check ---
-        if (self.v3_params.get("enabled", False)
-                and symbol in self.active_positions
-                and self.position_entry.get(symbol, {}).get("strategy") == "V3"):
+        if (
+            self.v3_params.get("enabled", False)
+            and symbol in self.active_positions
+            and self.position_entry.get(symbol, {}).get("strategy") == "V3"
+        ):
             self._manage_v3_exit(symbol, bar)
 
         # Store all sub-states per ticker for diagnostics
@@ -452,14 +544,18 @@ class CombinedEngine:
             # state (e.g. L's parallel evaluation of SAGT) triggers phantom
             # partial-sells when its shares value differs from prev. The
             # SAGT 30% phantom sell at 14:35 today is the symptom.
-            if (ticker in self.active_positions
-                    and self.position_entry.get(ticker, {}).get("strategy")
-                    and st.get("strategy")
-                    and st["strategy"] != self.position_entry[ticker]["strategy"]):
+            if (
+                ticker in self.active_positions
+                and self.position_entry.get(ticker, {}).get("strategy")
+                and st.get("strategy")
+                and st["strategy"] != self.position_entry[ticker]["strategy"]
+            ):
                 continue
 
             # New entry detected
-            if st.get("entry_price") is not None and (prev is None or prev.get("entry_price") is None):
+            if st.get("entry_price") is not None and (
+                prev is None or prev.get("entry_price") is None
+            ):
                 entry_price = st["entry_price"]
                 strategy = st.get("strategy", "?")
                 gap_pct = st.get("gap_pct", 0)
@@ -470,45 +566,95 @@ class CombinedEngine:
                     # Without this guard the same rejection is written every bar while
                     # in position because last_states[ticker] is never updated on continue.
                     if prev is None or prev.get("entry_price") is None:
-                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'already_in_position', gap_pct=gap_pct)
+                        self.db.log_signal(
+                            ticker,
+                            strategy,
+                            entry_price,
+                            "REJECTED",
+                            "already_in_position",
+                            gap_pct=gap_pct,
+                        )
                     self.last_states[ticker] = st  # prevent re-triggering next bar
                     continue
 
                 # Check if this strategy is already done for the day (timed out before crash/restart)
                 if self.db.is_done(ticker, strategy):
-                    log.debug("SIGNAL %s (%s) skipped — strategy marked DONE (timed out or finished)",
-                             ticker, strategy)
+                    log.debug(
+                        "SIGNAL %s (%s) skipped — strategy marked DONE (timed out or finished)",
+                        ticker,
+                        strategy,
+                    )
                     # Only log once: first bar where this signal appears
                     if prev is None or prev.get("entry_price") is None:
-                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'done', gap_pct=gap_pct)
+                        self.db.log_signal(
+                            ticker,
+                            strategy,
+                            entry_price,
+                            "REJECTED",
+                            "done",
+                            gap_pct=gap_pct,
+                        )
                     self.last_states[ticker] = st  # prevent re-triggering next bar
                     continue
 
                 # Record first signal time for time limit enforcement
-                self.db.record_signal_time(ticker, strategy, st.get("timestamp", datetime.now(ET)))
+                self.db.record_signal_time(
+                    ticker, strategy, st.get("timestamp", datetime.now(ET))
+                )
 
                 # Re-entry price floor filter: only re-enter if price > last exit * 1.01 (1% buffer)
                 last_exit = self.db.get_exit_price(ticker, strategy)
                 if last_exit is not None and entry_price <= last_exit * 1.01:
-                    log.debug("SIGNAL %s (%s) skipped — price $%.3f not > last exit $%.3f * 1.01",
-                             ticker, strategy, entry_price, last_exit)
+                    log.debug(
+                        "SIGNAL %s (%s) skipped — price $%.3f not > last exit $%.3f * 1.01",
+                        ticker,
+                        strategy,
+                        entry_price,
+                        last_exit,
+                    )
                     # Only log first occurrence — same bar-by-bar spam fix
                     if prev is None or prev.get("entry_price") is None:
-                        self.db.log_signal(ticker, strategy, entry_price, 'REJECTED', 'reentry_floor', gap_pct=gap_pct)
+                        self.db.log_signal(
+                            ticker,
+                            strategy,
+                            entry_price,
+                            "REJECTED",
+                            "reentry_floor",
+                            gap_pct=gap_pct,
+                        )
                     self.last_states[ticker] = st
                     continue
                 trade_size = st.get("position_cost", cash)
                 cum_dollar = self._cum_dollar_vol(ticker)
 
-                log.info("SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_$vol=$%.0f",
-                         ticker, strategy, entry_price, st.get("gap_pct", 0), trade_size, cum_dollar)
+                log.info(
+                    "SIGNAL %s (strategy %s): price=$%.3f gap=%.1f%% cost=$%.0f cum_$vol=$%.0f",
+                    ticker,
+                    strategy,
+                    entry_price,
+                    st.get("gap_pct", 0),
+                    trade_size,
+                    cum_dollar,
+                )
 
-                order = self.executor.buy(ticker, trade_size, entry_price,
-                                         cumulative_dollar_volume=cum_dollar,
-                                         strategy=strategy)
+                order = self.executor.buy(
+                    ticker,
+                    trade_size,
+                    entry_price,
+                    cumulative_dollar_volume=cum_dollar,
+                    strategy=strategy,
+                )
                 if order:
                     # Log signal as TAKEN
-                    self.db.log_signal(ticker, strategy, entry_price, 'TAKEN', None, str(order.id), gap_pct=gap_pct)
+                    self.db.log_signal(
+                        ticker,
+                        strategy,
+                        entry_price,
+                        "TAKEN",
+                        None,
+                        str(order.id),
+                        gap_pct=gap_pct,
+                    )
                     # 2026-06-23 FIX: previously polled for 15s and gave up — caused
                     # 85 untracked duplicate fills on GITS today (microcap fills took
                     # >15s; each "give up" triggered a NEW signal).
@@ -535,24 +681,39 @@ class CombinedEngine:
                         }
                     with self._pending_lock:
                         self.pending_orders[str(order.id)] = {
-                            "ticker": ticker, "strategy": strategy,
-                            "signal_price": entry_price, "signal_time": ts,
-                            "side": "buy", "requested_cost": trade_size,
+                            "ticker": ticker,
+                            "strategy": strategy,
+                            "signal_price": entry_price,
+                            "signal_time": ts,
+                            "side": "buy",
+                            "requested_cost": trade_size,
                         }
                     if self.fill_stream is not None:
                         self.fill_stream.register(order.id, self._on_buy_fill)
-                        log.info("BUY %s: order %s placed, awaiting TradingStream fill notification",
-                                 ticker, order.id)
+                        log.info(
+                            "BUY %s: order %s placed, awaiting TradingStream fill notification",
+                            ticker,
+                            order.id,
+                        )
                         # Set safety-net polling: if stream misses for >60s, force-poll
-                        self._schedule_safety_poll(order.id, ticker, "buy", entry_price, ts, strategy)
+                        self._schedule_safety_poll(
+                            order.id, ticker, "buy", entry_price, ts, strategy
+                        )
                     else:
                         # Legacy path — no stream, poll inline (kept for backward compat)
-                        self._poll_buy_fill_inline(order, ticker, strategy, entry_price, ts)
+                        self._poll_buy_fill_inline(
+                            order, ticker, strategy, entry_price, ts
+                        )
                 else:
-                    log.warning("BUY REJECTED %s: order returned None (vol_cap or executor error)", ticker)
+                    log.warning(
+                        "BUY REJECTED %s: order returned None (vol_cap or executor error)",
+                        ticker,
+                    )
 
             # Exit detected
-            if st.get("exit_price") is not None and (prev is None or prev.get("exit_price") is None):
+            if st.get("exit_price") is not None and (
+                prev is None or prev.get("exit_price") is None
+            ):
                 if ticker in self.active_positions:
                     exit_price = st["exit_price"]
                     exit_reason = st.get("exit_reason", "UNKNOWN")
@@ -560,7 +721,8 @@ class CombinedEngine:
 
                     entry_info = self.position_entry.get(ticker, {})
                     order = self.executor.sell(
-                        ticker, reason=exit_reason,
+                        ticker,
+                        reason=exit_reason,
                         signal_price=exit_price,
                         cumulative_dollar_volume=self._cum_dollar_vol(ticker),
                         strategy=entry_info.get("strategy", "?"),
@@ -571,17 +733,24 @@ class CombinedEngine:
                         # "I sold" state when actually order was rejected/unfilled.
                         with self._pending_lock:
                             self.pending_orders[str(order.id)] = {
-                                "ticker": ticker, "strategy": entry_info.get("strategy", "?"),
-                                "signal_price": exit_price, "signal_time": ts,
-                                "side": "sell", "exit_reason": exit_reason,
+                                "ticker": ticker,
+                                "strategy": entry_info.get("strategy", "?"),
+                                "signal_price": exit_price,
+                                "signal_time": ts,
+                                "side": "sell",
+                                "exit_reason": exit_reason,
                                 "expected_pnl": pnl,
                                 "pre_sell_shares": entry_info.get("shares", 0),
                                 "is_partial": False,
                             }
                         if self.fill_stream is not None:
                             self.fill_stream.register(order.id, self._on_sell_fill)
-                            log.info("SELL %s (%s): order %s placed, awaiting stream fill",
-                                     ticker, exit_reason, order.id)
+                            log.info(
+                                "SELL %s (%s): order %s placed, awaiting stream fill",
+                                ticker,
+                                exit_reason,
+                                order.id,
+                            )
                             self._schedule_sell_safety_poll(order.id, ticker)
                         else:
                             # Legacy synchronous behavior
@@ -591,7 +760,9 @@ class CombinedEngine:
                             entry_px = entry_info_l.get("entry_price", 0)
                             shares = entry_info_l.get("shares", 0)
                             market_value = entry_px * shares
-                            pnl_pct = (pnl / market_value * 100) if market_value > 0 else 0
+                            pnl_pct = (
+                                (pnl / market_value * 100) if market_value > 0 else 0
+                            )
                             trade = {
                                 "ticker": ticker,
                                 "strategy": entry_info_l.get("strategy", "?"),
@@ -606,31 +777,47 @@ class CombinedEngine:
                                 "exit_time": ts,
                             }
                             self._save_trade(trade)
-                            log.info("EXIT %s (%s) [LEGACY]: PnL=$%s | $%.2f -> $%.2f",
-                                     ticker, exit_reason, format(pnl, "+,.2f"),
-                                     entry_info_l.get("entry_price", 0), exit_price)
+                            log.info(
+                                "EXIT %s (%s) [LEGACY]: PnL=$%s | $%.2f -> $%.2f",
+                                ticker,
+                                exit_reason,
+                                format(pnl, "+,.2f"),
+                                entry_info_l.get("entry_price", 0),
+                                exit_price,
+                            )
 
             # Partial sell detected
             # FIX 2026-06-22: previously used the simulator's `st.shares` diff
             # directly, which was based on the phantom cash/entry_price size.
             # Now compute a FRACTION sold from the simulator state and apply
             # that fraction to the ACTUAL Alpaca position size.
-            if (prev is not None
+            if (
+                prev is not None
                 and st.get("shares", 0) < prev.get("shares", 0)
                 and st.get("entry_price") is not None
                 and prev.get("entry_price") is not None
-                and ticker in self.active_positions):
+                and ticker in self.active_positions
+            ):
                 pinfo = self.position_entry.get(ticker, {})
                 actual_shares = float(pinfo.get("shares", 0))
                 if actual_shares >= 1:
-                    sim_frac_sold = (prev["shares"] - st["shares"]) / max(prev["shares"], 1e-9)
+                    sim_frac_sold = (prev["shares"] - st["shares"]) / max(
+                        prev["shares"], 1e-9
+                    )
                     if sim_frac_sold >= 0.01:
                         sell_qty = int(actual_shares * sim_frac_sold)
                         if sell_qty >= 1:
-                            log.info("PARTIAL SELL %s: %d shares (%.0f%% of actual %.0f)",
-                                     ticker, sell_qty, sim_frac_sold * 100, actual_shares)
+                            log.info(
+                                "PARTIAL SELL %s: %d shares (%.0f%% of actual %.0f)",
+                                ticker,
+                                sell_qty,
+                                sim_frac_sold * 100,
+                                actual_shares,
+                            )
                             sell_order = self.executor.sell(
-                                ticker, shares=sell_qty, reason="PARTIAL",
+                                ticker,
+                                shares=sell_qty,
+                                reason="PARTIAL",
                                 signal_price=st.get("partial_price") or st.get("close"),
                                 strategy=pinfo.get("strategy", "?"),
                             )
@@ -642,12 +829,19 @@ class CombinedEngine:
                             actual_sold = sell_qty  # fallback assumption
                             if sell_order is not None:
                                 import time as _time
+
                                 term = {"filled", "canceled", "rejected", "expired"}
                                 deadline = _time.time() + 10.0
                                 while _time.time() < deadline:
                                     try:
-                                        o = self.executor.client.get_order_by_id(sell_order.id)
-                                        sst = o.status.value if hasattr(o.status, 'value') else str(o.status)
+                                        o = self.executor.client.get_order_by_id(
+                                            sell_order.id
+                                        )
+                                        sst = (
+                                            o.status.value
+                                            if hasattr(o.status, "value")
+                                            else str(o.status)
+                                        )
                                         if o.filled_qty:
                                             actual_sold = float(o.filled_qty)
                                         if sst in term:
@@ -655,13 +849,14 @@ class CombinedEngine:
                                     except Exception:
                                         pass
                                     _time.sleep(0.3)
-                            self.position_entry[ticker]["shares"] = actual_shares - actual_sold
+                            self.position_entry[ticker]["shares"] = (
+                                actual_shares - actual_sold
+                            )
 
             self.last_states[ticker] = dict(st)
 
         # --- v3 overlay entry check ---
-        if (self.v3_params.get("enabled", False)
-                and picks_with_data):
+        if self.v3_params.get("enabled", False) and picks_with_data:
             self._check_v3_entry(picks_with_data)
 
     # ------------------------------------------------------------------ #
@@ -676,35 +871,61 @@ class CombinedEngine:
             internal = self.position_entry.get(ticker, {})
             internal_qty = float(internal.get("shares", 0))
             if abs(actual_qty - internal_qty) >= 1.0:
-                log.warning("RECONCILE %s: internal=%.0f, Alpaca=%.0f → fixing",
-                            ticker, internal_qty, actual_qty)
+                log.warning(
+                    "RECONCILE %s: internal=%.0f, Alpaca=%.0f → fixing",
+                    ticker,
+                    internal_qty,
+                    actual_qty,
+                )
                 if actual_qty < 1:
-                    log.info("RECONCILE %s: position closed externally — clearing", ticker)
+                    log.info(
+                        "RECONCILE %s: position closed externally — clearing", ticker
+                    )
                     self.position_entry.pop(ticker, None)
                     self.active_positions.discard(ticker)
                 else:
                     if ticker not in self.position_entry or not internal:
                         try:
-                            actual_avg = float(getattr(actual_pos, "avg_entry_price", 0)) \
-                                         or float(actual_pos.cost_basis) / max(actual_qty, 1)
-                        except (AttributeError, ValueError, ZeroDivisionError, TypeError):
+                            actual_avg = float(
+                                getattr(actual_pos, "avg_entry_price", 0)
+                            ) or float(actual_pos.cost_basis) / max(actual_qty, 1)
+                        except (
+                            AttributeError,
+                            ValueError,
+                            ZeroDivisionError,
+                            TypeError,
+                        ):
                             actual_avg = 0.0
                         with self._pending_lock:
                             pending_match = next(
-                                (p for p in self.pending_orders.values()
-                                 if p.get("ticker") == ticker and p.get("side") == "buy"),
+                                (
+                                    p
+                                    for p in self.pending_orders.values()
+                                    if p.get("ticker") == ticker
+                                    and p.get("side") == "buy"
+                                ),
                                 None,
                             )
                         strategy = (pending_match or {}).get("strategy", "G")
-                        entry_time = (pending_match or {}).get("signal_time", current_ts)
+                        entry_time = (pending_match or {}).get(
+                            "signal_time", current_ts
+                        )
                         self.position_entry[ticker] = {
-                            "entry_price": actual_avg, "shares": actual_qty,
+                            "entry_price": actual_avg,
+                            "shares": actual_qty,
                             "cost": actual_qty * actual_avg,
-                            "strategy": strategy, "entry_time": entry_time,
+                            "strategy": strategy,
+                            "entry_time": entry_time,
                         }
-                        log.info("RECONCILE %s: rehydrated from Alpaca — strategy=%s "
-                                 "qty=%.0f avg=$%.3f entry_time=%s",
-                                 ticker, strategy, actual_qty, actual_avg, entry_time)
+                        log.info(
+                            "RECONCILE %s: rehydrated from Alpaca — strategy=%s "
+                            "qty=%.0f avg=$%.3f entry_time=%s",
+                            ticker,
+                            strategy,
+                            actual_qty,
+                            actual_avg,
+                            entry_time,
+                        )
                     else:
                         self.position_entry[ticker]["shares"] = actual_qty
         except Exception:
@@ -714,8 +935,10 @@ class CombinedEngine:
                     for p in self.pending_orders.values()
                 )
             if has_pending_buy:
-                log.debug("RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
-                          ticker)
+                log.debug(
+                    "RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
+                    ticker,
+                )
             else:
                 log.warning("RECONCILE %s: no position at Alpaca → clearing", ticker)
                 self.position_entry.pop(ticker, None)
@@ -753,7 +976,7 @@ class CombinedEngine:
             scan = ns
         for i in range(scan, len(mh)):
             if float(mh.iloc[i]["Close"]) > day_open:
-                ba = mh.iloc[i + 1:]
+                ba = mh.iloc[i + 1 :]
                 if len(ba) == 0:
                     return None
                 return (mh.index[i], float(mh.iloc[i]["Close"]), ba)
@@ -779,10 +1002,15 @@ class CombinedEngine:
         if hasattr(entry_time, "to_pydatetime"):
             et_dt = entry_time.to_pydatetime().replace(tzinfo=None)
         elif isinstance(entry_time, str):
-            et_dt = datetime.fromisoformat(entry_time.replace("Z", "+00:00")).replace(tzinfo=None)
+            et_dt = datetime.fromisoformat(entry_time.replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
         else:
-            et_dt = entry_time if not hasattr(entry_time, "tzinfo") or entry_time.tzinfo is None \
+            et_dt = (
+                entry_time
+                if not hasattr(entry_time, "tzinfo") or entry_time.tzinfo is None
                 else entry_time.replace(tzinfo=None)
+            )
 
         current = float(bar["Close"])
         high = float(bar["High"])
@@ -791,10 +1019,15 @@ class CombinedEngine:
         if hasattr(bar_ts, "to_pydatetime"):
             bt_dt = bar_ts.to_pydatetime().replace(tzinfo=None)
         elif isinstance(bar_ts, str):
-            bt_dt = datetime.fromisoformat(bar_ts.replace("Z", "+00:00")).replace(tzinfo=None)
+            bt_dt = datetime.fromisoformat(bar_ts.replace("Z", "+00:00")).replace(
+                tzinfo=None
+            )
         else:
-            bt_dt = bar_ts if not hasattr(bar_ts, "tzinfo") or bar_ts.tzinfo is None \
+            bt_dt = (
+                bar_ts
+                if not hasattr(bar_ts, "tzinfo") or bar_ts.tzinfo is None
                 else bar_ts.replace(tzinfo=None)
+            )
 
         tp = self.v3_params.get("target_pct", 57.0)
         sp = self.v3_params.get("stop_pct", 30.0)
@@ -819,8 +1052,12 @@ class CombinedEngine:
             if (peak / entry_price - 1) * 100 >= tap:
                 trailing_stop = peak * (1 - trp / 100)
 
-        self.v3_active_trade = {"peak": peak, "trailing_stop": trailing_stop,
-                                "entry_price": entry_price, "entry_time": entry_time}
+        self.v3_active_trade = {
+            "peak": peak,
+            "trailing_stop": trailing_stop,
+            "entry_price": entry_price,
+            "entry_time": entry_time,
+        }
 
         # Check exit conditions
         exit_reason = None
@@ -840,9 +1077,16 @@ class CombinedEngine:
                 exit_price = current
 
         if exit_reason:
-            log.info("V3 EXIT %s (%s): entry=$%.3f exit=$%.3f", ticker, exit_reason, entry_price, exit_price)
+            log.info(
+                "V3 EXIT %s (%s): entry=$%.3f exit=$%.3f",
+                ticker,
+                exit_reason,
+                entry_price,
+                exit_price,
+            )
             order = self.executor.sell(
-                ticker, reason=exit_reason,
+                ticker,
+                reason=exit_reason,
                 signal_price=exit_price,
                 cumulative_dollar_volume=self._cum_dollar_vol(ticker),
                 strategy="V3",
@@ -850,26 +1094,37 @@ class CombinedEngine:
             if order:
                 with self._pending_lock:
                     self.pending_orders[str(order.id)] = {
-                        "ticker": ticker, "strategy": "V3",
-                        "signal_price": exit_price, "signal_time": bar["timestamp"],
-                        "side": "sell", "exit_reason": exit_reason,
+                        "ticker": ticker,
+                        "strategy": "V3",
+                        "signal_price": exit_price,
+                        "signal_time": bar["timestamp"],
+                        "side": "sell",
+                        "exit_reason": exit_reason,
                         "pre_sell_shares": entry_info.get("shares", 0),
                         "is_partial": False,
                     }
                 if self.fill_stream is not None:
                     self.fill_stream.register(order.id, self._on_sell_fill)
-                    log.info("V3 SELL %s (%s): order %s placed, awaiting stream fill",
-                             ticker, exit_reason, order.id)
+                    log.info(
+                        "V3 SELL %s (%s): order %s placed, awaiting stream fill",
+                        ticker,
+                        exit_reason,
+                        order.id,
+                    )
                 else:
                     # Legacy synchronous exit
                     self.active_positions.discard(ticker)
                     pnl = (exit_price - entry_price) * entry_info.get("shares", 0)
                     self.daily_pnl += pnl
                     trade = {
-                        "ticker": ticker, "strategy": "V3",
-                        "entry_price": entry_price, "exit_price": exit_price,
-                        "pnl": pnl, "reason": exit_reason,
-                        "entry_time": entry_time, "exit_time": bar["timestamp"],
+                        "ticker": ticker,
+                        "strategy": "V3",
+                        "entry_price": entry_price,
+                        "exit_price": exit_price,
+                        "pnl": pnl,
+                        "reason": exit_reason,
+                        "entry_time": entry_time,
+                        "exit_time": bar["timestamp"],
                     }
                     self.trades_today.append(trade)
                     _append_trade(trade)
@@ -888,7 +1143,11 @@ class CombinedEngine:
         g_holds = defaultdict(list)
         for ticker, st_list in self.all_states.items():
             for st in st_list:
-                if st.get("strategy") == "G" and st.get("entry_time") and st.get("exit_time"):
+                if (
+                    st.get("strategy") == "G"
+                    and st.get("entry_time")
+                    and st.get("exit_time")
+                ):
                     g_holds[ticker].append((st["entry_time"], st["exit_time"]))
 
         # --- AGGREGATE CAP: all v3 positions combined ≤ 30% of equity ---
@@ -907,7 +1166,9 @@ class CombinedEngine:
         cash = max(0, raw_cash)
         pos_pct = self.v3_params.get("position_pct", 30.0)
         if cash <= 0:
-            log.debug("V3: no cash available (cash=$%.0f, equity=$%.0f)", raw_cash, equity)
+            log.debug(
+                "V3: no cash available (cash=$%.0f, equity=$%.0f)", raw_cash, equity
+            )
             return
 
         for pick in picks_with_data:
@@ -926,7 +1187,9 @@ class CombinedEngine:
             # Cap both by per-position PCT and remaining aggregate budget
             trade_size = min(cash * (pos_pct / 100), remaining_budget)
             if trade_size < 50:
-                log.debug("V3 %s: trade_size $%.0f too small after cap", ticker, trade_size)
+                log.debug(
+                    "V3 %s: trade_size $%.0f too small after cap", ticker, trade_size
+                )
                 continue
             cum_dvol = self._cum_dollar_vol(ticker)
 
@@ -935,7 +1198,9 @@ class CombinedEngine:
             v3_target = self.v3_params.get("target_pct", 57.0)
 
             order = self.executor.buy(
-                ticker, trade_size, fp,
+                ticker,
+                trade_size,
+                fp,
                 cumulative_dollar_volume=cum_dvol,
                 strategy="V3",
                 bracket_stop_pct=v3_stop,
@@ -943,7 +1208,9 @@ class CombinedEngine:
             )
             if order:
                 # Track aggregate allocation and recompute remaining budget
-                self._v3_allocated_today = getattr(self, "_v3_allocated_today", 0) + trade_size
+                self._v3_allocated_today = (
+                    getattr(self, "_v3_allocated_today", 0) + trade_size
+                )
                 remaining_budget = v3_budget - self._v3_allocated_today
                 self.active_positions.add(ticker)
                 if ticker not in self.position_entry:
@@ -956,24 +1223,36 @@ class CombinedEngine:
                     }
                 with self._pending_lock:
                     self.pending_orders[str(order.id)] = {
-                        "ticker": ticker, "strategy": "V3",
-                        "signal_price": fp, "signal_time": ets,
-                        "side": "buy", "requested_cost": trade_size,
+                        "ticker": ticker,
+                        "strategy": "V3",
+                        "signal_price": fp,
+                        "signal_time": ets,
+                        "side": "buy",
+                        "requested_cost": trade_size,
                     }
                 self.v3_active_trade = {
-                    "peak": fp, "trailing_stop": None,
-                    "entry_price": fp, "entry_time": ets,
+                    "peak": fp,
+                    "trailing_stop": None,
+                    "entry_price": fp,
+                    "entry_time": ets,
                 }
                 if self.fill_stream is not None:
                     self.fill_stream.register(order.id, self._on_buy_fill)
-                    log.info("V3 ENTRY %s: price=$%.3f size=$%.0f order=%s",
-                             ticker, fp, trade_size, order.id)
+                    log.info(
+                        "V3 ENTRY %s: price=$%.3f size=$%.0f order=%s",
+                        ticker,
+                        fp,
+                        trade_size,
+                        order.id,
+                    )
                     self._schedule_safety_poll(order.id, ticker, "buy", fp, ets, "V3")
                 else:
                     self._poll_buy_fill_inline(order, ticker, "V3", fp, ets)
                 return  # one v3 entry per ticker per day
             else:
-                log.debug("V3 ENTRY %s rejected by executor (vol cap or equity cap)", ticker)
+                log.debug(
+                    "V3 ENTRY %s rejected by executor (vol cap or equity cap)", ticker
+                )
 
     def _on_bar_halt(self, symbol, bar):
         """Halt-resume strategy bar handler. Runs independently of
@@ -981,14 +1260,16 @@ class CombinedEngine:
         on_bar so the same dashboard + trade-log surfaces apply.
         """
         ts = bar["timestamp"]
-        self.bar_data.setdefault(symbol, []).append({
-            "timestamp": ts,
-            "Open": bar["Open"],
-            "High": bar["High"],
-            "Low": bar["Low"],
-            "Close": bar["Close"],
-            "Volume": bar["Volume"],
-        })
+        self.bar_data.setdefault(symbol, []).append(
+            {
+                "timestamp": ts,
+                "Open": bar["Open"],
+                "High": bar["High"],
+                "Low": bar["Low"],
+                "Close": bar["Close"],
+                "Volume": bar["Volume"],
+            }
+        )
 
         state = self.halt_states.get(symbol)
         if state is None or state.get("done"):
@@ -1014,11 +1295,20 @@ class CombinedEngine:
             cash = self.executor.get_buying_power()
             cum_dollar = self._cum_dollar_vol(symbol)
             entry_price = state["signal_price"]
-            log.info("HALT-SIGNAL %s: price=$%.3f reason=%s cum_$vol=$%.0f",
-                     symbol, entry_price, state["halt_reason"], cum_dollar)
-            order = self.executor.buy(symbol, cash, entry_price,
-                                       cumulative_dollar_volume=cum_dollar,
-                                       strategy="HALT")
+            log.info(
+                "HALT-SIGNAL %s: price=$%.3f reason=%s cum_$vol=$%.0f",
+                symbol,
+                entry_price,
+                state["halt_reason"],
+                cum_dollar,
+            )
+            order = self.executor.buy(
+                symbol,
+                cash,
+                entry_price,
+                cumulative_dollar_volume=cum_dollar,
+                strategy="HALT",
+            )
             if order is None:
                 log.warning("HALT BUY REJECTED %s (vol_cap or executor error)", symbol)
                 state["done"] = True
@@ -1039,8 +1329,13 @@ class CombinedEngine:
                 "strategy": "HALT",
                 "entry_time": ts,
             }
-            log.info("HALT-ENTRY %s: %.2f shares @ $%.3f ($%s)",
-                     symbol, shares, entry_price, format(state["position_cost"], ",.0f"))
+            log.info(
+                "HALT-ENTRY %s: %.2f shares @ $%.3f ($%s)",
+                symbol,
+                shares,
+                entry_price,
+                format(state["position_cost"], ",.0f"),
+            )
             return
 
         # ----- Exit path -----
@@ -1053,36 +1348,54 @@ class CombinedEngine:
         # Minutes to 4:00 PM ET — used by EOD branch
         try:
             ts_et = ts.astimezone(ET) if hasattr(ts, "astimezone") else ts
-            close_dt = datetime.combine(ts_et.date(),
-                                        datetime.strptime("16:00", "%H:%M").time(),
-                                        tzinfo=ET)
+            close_dt = datetime.combine(
+                ts_et.date(), datetime.strptime("16:00", "%H:%M").time(), tzinfo=ET
+            )
             mins_to_close = max(0, int((close_dt - ts_et).total_seconds() // 60))
         except Exception:
             mins_to_close = 999
 
         should_exit, exit_price, reason = hr.check_exit(
-            state, c_high, c_low, c_close, mins_in, mins_to_close,
+            state,
+            c_high,
+            c_low,
+            c_close,
+            mins_in,
+            mins_to_close,
         )
         if not should_exit:
             return
 
         if reason == "PARTIAL":
-            sell_shares = state["shares"] * (hr.DEFAULT_PARAMS["partial_sell_pct"] / 100.0)
-            log.info("HALT-PARTIAL %s: %.2f shares @ $%.3f",
-                     symbol, sell_shares, exit_price)
-            self.executor.sell(symbol, shares=sell_shares, reason="HALT_PARTIAL",
-                               signal_price=exit_price, strategy="HALT")
+            sell_shares = state["shares"] * (
+                hr.DEFAULT_PARAMS["partial_sell_pct"] / 100.0
+            )
+            log.info(
+                "HALT-PARTIAL %s: %.2f shares @ $%.3f", symbol, sell_shares, exit_price
+            )
+            self.executor.sell(
+                symbol,
+                shares=sell_shares,
+                reason="HALT_PARTIAL",
+                signal_price=exit_price,
+                strategy="HALT",
+            )
             state["shares"] = max(0.0, state["shares"] - sell_shares)
             state["partial_proceeds"] = sell_shares * exit_price
             return
 
         # Full exit
         log.info("HALT-EXIT %s (%s): @ $%.3f", symbol, reason, exit_price)
-        order = self.executor.sell(symbol, reason=f"HALT_{reason}",
-                                    signal_price=exit_price, strategy="HALT")
+        order = self.executor.sell(
+            symbol, reason=f"HALT_{reason}", signal_price=exit_price, strategy="HALT"
+        )
         if order is not None or True:  # always finalize state even if executor was noop
             entry = state["entry_price"] or 0.0
-            pnl = (exit_price - entry) * state["shares"] + state.get("partial_proceeds", 0.0) - state.get("position_cost", 0.0)
+            pnl = (
+                (exit_price - entry) * state["shares"]
+                + state.get("partial_proceeds", 0.0)
+                - state.get("position_cost", 0.0)
+            )
             # Recompute pnl cleanly: partial_proceeds are gross. Final pnl is
             # (partial_proceeds + remaining_shares*exit_price) - original_cost.
             try:
@@ -1094,7 +1407,9 @@ class CombinedEngine:
                 else:
                     orig_shares = state["shares"]
                 orig_cost = entry * orig_shares
-                proceeds = state.get("partial_proceeds", 0.0) + state["shares"] * exit_price
+                proceeds = (
+                    state.get("partial_proceeds", 0.0) + state["shares"] * exit_price
+                )
                 pnl = proceeds - orig_cost
             except Exception:
                 pass
@@ -1119,8 +1434,13 @@ class CombinedEngine:
             }
             self.trades_today.append(trade)
             _append_trade(trade)
-            log.info("HALT-CLOSED %s: PnL=$%s | $%.2f -> $%.2f",
-                     symbol, format(pnl, "+,.2f"), entry, exit_price)
+            log.info(
+                "HALT-CLOSED %s: PnL=$%s | $%.2f -> $%.2f",
+                symbol,
+                format(pnl, "+,.2f"),
+                entry,
+                exit_price,
+            )
 
     def _cum_vol(self, ticker):
         """Cumulative SHARE volume for a ticker (engine-local — undercounts
@@ -1163,19 +1483,27 @@ class CombinedEngine:
         if event_type in ("fill", "partial_fill"):
             try:
                 cumulative_shares = float(order.filled_qty) if order.filled_qty else 0.0
-                actual_avg = float(order.filled_avg_price) if order.filled_avg_price else pending["signal_price"]
+                actual_avg = (
+                    float(order.filled_avg_price)
+                    if order.filled_avg_price
+                    else pending["signal_price"]
+                )
             except (TypeError, ValueError):
-                cumulative_shares = 0.0; actual_avg = pending["signal_price"]
+                cumulative_shares = 0.0
+                actual_avg = pending["signal_price"]
 
             # Track already-recorded fills to avoid duplicate ENTRY logs (filled_qty is cumulative)
             last_recorded = pending.get("last_recorded_qty", 0.0)
             delta_shares = cumulative_shares - last_recorded
 
             if cumulative_shares < 1:
-                log.warning("BUY %s STREAM-FILL: 0 shares filled (event=%s)", ticker, event_type)
+                log.warning(
+                    "BUY %s STREAM-FILL: 0 shares filled (event=%s)", ticker, event_type
+                )
                 # Don't clear active_positions yet on partial_fill — may complete later
                 if event_type != "partial_fill":
-                    if ticker in self.active_positions: self.active_positions.discard(ticker)
+                    if ticker in self.active_positions:
+                        self.active_positions.discard(ticker)
                 return
 
             # Update position_entry with cumulative totals (not delta)
@@ -1192,35 +1520,64 @@ class CombinedEngine:
             # not the signal price. Without this, a $0.10 slippage on a $10 stock
             # means the target and stop are wrong by 100bp on every exit decision.
             if actual_avg != pending["signal_price"]:
-                for st in self.last_states.values() if hasattr(self.last_states, "values") else []:
-                    if isinstance(st, dict) and st.get("ticker") == ticker and st.get("entry_price") is not None:
+                for st in (
+                    self.last_states.values()
+                    if hasattr(self.last_states, "values")
+                    else []
+                ):
+                    if (
+                        isinstance(st, dict)
+                        and st.get("ticker") == ticker
+                        and st.get("entry_price") is not None
+                    ):
                         st["entry_price"] = actual_avg
                 # Also patch in all_states (per-strategy list)
-                for sub_list in self.all_states.values() if hasattr(self.all_states, "values") else []:
-                    for sub_st in (sub_list if isinstance(sub_list, list) else []):
-                        if sub_st.get("ticker") == ticker and sub_st.get("entry_price") is not None:
+                for sub_list in (
+                    self.all_states.values()
+                    if hasattr(self.all_states, "values")
+                    else []
+                ):
+                    for sub_st in sub_list if isinstance(sub_list, list) else []:
+                        if (
+                            sub_st.get("ticker") == ticker
+                            and sub_st.get("entry_price") is not None
+                        ):
                             sub_st["entry_price"] = actual_avg
-                log.info("FILL PRICE CORRECTION %s: signal=$%.4f → fill=$%.4f (Δ=%.2fbp); "
-                         "stop/target now anchored to fill price",
-                         ticker, pending["signal_price"], actual_avg,
-                         (actual_avg / pending["signal_price"] - 1) * 10_000)
+                log.info(
+                    "FILL PRICE CORRECTION %s: signal=$%.4f → fill=$%.4f (Δ=%.2fbp); "
+                    "stop/target now anchored to fill price",
+                    ticker,
+                    pending["signal_price"],
+                    actual_avg,
+                    (actual_avg / pending["signal_price"] - 1) * 10_000,
+                )
 
             # Only log if this is new fills (not already logged)
             if delta_shares > 0.01:
                 pending["last_recorded_qty"] = cumulative_shares
-                log.info("ENTRY %s (%s) [STREAM]: %.2f shares @ $%.3f ($%s) — order=%s event=%s",
-                         ticker, strategy, cumulative_shares, actual_avg,
-                         format(actual_cost, ",.0f"), oid, event_type)
+                log.info(
+                    "ENTRY %s (%s) [STREAM]: %.2f shares @ $%.3f ($%s) — order=%s event=%s",
+                    ticker,
+                    strategy,
+                    cumulative_shares,
+                    actual_avg,
+                    format(actual_cost, ",.0f"),
+                    oid,
+                    event_type,
+                )
 
                 # Save position state to disk for crash recovery
                 # Extract strategy params from tgc module globals
                 try:
                     import test_green_candle_combined as tgc_mod
+
                     strat_lower = strategy.lower()
                     stop_pct = getattr(tgc_mod, f"{strat_lower}_stop_pct", 25.0)
                     target_pct = getattr(tgc_mod, f"{strat_lower}_target_pct", 50.0)
                     trail_pct = getattr(tgc_mod, f"{strat_lower}_trail_pct", 0.5)
-                    time_limit_min = getattr(tgc_mod, f"{strat_lower}_time_limit_min", 60)
+                    time_limit_min = getattr(
+                        tgc_mod, f"{strat_lower}_time_limit_min", 60
+                    )
 
                     stop_price = actual_avg * (1 - stop_pct / 100)
                     target_price = actual_avg * (1 + target_pct / 100)
@@ -1236,13 +1593,17 @@ class CombinedEngine:
                         target_price=target_price,
                         trail_pct=trail_pct,
                         time_limit_min=time_limit_min,
-                        entry_time=pending["signal_time"]
+                        entry_time=pending["signal_time"],
                     )
                 except Exception as e:
                     log.error(f"Failed to save position state for {ticker}: {e}")
         elif event_type in ("canceled", "rejected", "expired", "done_for_day"):
             # No fill — clear from active_positions so engine can react to next signal
-            log.warning("BUY %s [STREAM]: no fill (event=%s) — clearing active_positions", ticker, event_type)
+            log.warning(
+                "BUY %s [STREAM]: no fill (event=%s) — clearing active_positions",
+                ticker,
+                event_type,
+            )
             if ticker in self.active_positions and ticker not in self.position_entry:
                 self.active_positions.discard(ticker)
         else:
@@ -1276,17 +1637,26 @@ class CombinedEngine:
         if event_type in ("fill", "partial_fill"):
             try:
                 cumulative_sold = float(order.filled_qty) if order.filled_qty else 0.0
-                actual_avg = float(order.filled_avg_price) if order.filled_avg_price else pending["signal_price"]
+                actual_avg = (
+                    float(order.filled_avg_price)
+                    if order.filled_avg_price
+                    else pending["signal_price"]
+                )
             except (TypeError, ValueError):
-                cumulative_sold = 0.0; actual_avg = pending["signal_price"]
+                cumulative_sold = 0.0
+                actual_avg = pending["signal_price"]
 
             # Track already-recorded fills to avoid duplicates (filled_qty is cumulative across events)
             last_recorded = pending.get("last_recorded_qty", 0.0)
             actual_sold = cumulative_sold - last_recorded
 
             if actual_sold < 0.01:
-                log.debug("SELL %s STREAM-FILL: already recorded %.0f shares (event=%s)",
-                         ticker, cumulative_sold, event_type)
+                log.debug(
+                    "SELL %s STREAM-FILL: already recorded %.0f shares (event=%s)",
+                    ticker,
+                    cumulative_sold,
+                    event_type,
+                )
                 return
 
             # Update last_recorded for next event
@@ -1300,8 +1670,12 @@ class CombinedEngine:
 
             if is_partial and event_type == "partial_fill":
                 # Still some shares pending in this partial sell — don't clear active
-                log.info("PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f (partial event, still pending)",
-                         ticker, actual_sold, actual_avg)
+                log.info(
+                    "PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f (partial event, still pending)",
+                    ticker,
+                    actual_sold,
+                    actual_avg,
+                )
                 return
 
             # Position fully closed by this fill (full sell, or partial sell that completed all of its target qty)
@@ -1332,7 +1706,8 @@ class CombinedEngine:
                     log.warning(f"Could not fetch position details for {ticker}: {e}")
 
                 trade = {
-                    "ticker": ticker, "strategy": strategy,
+                    "ticker": ticker,
+                    "strategy": strategy,
                     "entry_price": entry_price,
                     "exit_price": actual_avg,
                     "shares": int(total_sold),
@@ -1343,7 +1718,7 @@ class CombinedEngine:
                     "reason": exit_reason,
                     "entry_time": pinfo.get("entry_time"),
                     "exit_time": pending["signal_time"],
-                    **pos_details  # Add stop, target, peak, trail, time_limit
+                    **pos_details,  # Add stop, target, peak, trail, time_limit
                 }
                 self._save_trade(trade)
 
@@ -1354,32 +1729,56 @@ class CombinedEngine:
                 # Mark done if this was a TIME exit (strategy timed out, shouldn't re-fire)
                 if exit_reason and "TIME" in exit_reason:
                     self.db.mark_done(ticker, strategy)
-                    log.info("STRATEGY DONE: %s (%s) marked done (timed out)", ticker, strategy)
+                    log.info(
+                        "STRATEGY DONE: %s (%s) marked done (timed out)",
+                        ticker,
+                        strategy,
+                    )
 
                 # Remove position state - no longer needs monitoring
                 self.position_state.remove_position(ticker)
 
-                log.info("EXIT %s (%s) [STREAM]: PnL=$%s | $%.2f -> $%.3f  (sold %.0f shares)",
-                         ticker, exit_reason, format(pnl, "+,.2f"),
-                         entry_price, actual_avg, total_sold)
+                log.info(
+                    "EXIT %s (%s) [STREAM]: PnL=$%s | $%.2f -> $%.3f  (sold %.0f shares)",
+                    ticker,
+                    exit_reason,
+                    format(pnl, "+,.2f"),
+                    entry_price,
+                    actual_avg,
+                    total_sold,
+                )
             else:
                 # Partial sell completed — log but stay in position
-                log.info("PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f sold, %.0f remaining",
-                         ticker, actual_sold, actual_avg, remaining)
+                log.info(
+                    "PARTIAL SELL %s [STREAM]: %.0f shares @ $%.3f sold, %.0f remaining",
+                    ticker,
+                    actual_sold,
+                    actual_avg,
+                    remaining,
+                )
         elif event_type in ("canceled", "rejected", "expired"):
-            log.warning("SELL %s [STREAM]: NO FILL (event=%s) — position STILL OPEN, engine will retry exit",
-                        ticker, event_type)
+            log.warning(
+                "SELL %s [STREAM]: NO FILL (event=%s) — position STILL OPEN, engine will retry exit",
+                ticker,
+                event_type,
+            )
         else:
             log.debug(f"SELL {ticker} STREAM event={event_type} order={oid}")
 
     def _schedule_sell_safety_poll(self, order_id, ticker):
         """Safety net for sell orders — same logic as buy, polls after 60s."""
+
         def _poll():
             time.sleep(60.0)
             with self._pending_lock:
                 still_pending = str(order_id) in self.pending_orders
-            if not still_pending: return
-            log.warning("SAFETY-POLL SELL %s order %s: stream silent 60s, polling Alpaca", ticker, order_id)
+            if not still_pending:
+                return
+            log.warning(
+                "SAFETY-POLL SELL %s order %s: stream silent 60s, polling Alpaca",
+                ticker,
+                order_id,
+            )
             try:
                 o = self.executor.client.get_order_by_id(order_id)
                 status = o.status.value if hasattr(o.status, "value") else str(o.status)
@@ -1389,25 +1788,39 @@ class CombinedEngine:
                 elif status in ("canceled", "rejected", "expired"):
                     self._on_sell_fill(status, o)
                 else:
-                    log.warning("SAFETY-POLL SELL %s order %s: still %s after 60s — abandoning callback",
-                                ticker, order_id, status)
+                    log.warning(
+                        "SAFETY-POLL SELL %s order %s: still %s after 60s — abandoning callback",
+                        ticker,
+                        order_id,
+                        status,
+                    )
                     with self._pending_lock:
                         self.pending_orders.pop(str(order_id), None)
             except Exception as e:
                 log.error(f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
-        threading.Thread(target=_poll, daemon=True, name=f"sell-safety-{str(order_id)[:8]}").start()
 
-    def _schedule_safety_poll(self, order_id, ticker, side, signal_price, signal_time, strategy):
+        threading.Thread(
+            target=_poll, daemon=True, name=f"sell-safety-{str(order_id)[:8]}"
+        ).start()
+
+    def _schedule_safety_poll(
+        self, order_id, ticker, side, signal_price, signal_time, strategy
+    ):
         """Background safety net: if TradingStream misses an event (stream disconnect,
         callback bug, etc.), poll Alpaca after 60s to force-resolve the pending order.
         """
+
         def _poll():
             time.sleep(60.0)
             with self._pending_lock:
                 still_pending = str(order_id) in self.pending_orders
             if not still_pending:
                 return  # stream already handled it
-            log.warning("SAFETY-POLL %s order %s: stream didn't notify in 60s, polling Alpaca", ticker, order_id)
+            log.warning(
+                "SAFETY-POLL %s order %s: stream didn't notify in 60s, polling Alpaca",
+                ticker,
+                order_id,
+            )
             try:
                 o = self.executor.client.get_order_by_id(order_id)
                 status = o.status.value if hasattr(o.status, "value") else str(o.status)
@@ -1418,15 +1831,25 @@ class CombinedEngine:
                 elif status in ("canceled", "rejected", "expired"):
                     self._on_buy_fill(status, o)
                 else:
-                    log.warning("SAFETY-POLL %s order %s: status=%s after 60s, still pending — abandoning",
-                                ticker, order_id, status)
+                    log.warning(
+                        "SAFETY-POLL %s order %s: status=%s after 60s, still pending — abandoning",
+                        ticker,
+                        order_id,
+                        status,
+                    )
                     with self._pending_lock:
                         self.pending_orders.pop(str(order_id), None)
-                    if ticker in self.active_positions and ticker not in self.position_entry:
+                    if (
+                        ticker in self.active_positions
+                        and ticker not in self.position_entry
+                    ):
                         self.active_positions.discard(ticker)
             except Exception as e:
                 log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
-        threading.Thread(target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}").start()
+
+        threading.Thread(
+            target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}"
+        ).start()
 
     def _poll_buy_fill_inline(self, order, ticker, strategy, entry_price, ts):
         """LEGACY synchronous polling — used only when fill_stream is None.
@@ -1439,28 +1862,48 @@ class CombinedEngine:
         while time.time() < deadline:
             try:
                 o = self.executor.client.get_order_by_id(order.id)
-                fst = o.status.value if hasattr(o.status, 'value') else str(o.status)
+                fst = o.status.value if hasattr(o.status, "value") else str(o.status)
                 last_status = fst
-                if o.filled_qty: actual_shares = float(o.filled_qty)
-                if o.filled_avg_price: actual_avg = float(o.filled_avg_price)
-                if fst in terminal_states: break
+                if o.filled_qty:
+                    actual_shares = float(o.filled_qty)
+                if o.filled_avg_price:
+                    actual_avg = float(o.filled_avg_price)
+                if fst in terminal_states:
+                    break
             except Exception:
                 pass
             time.sleep(0.3)
         else:
-            log.warning("BUY %s: order %s still %s after 30s polling — reconciliation",
-                        ticker, order.id, last_status)
+            log.warning(
+                "BUY %s: order %s still %s after 30s polling — reconciliation",
+                ticker,
+                order.id,
+                last_status,
+            )
         if actual_shares < 1:
-            log.warning("BUY %s LEGACY-POLL: 0 shares filled in 30s — not recording position", ticker)
-            if ticker in self.active_positions: self.active_positions.discard(ticker)
+            log.warning(
+                "BUY %s LEGACY-POLL: 0 shares filled in 30s — not recording position",
+                ticker,
+            )
+            if ticker in self.active_positions:
+                self.active_positions.discard(ticker)
         else:
             actual_cost = actual_shares * actual_avg
             self.position_entry[ticker] = {
-                "entry_price": actual_avg, "shares": actual_shares, "cost": actual_cost,
-                "strategy": strategy, "entry_time": ts,
+                "entry_price": actual_avg,
+                "shares": actual_shares,
+                "cost": actual_cost,
+                "strategy": strategy,
+                "entry_time": ts,
             }
-            log.info("ENTRY %s (%s) [LEGACY-POLL]: %.2f shares @ $%.3f ($%s)",
-                     ticker, strategy, actual_shares, actual_avg, format(actual_cost, ",.0f"))
+            log.info(
+                "ENTRY %s (%s) [LEGACY-POLL]: %.2f shares @ $%.3f ($%s)",
+                ticker,
+                strategy,
+                actual_shares,
+                actual_avg,
+                format(actual_cost, ",.0f"),
+            )
 
     def _cum_dollar_vol(self, ticker):
         """Cumulative DOLLAR volume since 9:30 ET today, fetched live from
@@ -1482,6 +1925,7 @@ class CombinedEngine:
             from alpaca.data.timeframe import TimeFrame
             from datetime import time as dt_time, timedelta
             from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
+
             client = StockHistoricalDataClient(ALPACA_API_KEY, ALPACA_API_SECRET)
             now_et = datetime.now(ET)
             market_open = datetime.combine(now_et.date(), dt_time(9, 30), tzinfo=ET)
@@ -1514,8 +1958,9 @@ class CombinedEngine:
                     tail_dvol += float(b["Close"]) * float(b["Volume"])
             return sip_dvol + tail_dvol
         except Exception as e:
-            log.warning(f"_cum_dollar_vol({ticker}) REST failed: {e}; "
-                        f"falling back to local")
+            log.warning(
+                f"_cum_dollar_vol({ticker}) REST failed: {e}; falling back to local"
+            )
             bars = self.bar_data.get(ticker, [])
             return float(sum(float(b["Close"]) * float(b["Volume"]) for b in bars))
 
@@ -1545,6 +1990,7 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
+            df.index = df.index.floor("2min")
             df = df[~df.index.duplicated(keep="last")]
             pick_copy = dict(pick)
             pick_copy["market_hour_candles"] = df
@@ -1557,9 +2003,12 @@ class CombinedEngine:
 
         cash = self.executor.get_buying_power()
         states, _, _, _ = tgc.simulate_day_combined(picks_with_data, cash, is_live=True)
-        log.info("=== EOD DIAGNOSTICS (%d tickers, %d bars avg) ===",
-                 len(picks_with_data),
-                 sum(len(self.bar_data.get(p["ticker"], [])) for p in picks_with_data) // max(len(picks_with_data), 1))
+        log.info(
+            "=== EOD DIAGNOSTICS (%d tickers, %d bars avg) ===",
+            len(picks_with_data),
+            sum(len(self.bar_data.get(p["ticker"], [])) for p in picks_with_data)
+            // max(len(picks_with_data), 1),
+        )
         for st in states:
             tk = st["ticker"]
             candles = st.get("candle_count", 0)
@@ -1567,18 +2016,30 @@ class CombinedEngine:
             entry = st.get("entry_price")
             strategy = st.get("strategy", "none")
             if entry:
-                log.info("  EOD-DIAG %s: TRADED strat=%s candles=%d gap=%.1f%%",
-                         tk, strategy, candles, gap)
+                log.info(
+                    "  EOD-DIAG %s: TRADED strat=%s candles=%d gap=%.1f%%",
+                    tk,
+                    strategy,
+                    candles,
+                    gap,
+                )
             else:
                 # Log which strategies were eligible
                 eligible = []
                 for s in "HGAFDVPMRWOBKCEIJNL":
                     if st.get(f"{s.lower()}_eligible", False):
                         eligible.append(s)
-                log.info("  EOD-DIAG %s: NO SIGNAL | candles=%d gap=%.1f%% eligible=%s pm_high=%.3f open=%.3f",
-                         tk, candles, gap, eligible or "none",
-                         pick.get("premarket_high", 0) if (pick := next((p for p in self.picks if p["ticker"] == tk), {})) else 0,
-                         st.get("market_open", 0))
+                log.info(
+                    "  EOD-DIAG %s: NO SIGNAL | candles=%d gap=%.1f%% eligible=%s pm_high=%.3f open=%.3f",
+                    tk,
+                    candles,
+                    gap,
+                    eligible or "none",
+                    pick.get("premarket_high", 0)
+                    if (pick := next((p for p in self.picks if p["ticker"] == tk), {}))
+                    else 0,
+                    st.get("market_open", 0),
+                )
 
     def save_bar_summaries(self):
         """Save daily bar summaries for all tickers at EOD."""
@@ -1587,19 +2048,27 @@ class CombinedEngine:
             if not bars:
                 continue
             try:
-                open_price = bars[0]['Open']
-                high = max(b['High'] for b in bars)
-                low = min(b['Low'] for b in bars)
-                close = bars[-1]['Close']
-                volume = sum(b['Volume'] for b in bars)
+                open_price = bars[0]["Open"]
+                high = max(b["High"] for b in bars)
+                low = min(b["Low"] for b in bars)
+                close = bars[-1]["Close"]
+                volume = sum(b["Volume"] for b in bars)
 
                 # Calculate VWAP
-                total_pv = sum(b['Close'] * b['Volume'] for b in bars)
+                total_pv = sum(b["Close"] * b["Volume"] for b in bars)
                 vwap = total_pv / volume if volume > 0 else None
 
                 self.db.save_bar_summary(
-                    ticker, open_price, high, low, close, volume, vwap,
-                    len(bars), bars[0]['timestamp'], bars[-1]['timestamp']
+                    ticker,
+                    open_price,
+                    high,
+                    low,
+                    close,
+                    volume,
+                    vwap,
+                    len(bars),
+                    bars[0]["timestamp"],
+                    bars[-1]["timestamp"],
                 )
                 saved_count += 1
             except Exception as e:
@@ -1614,4 +2083,5 @@ class CombinedEngine:
             "wins": sum(1 for t in self.trades_today if t["pnl"] > 0),
             "losses": sum(1 for t in self.trades_today if t["pnl"] <= 0),
             "trade_details": self.trades_today,
+            "intraday_discoveries": self.intraday_discoveries,
         }

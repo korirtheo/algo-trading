@@ -33,6 +33,7 @@ import math
 import numpy as np
 import pandas as pd
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -53,9 +54,11 @@ from test_full import (
 )
 
 import io, sys as _sys
-if hasattr(_sys.stdout, 'buffer'):
-    _sys.stdout = io.TextIOWrapper(_sys.stdout.buffer, encoding="utf-8",
-                                    errors="replace", line_buffering=True)
+
+if hasattr(_sys.stdout, "buffer"):
+    _sys.stdout = io.TextIOWrapper(
+        _sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True
+    )
 
 # --- LIQUIDITY-AWARE SLIPPAGE MODEL ---
 # Default OFF for backward compatibility: when USE_DYNAMIC_SLIPPAGE is False
@@ -85,7 +88,9 @@ REGIME_AMP = 0.0  # opt-in regime amplifier
 # actually available, not all volume since premarket. Also enables the per-2-min
 # participation cap (MAX_2MIN_PARTICIPATION) on entry sizing.
 USE_2MIN_SLIPPAGE = False
-MAX_2MIN_PARTICIPATION = 0.15  # cap position at 15% of last 2-min $vol when above flag is True
+MAX_2MIN_PARTICIPATION = (
+    0.15  # cap position at 15% of last 2-min $vol when above flag is True
+)
 
 # --- MULTI-WINDOW EFFECTIVE LIQUIDITY (supersedes USE_2MIN_SLIPPAGE when True) ---
 # Liquidity is a *flow*. A single 2-min window can fool you if it's an isolated spike
@@ -104,12 +109,12 @@ MAX_2MIN_PARTICIPATION = 0.15  # cap position at 15% of last 2-min $vol when abo
 #   - MAX_REGIME_PARTICIPATION * v_10min              (regime cap)
 #   - MAX_2MIN_PARTICIPATION   * v_eff_adj            (execution cap, usually binds)
 USE_MULTIWINDOW_SLIPPAGE = False
-WINDOW_BARS_LOCAL = 3            # 3 bars = ~6 minutes (mid-range window)
-WINDOW_BARS_REGIME = 5           # 5 bars = ~10 minutes (regime window)
-MULTIWIN_LOCAL_WEIGHT = 0.5      # weight of 6-min window
-MULTIWIN_REGIME_WEIGHT = 0.25    # weight of 10-min window
-USE_VOLATILITY_ADJUSTMENT = True # divide v_eff by (1 + range_pct/VOL_FACTOR_SCALE)
-VOL_FACTOR_SCALE = 5.0           # 10% recent range -> 2x vol factor (capped at 2x)
+WINDOW_BARS_LOCAL = 3  # 3 bars = ~6 minutes (mid-range window)
+WINDOW_BARS_REGIME = 5  # 5 bars = ~10 minutes (regime window)
+MULTIWIN_LOCAL_WEIGHT = 0.5  # weight of 6-min window
+MULTIWIN_REGIME_WEIGHT = 0.25  # weight of 10-min window
+USE_VOLATILITY_ADJUSTMENT = True  # divide v_eff by (1 + range_pct/VOL_FACTOR_SCALE)
+VOL_FACTOR_SCALE = 5.0  # 10% recent range -> 2x vol factor (capped at 2x)
 MAX_REGIME_PARTICIPATION = 0.08  # 8% of 10-min vol regime cap
 
 
@@ -120,7 +125,7 @@ MAX_REGIME_PARTICIPATION = 0.08  # 8% of 10-min vol regime cap
 # Other bucket modulations (skip-no-news, half-no-catalyst) HURT compounding.
 NEWS_MODULATOR_ENABLED = False
 NEWS_OVERCROWDED_THRESHOLD = 10  # n_articles >= this triggers reduction
-NEWS_OVERCROWDED_MULT = 0.5      # scale trade size by this when overcrowded
+NEWS_OVERCROWDED_MULT = 0.5  # scale trade size by this when overcrowded
 
 
 # --- PHASE 1A ADAPTIVE CONTROLS (added 2026-06-17) ---
@@ -133,10 +138,12 @@ NEWS_OVERCROWDED_MULT = 0.5      # scale trade size by this when overcrowded
 # and behavior matches pre-Phase-1A exactly.
 
 # Global day-level filters
-MIN_PRICE = 0.0                      # skip strategy entries on stocks below this price
-MAX_MODELED_SLIP_BP = 0.0            # skip if modeled entry slippage > this many bp (0 = no cap)
-MAX_CUM_DVOL_AT_ENTRY_M = 0.0        # skip if cumulative $-vol since open > this many $M (0 = no cap)
-MIN_ATR_PCT = 0.0                    # require pre-entry ATR >= this % (0 = no requirement)
+MIN_PRICE = 0.0  # skip strategy entries on stocks below this price
+MAX_MODELED_SLIP_BP = 0.0  # skip if modeled entry slippage > this many bp (0 = no cap)
+MAX_CUM_DVOL_AT_ENTRY_M = (
+    0.0  # skip if cumulative $-vol since open > this many $M (0 = no cap)
+)
+MIN_ATR_PCT = 0.0  # require pre-entry ATR >= this % (0 = no requirement)
 
 # Per-strategy participation caps — 0 means "fall back to MAX_2MIN_PARTICIPATION"
 H_PARTICIPATION_CAP = 0.0
@@ -165,13 +172,15 @@ X_PARTICIPATION_CAP = 0.0
 # When ENABLE_REENTRY=False, each (ticker, strategy) can only enter once per day
 # When ENABLE_REENTRY=True, re-entry is allowed if price > last_exit * (1 + REENTRY_PRICE_BUFFER_PCT/100)
 # This ensures we only re-enter on momentum continuation, not catching falling knives
-ENABLE_REENTRY = False             # Master toggle for re-entry (DISABLED - marginal +0.9% impact)
-REENTRY_PRICE_BUFFER_PCT = 1.0     # Require price > last_exit * 1.01 to re-enter (1% buffer)
+ENABLE_REENTRY = False  # Master toggle for re-entry (DISABLED - marginal +0.9% impact)
+REENTRY_PRICE_BUFFER_PCT = (
+    1.0  # Require price > last_exit * 1.01 to re-enter (1% buffer)
+)
 
 # Point-in-time news filter (drop picks lacking enough premarket news coverage)
-NEWS_FILTER_ENABLED = False          # master toggle
-NEWS_MIN_ARTICLES = 0                # require >= this many articles before 9:30 ET
-NEWS_REQUIRE_CATALYST = False        # require at least one non-scanner-roundup article
+NEWS_FILTER_ENABLED = False  # master toggle
+NEWS_MIN_ARTICLES = 0  # require >= this many articles before 9:30 ET
+NEWS_REQUIRE_CATALYST = False  # require at least one non-scanner-roundup article
 
 # Per-trade leverage. 1.0 = cash-only (current default). 2.0 = Reg-T 2x margin
 # (intraday). cash_box[0] is allowed to go negative under this scheme — the
@@ -184,20 +193,22 @@ MARGIN_MULTIPLIER = 1.0
 # Each weight is the "credit" the day gets when the corresponding signal is true.
 # Weights can be negative (signal inverts) or zero (signal ignored).
 # Default 0 weights + 0 threshold = "no gating" (matches pre-1A behavior).
-W_NOT_WED = 0.0                  # weight when DOW != Wednesday
-W_NOT_JUN_AUG = 0.0              # weight when month not in (6, 8)
-W_DXY_UP = 0.0                   # weight when prior-day DXY_1d > 0
-W_BTC_FLAT = 0.0                 # weight when |BTC_5d| < BTC_FLAT_BANDWIDTH
-W_VIX_MID = 0.0                  # weight when VIX in middle tercile (precomputed)
-W_IWM_MID = 0.0                  # weight when IWM_close in middle tercile (precomputed)
-W_PM_DVOL_MID = 0.0              # weight when median pm_$vol in middle tercile (today vs distribution)
-MIN_FAVORABILITY_THRESHOLD = 0.0 # skip day if weighted favorability score < this
-BTC_FLAT_BANDWIDTH = 5.0         # |BTC_5d| < this (in pct) counts as "flat"
+W_NOT_WED = 0.0  # weight when DOW != Wednesday
+W_NOT_JUN_AUG = 0.0  # weight when month not in (6, 8)
+W_DXY_UP = 0.0  # weight when prior-day DXY_1d > 0
+W_BTC_FLAT = 0.0  # weight when |BTC_5d| < BTC_FLAT_BANDWIDTH
+W_VIX_MID = 0.0  # weight when VIX in middle tercile (precomputed)
+W_IWM_MID = 0.0  # weight when IWM_close in middle tercile (precomputed)
+W_PM_DVOL_MID = (
+    0.0  # weight when median pm_$vol in middle tercile (today vs distribution)
+)
+MIN_FAVORABILITY_THRESHOLD = 0.0  # skip day if weighted favorability score < this
+BTC_FLAT_BANDWIDTH = 5.0  # |BTC_5d| < this (in pct) counts as "flat"
 
 # Macro lookup — populated lazily by load_macro_data().
 # Keys are YYYY-MM-DD strings, values are dicts of feature values.
 _MACRO_DATA = {}
-_VIX_TERCILE_BOUNDS = (0.0, 0.0)   # (low, high) — set after macro load
+_VIX_TERCILE_BOUNDS = (0.0, 0.0)  # (low, high) — set after macro load
 _IWM_TERCILE_BOUNDS = (0.0, 0.0)
 
 
@@ -214,6 +225,7 @@ def load_macro_data(csv_path):
     global _MACRO_DATA, _VIX_TERCILE_BOUNDS, _IWM_TERCILE_BOUNDS
     import csv as _csv
     import os as _os
+
     if not _os.path.exists(csv_path):
         return 0
     _MACRO_DATA = {}
@@ -225,8 +237,17 @@ def load_macro_data(csv_path):
             if not d:
                 continue
             row = {}
-            for k in ("VIX_close", "VIX_1d", "VIX_5d", "DXY_close", "DXY_1d",
-                      "BTC_close", "BTC_5d", "IWM_close", "median_pm_dollar_vol"):
+            for k in (
+                "VIX_close",
+                "VIX_1d",
+                "VIX_5d",
+                "DXY_close",
+                "DXY_1d",
+                "BTC_close",
+                "BTC_5d",
+                "IWM_close",
+                "median_pm_dollar_vol",
+            ):
                 v = r.get(k, "")
                 try:
                     row[k] = float(v) if v not in ("", None) else None
@@ -257,6 +278,7 @@ def compute_day_favorability(date_str, picks):
     if not _MACRO_DATA:
         return None, {}
     from datetime import datetime as _dt
+
     try:
         d = _dt.strptime(date_str, "%Y-%m-%d")
         dow = d.strftime("%A")
@@ -268,8 +290,10 @@ def compute_day_favorability(date_str, picks):
         return None, {}
 
     # Compute today's pm_dollar_vol from picks for the median-bucket signal
-    pm_dvols = [(p.get("pm_volume", 0) or 0) * (p.get("prev_close", 0) or 0)
-                for p in (picks or [])]
+    pm_dvols = [
+        (p.get("pm_volume", 0) or 0) * (p.get("prev_close", 0) or 0)
+        for p in (picks or [])
+    ]
     median_pm_dvol_today = sorted(pm_dvols)[len(pm_dvols) // 2] if pm_dvols else 0
 
     # Binary signals
@@ -278,28 +302,36 @@ def compute_day_favorability(date_str, picks):
         "not_jun_aug": (month not in (6, 8)),
         "dxy_up": ((macro.get("DXY_1d") or 0) > 0),
         "btc_flat": (abs(macro.get("BTC_5d") or 0) < BTC_FLAT_BANDWIDTH),
-        "vix_mid": (_VIX_TERCILE_BOUNDS[0] <= (macro.get("VIX_close") or 0)
-                    <= _VIX_TERCILE_BOUNDS[1]),
-        "iwm_mid": (_IWM_TERCILE_BOUNDS[0] <= (macro.get("IWM_close") or 0)
-                    <= _IWM_TERCILE_BOUNDS[1]),
+        "vix_mid": (
+            _VIX_TERCILE_BOUNDS[0]
+            <= (macro.get("VIX_close") or 0)
+            <= _VIX_TERCILE_BOUNDS[1]
+        ),
+        "iwm_mid": (
+            _IWM_TERCILE_BOUNDS[0]
+            <= (macro.get("IWM_close") or 0)
+            <= _IWM_TERCILE_BOUNDS[1]
+        ),
         # PM $vol mid bucket — based on historical median distribution from macro CSV
         "pm_dvol_mid": False,  # filled below if macro had the historical bucket info
     }
 
     # Weighted sum
     score = (
-        W_NOT_WED       * (1.0 if sig["not_wed"]      else 0.0) +
-        W_NOT_JUN_AUG   * (1.0 if sig["not_jun_aug"]  else 0.0) +
-        W_DXY_UP        * (1.0 if sig["dxy_up"]       else 0.0) +
-        W_BTC_FLAT      * (1.0 if sig["btc_flat"]     else 0.0) +
-        W_VIX_MID       * (1.0 if sig["vix_mid"]      else 0.0) +
-        W_IWM_MID       * (1.0 if sig["iwm_mid"]      else 0.0) +
-        W_PM_DVOL_MID   * (1.0 if sig["pm_dvol_mid"]  else 0.0)
+        W_NOT_WED * (1.0 if sig["not_wed"] else 0.0)
+        + W_NOT_JUN_AUG * (1.0 if sig["not_jun_aug"] else 0.0)
+        + W_DXY_UP * (1.0 if sig["dxy_up"] else 0.0)
+        + W_BTC_FLAT * (1.0 if sig["btc_flat"] else 0.0)
+        + W_VIX_MID * (1.0 if sig["vix_mid"] else 0.0)
+        + W_IWM_MID * (1.0 if sig["iwm_mid"] else 0.0)
+        + W_PM_DVOL_MID * (1.0 if sig["pm_dvol_mid"] else 0.0)
     )
     return score, sig
 
 
-def compute_slippage_pct(price, position_dollars, cum_dollar_volume, regime_factor=20.0):
+def compute_slippage_pct(
+    price, position_dollars, cum_dollar_volume, regime_factor=20.0
+):
     """Liquidity-aware slippage in percent (one-leg, e.g. 0.4 = 0.4%).
 
     When USE_DYNAMIC_SLIPPAGE is False, returns the legacy constant SLIPPAGE_PCT
@@ -312,7 +344,7 @@ def compute_slippage_pct(price, position_dollars, cum_dollar_volume, regime_fact
     base_spread = SLIP_BASE_SPREAD + SLIP_PRICE_COEFF / max(price, 0.1)
     if cum_dollar_volume > 1 and position_dollars > 0:
         participation = position_dollars / cum_dollar_volume
-        impact = SLIP_IMPACT_K * (participation ** 0.5)
+        impact = SLIP_IMPACT_K * (participation**0.5)
     else:
         impact = 0.0
     regime_mult = 1.0 + REGIME_AMP * max(0.0, (regime_factor - 20.0) / 20.0)
@@ -415,7 +447,9 @@ def _entry_slip_pct(fill_price, trade_size, dollar_vol, regime_factor=20.0):
 
 # --- FLOAT DATA (for strategy L) ---
 FLOAT_DATA = {}
-_float_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "float_data.json")
+_float_path = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "float_data.json"
+)
 if os.path.exists(_float_path):
     with open(_float_path) as _f:
         _raw = json.load(_f)
@@ -429,8 +463,8 @@ H_MIN_BODY_PCT = 4.0
 H_REQUIRE_VOL_CONFIRM = True
 H_TARGET_PCT = 16.0
 H_TIME_LIMIT_MINUTES = 15
-H_STOP_PCT = 0.0                 # 0 = no hard stop (legacy behavior)
-H_TRAIL_PCT = 0.0                # 0 = no trailing stop
+H_STOP_PCT = 0.0  # 0 = no hard stop (legacy behavior)
+H_TRAIL_PCT = 0.0  # 0 = no trailing stop
 H_TRAIL_ACTIVATE_PCT = 0.0
 
 # --- STRATEGY G CONFIG: Big Gap Runner ---
@@ -439,8 +473,12 @@ G_MIN_BODY_PCT = 0.0
 G_REQUIRE_2ND_GREEN = True
 G_REQUIRE_2ND_NEW_HIGH = True
 G_TARGET_PCT = 11.0
-G_TARGET2_PCT = 30.0          # Runner target after partial sell (used when G_PARTIAL_SELL_PCT > 0)
-G_PARTIAL_SELL_PCT = 0.0      # % of position to sell at G_TARGET_PCT (0 = sell all, legacy behavior)
+G_TARGET2_PCT = (
+    30.0  # Runner target after partial sell (used when G_PARTIAL_SELL_PCT > 0)
+)
+G_PARTIAL_SELL_PCT = (
+    0.0  # % of position to sell at G_TARGET_PCT (0 = sell all, legacy behavior)
+)
 G_TIME_LIMIT_MINUTES = 10
 G_STOP_PCT = 0.0
 G_TRAIL_PCT = 0.0
@@ -471,152 +509,152 @@ F_TRAIL_ACTIVATE_PCT = 0.0
 
 # --- STRATEGY D CONFIG: Opening Dip Buy (Optuna v2 optimized) ---
 # Fallback: fires when H/G/A/F don't classify, alongside P but fires earlier
-D_MIN_GAP_PCT = 30.0             # Optuna v2: raised from 10%
-D_MIN_SPIKE_PCT = 10.0           # Optuna v2: raised from 6%
-D_SPIKE_WINDOW = 20              # Optuna v2: widened from 5
-D_DIP_PCT = 6.0                  # Optuna v2: tightened from 8%
-D_ENTRY_MODE = "5candle"         # "5candle" or "vwap"
-D_MAX_ENTRY_CANDLE = 45          # Optuna v2: widened from 15
-D_TARGET1_PCT = 12.0             # Target (no partial sell)
-D_TARGET2_PCT = 12.0             # Same as target1 (partial_sell=0)
-D_STOP_PCT = 9.0                 # Hard stop per entry
-D_TIME_LIMIT_MINUTES = 70        # Optuna v2: widened from 30
-D_PARTIAL_SELL_PCT = 0.0         # Optuna v2: no partial sell — trail only
-D_TRAIL_PCT = 2.0                # Fixed trailing stop %
-D_TRAIL_ACTIVATE_PCT = 2.0       # Start trailing after +2% unrealized
+D_MIN_GAP_PCT = 30.0  # Optuna v2: raised from 10%
+D_MIN_SPIKE_PCT = 10.0  # Optuna v2: raised from 6%
+D_SPIKE_WINDOW = 20  # Optuna v2: widened from 5
+D_DIP_PCT = 6.0  # Optuna v2: tightened from 8%
+D_ENTRY_MODE = "5candle"  # "5candle" or "vwap"
+D_MAX_ENTRY_CANDLE = 45  # Optuna v2: widened from 15
+D_TARGET1_PCT = 12.0  # Target (no partial sell)
+D_TARGET2_PCT = 12.0  # Same as target1 (partial_sell=0)
+D_STOP_PCT = 9.0  # Hard stop per entry
+D_TIME_LIMIT_MINUTES = 70  # Optuna v2: widened from 30
+D_PARTIAL_SELL_PCT = 0.0  # Optuna v2: no partial sell — trail only
+D_TRAIL_PCT = 2.0  # Fixed trailing stop %
+D_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing after +2% unrealized
 
 # --- STRATEGY M CONFIG: Midday Range Break ---
 # Morning spike → midday consolidation → afternoon breakout
 M_MIN_GAP_PCT = 10.0
-M_MORNING_SPIKE_PCT = 8.0        # Morning high >= 8% above open
-M_MORNING_CANDLES = 40           # Check spike in first 40 candles
-M_RANGE_START_CANDLE = 55        # Consolidation starts at candle 55
-M_CONSOLIDATION_LEN = 40         # Consolidation lasts 40 candles (ends c95)
-M_MAX_RANGE_PCT = 7.0            # Consolidation range <= 7%
-M_VOL_RATIO = 0.5                # Consolidation vol <= 0.5x morning vol
-M_MAX_ENTRY_CANDLE = 150         # Must enter by candle 150
-M_TARGET1_PCT = 6.0              # Partial target: sell 50% here
-M_STOP_PCT = 10.0                # Hard stop per entry
-M_TIME_LIMIT_MINUTES = 120       # 60 candles * 2 min
-M_PARTIAL_SELL_PCT = 50.0        # Sell 50% at target1
-M_TRAIL_PCT = 4.0                # Trailing stop %
-M_TRAIL_ACTIVATE_PCT = 5.0       # Start trailing after +5% unrealized
+M_MORNING_SPIKE_PCT = 8.0  # Morning high >= 8% above open
+M_MORNING_CANDLES = 40  # Check spike in first 40 candles
+M_RANGE_START_CANDLE = 55  # Consolidation starts at candle 55
+M_CONSOLIDATION_LEN = 40  # Consolidation lasts 40 candles (ends c95)
+M_MAX_RANGE_PCT = 7.0  # Consolidation range <= 7%
+M_VOL_RATIO = 0.5  # Consolidation vol <= 0.5x morning vol
+M_MAX_ENTRY_CANDLE = 150  # Must enter by candle 150
+M_TARGET1_PCT = 6.0  # Partial target: sell 50% here
+M_STOP_PCT = 10.0  # Hard stop per entry
+M_TIME_LIMIT_MINUTES = 120  # 60 candles * 2 min
+M_PARTIAL_SELL_PCT = 50.0  # Sell 50% at target1
+M_TRAIL_PCT = 4.0  # Trailing stop %
+M_TRAIL_ACTIVATE_PCT = 5.0  # Start trailing after +5% unrealized
 
 # --- STRATEGY V CONFIG: VWAP Reclaim (Optuna v2 optimized) ---
 # Gap-up sells off below VWAP, then reclaims with volume -> buy the reclaim
-V_MIN_GAP_PCT = 14.0             # Optuna v2: lowered from 24%
-V_MIN_BELOW_CANDLES = 7          # Optuna v2: raised from 4
-V_MIN_BELOW_PCT = 1.0            # Must dip at least 1% below VWAP
-V_VOL_SPIKE_RATIO = 3.5          # Optuna v2: raised from 1.0
-V_MAX_ENTRY_CANDLE = 60          # Optuna v2: lowered from 80
-V_TARGET1_PCT = 3.0              # Optuna v2: lowered from 9%
-V_TARGET2_PCT = 19.0             # Optuna v2: raised from 17%
-V_STOP_PCT = 9.0                 # Optuna v2: lowered from 10%
-V_TIME_LIMIT_MINUTES = 100       # 50 candles * 2 min
-V_PARTIAL_SELL_PCT = 25.0        # Sell 25% at target1
-V_TRAIL_PCT = 3.0                # Optuna v2: raised from 2%
-V_TRAIL_ACTIVATE_PCT = 5.0       # Optuna v2: raised from 2%
+V_MIN_GAP_PCT = 14.0  # Optuna v2: lowered from 24%
+V_MIN_BELOW_CANDLES = 7  # Optuna v2: raised from 4
+V_MIN_BELOW_PCT = 1.0  # Must dip at least 1% below VWAP
+V_VOL_SPIKE_RATIO = 3.5  # Optuna v2: raised from 1.0
+V_MAX_ENTRY_CANDLE = 60  # Optuna v2: lowered from 80
+V_TARGET1_PCT = 3.0  # Optuna v2: lowered from 9%
+V_TARGET2_PCT = 19.0  # Optuna v2: raised from 17%
+V_STOP_PCT = 9.0  # Optuna v2: lowered from 10%
+V_TIME_LIMIT_MINUTES = 100  # 50 candles * 2 min
+V_PARTIAL_SELL_PCT = 25.0  # Sell 25% at target1
+V_TRAIL_PCT = 3.0  # Optuna v2: raised from 2%
+V_TRAIL_ACTIVATE_PCT = 5.0  # Optuna v2: raised from 2%
 
 # --- STRATEGY R CONFIG: Multi-Day Runner ---
 # Day 1: massive gap-up. Day 2: pullback then bounce continuation.
 R_DAY1_MIN_GAP = 40.0
-R_D2_PULLBACK_PCT = 10.0         # Optuna v2: raised from 3%
-R_PULLBACK_WINDOW = 30           # Pullback within first 30 candles
-R_BOUNCE_REF = "d2_open"         # Optuna v2: changed from d1_close
-R_MAX_ENTRY_CANDLE = 55          # Optuna v2: raised from 20
-R_TARGET1_PCT = 9.0              # Optuna v2: lowered from 19%
-R_STOP_PCT = 9.0                 # Optuna v2: lowered from 10%
-R_TRAIL_PCT = 6.0                # Optuna v2: raised from 4%
-R_TRAIL_ACTIVATE_PCT = 6.0       # Optuna v2: lowered from 8%
-R_TIME_LIMIT_MINUTES = 100       # Optuna v2: reduced from 180
+R_D2_PULLBACK_PCT = 10.0  # Optuna v2: raised from 3%
+R_PULLBACK_WINDOW = 30  # Pullback within first 30 candles
+R_BOUNCE_REF = "d2_open"  # Optuna v2: changed from d1_close
+R_MAX_ENTRY_CANDLE = 55  # Optuna v2: raised from 20
+R_TARGET1_PCT = 9.0  # Optuna v2: lowered from 19%
+R_STOP_PCT = 9.0  # Optuna v2: lowered from 10%
+R_TRAIL_PCT = 6.0  # Optuna v2: raised from 4%
+R_TRAIL_ACTIVATE_PCT = 6.0  # Optuna v2: lowered from 8%
+R_TIME_LIMIT_MINUTES = 100  # Optuna v2: reduced from 180
 
 # --- STRATEGY P CONFIG: PM High Breakout + Pullback + Bounce (Optuna v2 optimized) ---
 # Only fires when H/G/A/F did not classify the stock (fallback)
 # Advanced exits: trailing stop (no partial sell — full trail)
-P_MIN_GAP_PCT = 10.0            # Minimum gap
-P_CONFIRM_ABOVE = 3             # Optuna v2: 3 candles above PM high
-P_CONFIRM_WINDOW = 3            # Optuna v2: 3 candle window
-P_PULLBACK_PCT = 9.0            # Optuna v2: widened from 7%
-P_PULLBACK_TIMEOUT = 10         # Optuna v2: tightened from 30
-P_MAX_ENTRY_CANDLE = 105        # Optuna v2: raised from 75
-P_TARGET1_PCT = 15.0            # Optuna v2: raised from 9%
-P_TARGET2_PCT = 15.0            # Same as target1 (partial_sell=0)
-P_STOP_PCT = 12.0               # Hard stop
-P_TIME_LIMIT_MINUTES = 180      # Optuna v2: raised from 40
-P_PARTIAL_SELL_PCT = 0.0        # Optuna v2: no partial sell — trail only
-P_TRAIL_PCT = 2.0               # Fixed trailing stop %
-P_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing after +2% unrealized
+P_MIN_GAP_PCT = 10.0  # Minimum gap
+P_CONFIRM_ABOVE = 3  # Optuna v2: 3 candles above PM high
+P_CONFIRM_WINDOW = 3  # Optuna v2: 3 candle window
+P_PULLBACK_PCT = 9.0  # Optuna v2: widened from 7%
+P_PULLBACK_TIMEOUT = 10  # Optuna v2: tightened from 30
+P_MAX_ENTRY_CANDLE = 105  # Optuna v2: raised from 75
+P_TARGET1_PCT = 15.0  # Optuna v2: raised from 9%
+P_TARGET2_PCT = 15.0  # Same as target1 (partial_sell=0)
+P_STOP_PCT = 12.0  # Hard stop
+P_TIME_LIMIT_MINUTES = 180  # Optuna v2: raised from 40
+P_PARTIAL_SELL_PCT = 0.0  # Optuna v2: no partial sell — trail only
+P_TRAIL_PCT = 2.0  # Fixed trailing stop %
+P_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing after +2% unrealized
 
 # --- STRATEGY W CONFIG: Power Hour Breakout ---
 # Gap-up + morning run + all-day consolidation + 3 PM+ volume breakout
 W_MIN_GAP_PCT = 10.0
-W_MIN_MORNING_RUN = 4.0          # Optuna v2: raised from 3%
-W_CONSOL_START = 35              # Optuna v2: earlier start
-W_MAX_RANGE_PCT = 10.0           # Optuna v2: tightened from 16%
-W_MAX_VWAP_DEV_PCT = 5.0         # Optuna v2: tightened from 11%
-W_EARLIEST_CANDLE = 165          # Optuna v2: later start
-W_LATEST_CANDLE = 190            # Optuna v2: later end
-W_VOL_SURGE_MULT = 2.0           # Optuna v2: lowered from 3x
-W_VOL_VS_MORNING_MULT = 0.1      # Breakout vol >= 0.1x morning spike vol
-W_MAX_HOD_BREAKS = 3             # Max HOD breaks before entry window
-W_REQUIRE_ABOVE_VWAP = True      # Must be above VWAP at breakout
-W_TARGET_PCT = 8.0               # Optuna v2: raised from 6%
-W_STOP_PCT = 3.0                 # Optuna v2: tightened from 3.5%
-W_TRAIL_PCT = 2.5                # Optuna v2: raised from 1%
-W_TRAIL_ACTIVATE_PCT = 2.0       # Optuna v2: lowered from 3.5%
+W_MIN_MORNING_RUN = 4.0  # Optuna v2: raised from 3%
+W_CONSOL_START = 35  # Optuna v2: earlier start
+W_MAX_RANGE_PCT = 10.0  # Optuna v2: tightened from 16%
+W_MAX_VWAP_DEV_PCT = 5.0  # Optuna v2: tightened from 11%
+W_EARLIEST_CANDLE = 165  # Optuna v2: later start
+W_LATEST_CANDLE = 190  # Optuna v2: later end
+W_VOL_SURGE_MULT = 2.0  # Optuna v2: lowered from 3x
+W_VOL_VS_MORNING_MULT = 0.1  # Breakout vol >= 0.1x morning spike vol
+W_MAX_HOD_BREAKS = 3  # Max HOD breaks before entry window
+W_REQUIRE_ABOVE_VWAP = True  # Must be above VWAP at breakout
+W_TARGET_PCT = 8.0  # Optuna v2: raised from 6%
+W_STOP_PCT = 3.0  # Optuna v2: tightened from 3.5%
+W_TRAIL_PCT = 2.5  # Optuna v2: raised from 1%
+W_TRAIL_ACTIVATE_PCT = 2.0  # Optuna v2: lowered from 3.5%
 
 # --- STRATEGY L CONFIG: Low Float Squeeze (optimized trial #486) ---
-L_MAX_FLOAT = 15_000_000        # Float shares threshold
-L_MIN_GAP_PCT = 30.0            # Minimum gap %
-L_EARLIEST_CANDLE = 8           # Don't enter too early
-L_LATEST_CANDLE = 115           # Latest possible entry candle
-L_HOD_BREAK_REQUIRED = True     # Must break to new HOD for entry
-L_VOL_SURGE_MULT = 1.5          # Current candle vol >= Nx avg of last 10
-L_MIN_PRICE_ACCEL_PCT = 1.0     # Min green candle body % for entry candle
-L_REQUIRE_ABOVE_VWAP = True     # Must be above VWAP at entry
+L_MAX_FLOAT = 15_000_000  # Float shares threshold
+L_MIN_GAP_PCT = 30.0  # Minimum gap %
+L_EARLIEST_CANDLE = 8  # Don't enter too early
+L_LATEST_CANDLE = 115  # Latest possible entry candle
+L_HOD_BREAK_REQUIRED = True  # Must break to new HOD for entry
+L_VOL_SURGE_MULT = 1.5  # Current candle vol >= Nx avg of last 10
+L_MIN_PRICE_ACCEL_PCT = 1.0  # Min green candle body % for entry candle
+L_REQUIRE_ABOVE_VWAP = True  # Must be above VWAP at entry
 # Float-tiered targets
-L_TIER1_FLOAT = 1_000_000       # Ultra-low float boundary
-L_TIER2_FLOAT = 5_000_000       # Low float boundary
+L_TIER1_FLOAT = 1_000_000  # Ultra-low float boundary
+L_TIER2_FLOAT = 5_000_000  # Low float boundary
 L_TIER1_TARGET1_PCT = 30.0
 L_TIER1_TARGET2_PCT = 40.0
 L_TIER2_TARGET1_PCT = 15.0
 L_TIER2_TARGET2_PCT = 40.0
 L_TIER3_TARGET1_PCT = 9.0
 L_TIER3_TARGET2_PCT = 32.0
-L_STOP_PCT = 14.0               # Hard stop (wide for low float volatility)
-L_PARTIAL_SELL_PCT = 0.0        # No partial sell
-L_TRAIL_PCT = 1.0               # Tight trailing stop %
-L_TRAIL_ACTIVATE_PCT = 2.0      # Start trailing early at +2%
-L_TIME_LIMIT_MINUTES = 70       # Time limit in minutes
+L_STOP_PCT = 14.0  # Hard stop (wide for low float volatility)
+L_PARTIAL_SELL_PCT = 0.0  # No partial sell
+L_TRAIL_PCT = 1.0  # Tight trailing stop %
+L_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing early at +2%
+L_TIME_LIMIT_MINUTES = 70  # Time limit in minutes
 
 # --- STRATEGY X CONFIG: Range Reversion (re-entry / second-leg pattern) ---
 # Targets the pullback-then-bounce pattern that follows ~65% of first-leg gap-ups.
 # Empirically (2024 scan, 3,572 ticker-days): 2,333 had >=10% pullback + >=5%
 # recovery, median 16% upside, median second-peak = 92% of first-leg peak.
-X_FIRST_LEG_WINDOW_BARS = 15     # bars 0..15 (first ~30 min) define "first leg"
-X_MIN_FIRST_LEG_GAIN_PCT = 5.0   # first-leg high must be >= this above open
-X_MIN_PULLBACK_PCT = 10.0        # then price must drop >= this from first-leg high
-X_MIN_RECOVERY_PCT = 3.0         # then bounce >= this from intraday low to trigger
-X_MIN_BARS_SINCE_PEAK = 5        # >=5 bars (~10 min) must have passed since peak
-X_ENTRY_REQUIRE_GREEN = True     # entry bar must be green (close > open)
-X_TARGET_PCT_OF_PEAK = 92.0      # exit at 92% of first-leg peak (empirical median)
-X_STOP_PCT_BELOW_TROUGH = 2.0    # stop = trough * (1 - X_STOP_PCT_BELOW_TROUGH/100)
-X_TRAIL_PCT = 5.0                # trail %
-X_TRAIL_ACTIVATE_PCT = 5.0       # activate trail at +5% above entry
-X_TIME_LIMIT_MINUTES = 60        # 60 min hold (mid-day fades slower than open)
-X_MIN_VOL_VS_AVG = 1.0           # entry bar volume >= 1.0x rolling avg
-X_VOL_AVG_BARS = 5               # rolling avg window for volume check
-X_MAX_ENTRY_HHMM = "14:30"       # don't enter past 14:30 ET (need 60 min before EOD)
-X_MIN_ENTRY_ROOM_PCT = 4.0       # require >= this % room between entry and target
+X_FIRST_LEG_WINDOW_BARS = 15  # bars 0..15 (first ~30 min) define "first leg"
+X_MIN_FIRST_LEG_GAIN_PCT = 5.0  # first-leg high must be >= this above open
+X_MIN_PULLBACK_PCT = 10.0  # then price must drop >= this from first-leg high
+X_MIN_RECOVERY_PCT = 3.0  # then bounce >= this from intraday low to trigger
+X_MIN_BARS_SINCE_PEAK = 5  # >=5 bars (~10 min) must have passed since peak
+X_ENTRY_REQUIRE_GREEN = True  # entry bar must be green (close > open)
+X_TARGET_PCT_OF_PEAK = 92.0  # exit at 92% of first-leg peak (empirical median)
+X_STOP_PCT_BELOW_TROUGH = 2.0  # stop = trough * (1 - X_STOP_PCT_BELOW_TROUGH/100)
+X_TRAIL_PCT = 5.0  # trail %
+X_TRAIL_ACTIVATE_PCT = 5.0  # activate trail at +5% above entry
+X_TIME_LIMIT_MINUTES = 60  # 60 min hold (mid-day fades slower than open)
+X_MIN_VOL_VS_AVG = 1.0  # entry bar volume >= 1.0x rolling avg
+X_VOL_AVG_BARS = 5  # rolling avg window for volume check
+X_MAX_ENTRY_HHMM = "14:30"  # don't enter past 14:30 ET (need 60 min before EOD)
+X_MIN_ENTRY_ROOM_PCT = 4.0  # require >= this % room between entry and target
 
 # --- STRATEGY O CONFIG: Opening Range Breakout ---
 O_MIN_GAP_PCT = 10.0
-O_RANGE_CANDLES = 5              # candles to form opening range (5 = 10 min)
-O_BREAKOUT_VOL_MULT = 1.5       # breakout candle vol vs avg range vol
+O_RANGE_CANDLES = 5  # candles to form opening range (5 = 10 min)
+O_BREAKOUT_VOL_MULT = 1.5  # breakout candle vol vs avg range vol
 O_MAX_ENTRY_CANDLE = 30
 O_TARGET1_PCT = 8.0
 O_TARGET2_PCT = 15.0
-O_STOP_PCT = 0.0                # 0 = dynamic stop at range low
+O_STOP_PCT = 0.0  # 0 = dynamic stop at range low
 O_PARTIAL_SELL_PCT = 50.0
 O_TRAIL_PCT = 2.0
 O_TRAIL_ACTIVATE_PCT = 3.0
@@ -624,8 +662,8 @@ O_TIME_LIMIT_MINUTES = 60
 
 # --- STRATEGY B CONFIG: Red-to-Green (R2G) ---
 B_MIN_GAP_PCT = 15.0
-B_MAX_DIP_PCT = 5.0             # max dip below open before abandoning
-B_MIN_RECLAIM_VOL_MULT = 1.5    # volume surge on reclaim candle
+B_MAX_DIP_PCT = 5.0  # max dip below open before abandoning
+B_MIN_RECLAIM_VOL_MULT = 1.5  # volume surge on reclaim candle
 B_MAX_ENTRY_CANDLE = 20
 B_TARGET1_PCT = 6.0
 B_TARGET2_PCT = 12.0
@@ -637,11 +675,11 @@ B_TIME_LIMIT_MINUTES = 30
 
 # --- STRATEGY K CONFIG: First Pullback Buy ---
 K_MIN_GAP_PCT = 10.0
-K_MIN_RUN_PCT = 5.0             # min morning run-up before pullback
-K_RUN_WINDOW = 15               # candles to establish run
-K_PULLBACK_PCT = 3.0            # min pullback % from run high
-K_PULLBACK_VOL_RATIO = 0.5      # pullback vol <= ratio * run vol (orderly)
-K_BOUNCE_VOL_MULT = 1.5         # bounce vol >= mult * pullback avg vol
+K_MIN_RUN_PCT = 5.0  # min morning run-up before pullback
+K_RUN_WINDOW = 15  # candles to establish run
+K_PULLBACK_PCT = 3.0  # min pullback % from run high
+K_PULLBACK_VOL_RATIO = 0.5  # pullback vol <= ratio * run vol (orderly)
+K_BOUNCE_VOL_MULT = 1.5  # bounce vol >= mult * pullback avg vol
 K_MAX_ENTRY_CANDLE = 45
 K_TARGET1_PCT = 8.0
 K_TARGET2_PCT = 15.0
@@ -653,11 +691,11 @@ K_TIME_LIMIT_MINUTES = 60
 
 # --- STRATEGY C CONFIG: Micro Flag / Base Pattern ---
 C_MIN_GAP_PCT = 10.0
-C_MIN_SPIKE_PCT = 5.0           # initial spike before consolidation
-C_MIN_BASE_CANDLES = 3          # min candles in tight base
-C_MAX_BASE_CANDLES = 8          # max candles in base before abandon
-C_MAX_BASE_RANGE_PCT = 3.0      # max range of base (tight consolidation)
-C_BREAKOUT_VOL_MULT = 1.5       # vol surge on breakout
+C_MIN_SPIKE_PCT = 5.0  # initial spike before consolidation
+C_MIN_BASE_CANDLES = 3  # min candles in tight base
+C_MAX_BASE_CANDLES = 8  # max candles in base before abandon
+C_MAX_BASE_RANGE_PCT = 3.0  # max range of base (tight consolidation)
+C_BREAKOUT_VOL_MULT = 1.5  # vol surge on breakout
 C_MAX_ENTRY_CANDLE = 60
 C_TARGET1_PCT = 8.0
 C_TARGET2_PCT = 15.0
@@ -669,10 +707,10 @@ C_TIME_LIMIT_MINUTES = 60
 
 # --- STRATEGY S CONFIG: Stuff-and-Break ---
 S_MIN_GAP_PCT = 10.0
-S_MIN_HOD_TESTS = 2             # min times HOD tested and rejected
-S_HOD_TOLERANCE_PCT = 0.5       # within X% of HOD = "test"
-S_REJECTION_PCT = 1.0           # must pull back X% to count as rejection
-S_BREAKOUT_VOL_MULT = 1.5       # vol surge on final break
+S_MIN_HOD_TESTS = 2  # min times HOD tested and rejected
+S_HOD_TOLERANCE_PCT = 0.5  # within X% of HOD = "test"
+S_REJECTION_PCT = 1.0  # must pull back X% to count as rejection
+S_BREAKOUT_VOL_MULT = 1.5  # vol surge on final break
 S_MAX_ENTRY_CANDLE = 90
 S_TARGET1_PCT = 8.0
 S_TARGET2_PCT = 15.0
@@ -684,8 +722,8 @@ S_TIME_LIMIT_MINUTES = 90
 
 # --- STRATEGY E CONFIG: Gap-and-Go RelVol ---
 E_MIN_GAP_PCT = 15.0
-E_MIN_PM_VOL_MULT = 5.0         # premarket vol >= X * typical daily avg
-E_MAX_ENTRY_CANDLE = 5           # enter very early
+E_MIN_PM_VOL_MULT = 5.0  # premarket vol >= X * typical daily avg
+E_MAX_ENTRY_CANDLE = 5  # enter very early
 E_TARGET1_PCT = 6.0
 E_TARGET2_PCT = 12.0
 E_STOP_PCT = 4.0
@@ -696,7 +734,7 @@ E_TIME_LIMIT_MINUTES = 20
 
 # --- STRATEGY I CONFIG: P1 Immediate PM High Breakout ---
 I_MIN_GAP_PCT = 10.0
-I_MAX_ENTRY_CANDLE = 30          # must break PM high early
+I_MAX_ENTRY_CANDLE = 30  # must break PM high early
 I_BREAKOUT_VOL_MULT = 1.5
 I_TARGET1_PCT = 8.0
 I_TARGET2_PCT = 15.0
@@ -709,7 +747,7 @@ I_TIME_LIMIT_MINUTES = 60
 # --- STRATEGY J CONFIG: P3 VWAP + PM High Breakout ---
 J_MIN_GAP_PCT = 10.0
 J_MAX_ENTRY_CANDLE = 90
-J_VWAP_PROXIMITY_PCT = 2.0      # price within X% of VWAP at breakout
+J_VWAP_PROXIMITY_PCT = 2.0  # price within X% of VWAP at breakout
 J_TARGET1_PCT = 8.0
 J_TARGET2_PCT = 15.0
 J_STOP_PCT = 5.0
@@ -720,8 +758,8 @@ J_TIME_LIMIT_MINUTES = 90
 
 # --- STRATEGY N CONFIG: P4 HOD Reclaim ---
 N_MIN_GAP_PCT = 10.0
-N_MIN_HOD_AGE = 10              # HOD must be at least X candles old
-N_PULLBACK_FROM_HOD_PCT = 3.0   # must pull back X% from HOD
+N_MIN_HOD_AGE = 10  # HOD must be at least X candles old
+N_PULLBACK_FROM_HOD_PCT = 3.0  # must pull back X% from HOD
 N_MAX_ENTRY_CANDLE = 120
 N_TARGET1_PCT = 8.0
 N_TARGET2_PCT = 15.0
@@ -733,17 +771,55 @@ N_TIME_LIMIT_MINUTES = 90
 
 # --- SHARED CONFIG ---
 EOD_EXIT_MINUTES = 15
-FULL_BALANCE_SIZING = True      # Use full balance for each trade
+FULL_BALANCE_SIZING = True  # Use full balance for each trade
 
 # Strategy priority (lower = higher priority; Optuna can override)
 STRAT_PRIORITY = {
-    "H": 0, "G": 1, "A": 2, "F": 3, "D": 4, "V": 5, "P": 6,
-    "M": 7, "R": 8, "W": 9,
-    "O": 10, "B": 11, "K": 12, "C": 13, "S": 14, "E": 15,
-    "I": 16, "J": 17, "N": 18, "L": 19, "X": 20
+    "H": 0,
+    "G": 1,
+    "A": 2,
+    "F": 3,
+    "D": 4,
+    "V": 5,
+    "P": 6,
+    "M": 7,
+    "R": 8,
+    "W": 9,
+    "O": 10,
+    "B": 11,
+    "K": 12,
+    "C": 13,
+    "S": 14,
+    "E": 15,
+    "I": 16,
+    "J": 17,
+    "N": 18,
+    "L": 19,
+    "X": 20,
 }
-STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L","X"]
-
+STRAT_KEYS = [
+    "H",
+    "G",
+    "A",
+    "F",
+    "D",
+    "V",
+    "P",
+    "M",
+    "R",
+    "W",
+    "O",
+    "B",
+    "K",
+    "C",
+    "S",
+    "E",
+    "I",
+    "J",
+    "N",
+    "L",
+    "X",
+]
 
 
 def _load_r_intraday(ticker, target_date, data_dirs):
@@ -765,7 +841,9 @@ def _load_r_intraday(ticker, target_date, data_dirs):
             if len(day_data) < 20:
                 continue
             # Re-localize to UTC for consistency with other picks
-            day_data.index = day_data.index.tz_localize("America/New_York").tz_convert("UTC")
+            day_data.index = day_data.index.tz_localize("America/New_York").tz_convert(
+                "UTC"
+            )
             return day_data
         except Exception:
             continue
@@ -795,10 +873,14 @@ def _get_tiered_targets(float_shares, params=None):
         t2_t1, t2_t2 = L_TIER2_TARGET1_PCT, L_TIER2_TARGET2_PCT
         t3_t1, t3_t2 = L_TIER3_TARGET1_PCT, L_TIER3_TARGET2_PCT
     else:
-        t1f = params['L_TIER1_FLOAT']; t2f = params['L_TIER2_FLOAT']
-        t1_t1 = params['L_TIER1_TARGET1_PCT']; t1_t2 = params['L_TIER1_TARGET2_PCT']
-        t2_t1 = params['L_TIER2_TARGET1_PCT']; t2_t2 = params['L_TIER2_TARGET2_PCT']
-        t3_t1 = params['L_TIER3_TARGET1_PCT']; t3_t2 = params['L_TIER3_TARGET2_PCT']
+        t1f = params["L_TIER1_FLOAT"]
+        t2f = params["L_TIER2_FLOAT"]
+        t1_t1 = params["L_TIER1_TARGET1_PCT"]
+        t1_t2 = params["L_TIER1_TARGET2_PCT"]
+        t2_t1 = params["L_TIER2_TARGET1_PCT"]
+        t2_t2 = params["L_TIER2_TARGET2_PCT"]
+        t3_t1 = params["L_TIER3_TARGET1_PCT"]
+        t3_t2 = params["L_TIER3_TARGET2_PCT"]
     if float_shares < t1f:
         return t1_t1, t1_t2
     elif float_shares < t2f:
@@ -807,41 +889,57 @@ def _get_tiered_targets(float_shares, params=None):
         return t3_t1, t3_t2
 
 
-def _classify_candle2(gap_pct, body_pct, second_green, second_new_high, vol_confirm=False, params=None):
+def _classify_candle2(
+    gap_pct, body_pct, second_green, second_new_high, vol_confirm=False, params=None
+):
     """Classify on candle 2 for strategies H, G, A, F.
     Priority: H > G > A > F (highest conviction first).
     When params is a dict, read mutable min_gap thresholds from it (thread-safe);
     else fall back to module globals (back-compat)."""
     if params is None:
-        h_gap, g_gap, a_gap, f_gap = H_MIN_GAP_PCT, G_MIN_GAP_PCT, A_MIN_GAP_PCT, F_MIN_GAP_PCT
+        h_gap, g_gap, a_gap, f_gap = (
+            H_MIN_GAP_PCT,
+            G_MIN_GAP_PCT,
+            A_MIN_GAP_PCT,
+            F_MIN_GAP_PCT,
+        )
     else:
-        h_gap = params['H_MIN_GAP_PCT']
-        g_gap = params['G_MIN_GAP_PCT']
-        a_gap = params['A_MIN_GAP_PCT']
-        f_gap = params['F_MIN_GAP_PCT']
+        h_gap = params["H_MIN_GAP_PCT"]
+        g_gap = params["G_MIN_GAP_PCT"]
+        a_gap = params["A_MIN_GAP_PCT"]
+        f_gap = params["F_MIN_GAP_PCT"]
     # H: high conviction - gap>=25%, body>=5%, 2nd green + new hi + vol confirm
-    if (gap_pct >= h_gap
-            and body_pct >= H_MIN_BODY_PCT
-            and second_green and second_new_high
-            and (not H_REQUIRE_VOL_CONFIRM or vol_confirm)):
+    if (
+        gap_pct >= h_gap
+        and body_pct >= H_MIN_BODY_PCT
+        and second_green
+        and second_new_high
+        and (not H_REQUIRE_VOL_CONFIRM or vol_confirm)
+    ):
         return "H"
     # G: gap>=25%, 2nd green + new hi (strong runners)
-    if (gap_pct >= g_gap
-            and body_pct >= G_MIN_BODY_PCT
-            and (not G_REQUIRE_2ND_GREEN or second_green)
-            and (not G_REQUIRE_2ND_NEW_HIGH or second_new_high)):
+    if (
+        gap_pct >= g_gap
+        and body_pct >= G_MIN_BODY_PCT
+        and (not G_REQUIRE_2ND_GREEN or second_green)
+        and (not G_REQUIRE_2ND_NEW_HIGH or second_new_high)
+    ):
         return "G"
     # A: gap>=15%, 2nd green + new hi (quick scalp)
-    if (gap_pct >= a_gap
-            and A_MIN_BODY_PCT <= body_pct <= A_MAX_BODY_PCT
-            and (not A_REQUIRE_2ND_GREEN or second_green)
-            and (not A_REQUIRE_2ND_NEW_HIGH or second_new_high)):
+    if (
+        gap_pct >= a_gap
+        and A_MIN_BODY_PCT <= body_pct <= A_MAX_BODY_PCT
+        and (not A_REQUIRE_2ND_GREEN or second_green)
+        and (not A_REQUIRE_2ND_NEW_HIGH or second_new_high)
+    ):
         return "A"
     # F: gap>=10%, 2nd green (catch-all)
-    if (gap_pct >= f_gap
-            and body_pct >= F_MIN_BODY_PCT
-            and (not F_REQUIRE_2ND_GREEN or second_green)
-            and (not F_REQUIRE_2ND_NEW_HIGH or second_new_high)):
+    if (
+        gap_pct >= f_gap
+        and body_pct >= F_MIN_BODY_PCT
+        and (not F_REQUIRE_2ND_GREEN or second_green)
+        and (not F_REQUIRE_2ND_NEW_HIGH or second_new_high)
+    ):
         return "F"
     return None
 
@@ -864,221 +962,490 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     # All 215 names then shadow module globals throughout this function body.
     if params is None:
         _g = globals()
-        params = {n: _g[n] for n in (
-            # Names consumed by helper functions (_classify_candle2, _get_tiered_targets)
-            'H_MIN_GAP_PCT', 'G_MIN_GAP_PCT', 'A_MIN_GAP_PCT', 'F_MIN_GAP_PCT',
-            'L_TIER1_FLOAT', 'L_TIER2_FLOAT',
-            'L_TIER1_TARGET1_PCT', 'L_TIER1_TARGET2_PCT',
-            'L_TIER2_TARGET1_PCT', 'L_TIER2_TARGET2_PCT',
-            'L_TIER3_TARGET1_PCT', 'L_TIER3_TARGET2_PCT',
-            'A_STOP_PCT', 'A_TARGET_PCT', 'A_TIME_LIMIT_MINUTES', 'A_TRAIL_ACTIVATE_PCT', 'A_TRAIL_PCT',
-            'B_MAX_DIP_PCT', 'B_MAX_ENTRY_CANDLE', 'B_MIN_GAP_PCT', 'B_MIN_RECLAIM_VOL_MULT',
-            'B_PARTIAL_SELL_PCT', 'B_STOP_PCT', 'B_TARGET1_PCT', 'B_TARGET2_PCT', 'B_TIME_LIMIT_MINUTES',
-            'B_TRAIL_ACTIVATE_PCT', 'B_TRAIL_PCT',
-            'C_BREAKOUT_VOL_MULT', 'C_MAX_BASE_CANDLES', 'C_MAX_BASE_RANGE_PCT', 'C_MAX_ENTRY_CANDLE',
-            'C_MIN_BASE_CANDLES', 'C_MIN_GAP_PCT', 'C_MIN_SPIKE_PCT', 'C_PARTIAL_SELL_PCT', 'C_STOP_PCT',
-            'C_TARGET1_PCT', 'C_TARGET2_PCT', 'C_TIME_LIMIT_MINUTES', 'C_TRAIL_ACTIVATE_PCT', 'C_TRAIL_PCT',
-            'D_DIP_PCT', 'D_ENTRY_MODE', 'D_MAX_ENTRY_CANDLE', 'D_MIN_GAP_PCT', 'D_MIN_SPIKE_PCT',
-            'D_PARTIAL_SELL_PCT', 'D_SPIKE_WINDOW', 'D_STOP_PCT', 'D_TARGET1_PCT', 'D_TARGET2_PCT',
-            'D_TIME_LIMIT_MINUTES', 'D_TRAIL_ACTIVATE_PCT', 'D_TRAIL_PCT',
-            'EOD_EXIT_MINUTES',
-            'E_MAX_ENTRY_CANDLE', 'E_MIN_GAP_PCT', 'E_MIN_PM_VOL_MULT', 'E_PARTIAL_SELL_PCT',
-            'E_STOP_PCT', 'E_TARGET1_PCT', 'E_TARGET2_PCT', 'E_TIME_LIMIT_MINUTES',
-            'E_TRAIL_ACTIVATE_PCT', 'E_TRAIL_PCT',
-            'F_STOP_PCT', 'F_TARGET_PCT', 'F_TIME_LIMIT_MINUTES', 'F_TRAIL_ACTIVATE_PCT', 'F_TRAIL_PCT',
-            'G_PARTIAL_SELL_PCT', 'G_STOP_PCT', 'G_TARGET_PCT', 'G_TARGET2_PCT',
-            'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
-            'H_STOP_PCT', 'H_TARGET_PCT', 'H_TIME_LIMIT_MINUTES', 'H_TRAIL_ACTIVATE_PCT', 'H_TRAIL_PCT',
-            'I_BREAKOUT_VOL_MULT', 'I_MAX_ENTRY_CANDLE', 'I_MIN_GAP_PCT', 'I_PARTIAL_SELL_PCT',
-            'I_STOP_PCT', 'I_TARGET1_PCT', 'I_TARGET2_PCT', 'I_TIME_LIMIT_MINUTES',
-            'I_TRAIL_ACTIVATE_PCT', 'I_TRAIL_PCT',
-            'J_MAX_ENTRY_CANDLE', 'J_MIN_GAP_PCT', 'J_PARTIAL_SELL_PCT', 'J_STOP_PCT',
-            'J_TARGET1_PCT', 'J_TARGET2_PCT', 'J_TIME_LIMIT_MINUTES', 'J_TRAIL_ACTIVATE_PCT',
-            'J_TRAIL_PCT', 'J_VWAP_PROXIMITY_PCT',
-            'K_BOUNCE_VOL_MULT', 'K_MAX_ENTRY_CANDLE', 'K_MIN_GAP_PCT', 'K_MIN_RUN_PCT',
-            'K_PARTIAL_SELL_PCT', 'K_PULLBACK_PCT', 'K_PULLBACK_VOL_RATIO', 'K_RUN_WINDOW',
-            'K_STOP_PCT', 'K_TARGET1_PCT', 'K_TARGET2_PCT', 'K_TIME_LIMIT_MINUTES',
-            'K_TRAIL_ACTIVATE_PCT', 'K_TRAIL_PCT',
-            'L_EARLIEST_CANDLE', 'L_HOD_BREAK_REQUIRED', 'L_LATEST_CANDLE', 'L_MAX_FLOAT',
-            'L_MIN_GAP_PCT', 'L_MIN_PRICE_ACCEL_PCT', 'L_PARTIAL_SELL_PCT', 'L_REQUIRE_ABOVE_VWAP',
-            'L_STOP_PCT', 'L_TIME_LIMIT_MINUTES', 'L_TRAIL_ACTIVATE_PCT', 'L_TRAIL_PCT',
-            'L_VOL_SURGE_MULT',
-            'M_CONSOLIDATION_LEN', 'M_MAX_ENTRY_CANDLE', 'M_MAX_RANGE_PCT', 'M_MIN_GAP_PCT',
-            'M_MORNING_CANDLES', 'M_MORNING_SPIKE_PCT', 'M_PARTIAL_SELL_PCT', 'M_RANGE_START_CANDLE',
-            'M_STOP_PCT', 'M_TARGET1_PCT', 'M_TIME_LIMIT_MINUTES', 'M_TRAIL_ACTIVATE_PCT',
-            'M_TRAIL_PCT', 'M_VOL_RATIO',
-            'N_MAX_ENTRY_CANDLE', 'N_MIN_GAP_PCT', 'N_MIN_HOD_AGE', 'N_PARTIAL_SELL_PCT',
-            'N_PULLBACK_FROM_HOD_PCT', 'N_STOP_PCT', 'N_TARGET1_PCT', 'N_TARGET2_PCT',
-            'N_TIME_LIMIT_MINUTES', 'N_TRAIL_ACTIVATE_PCT', 'N_TRAIL_PCT',
-            'O_BREAKOUT_VOL_MULT', 'O_MAX_ENTRY_CANDLE', 'O_MIN_GAP_PCT', 'O_PARTIAL_SELL_PCT',
-            'O_RANGE_CANDLES', 'O_STOP_PCT', 'O_TARGET1_PCT', 'O_TARGET2_PCT',
-            'O_TIME_LIMIT_MINUTES', 'O_TRAIL_ACTIVATE_PCT', 'O_TRAIL_PCT',
-            'P_CONFIRM_ABOVE', 'P_CONFIRM_WINDOW', 'P_MAX_ENTRY_CANDLE', 'P_MIN_GAP_PCT',
-            'P_PARTIAL_SELL_PCT', 'P_PULLBACK_PCT', 'P_PULLBACK_TIMEOUT', 'P_STOP_PCT',
-            'P_TARGET1_PCT', 'P_TARGET2_PCT', 'P_TIME_LIMIT_MINUTES', 'P_TRAIL_ACTIVATE_PCT',
-            'P_TRAIL_PCT',
-            'R_BOUNCE_REF', 'R_D2_PULLBACK_PCT', 'R_MAX_ENTRY_CANDLE', 'R_PULLBACK_WINDOW',
-            'R_STOP_PCT', 'R_TARGET1_PCT', 'R_TIME_LIMIT_MINUTES', 'R_TRAIL_ACTIVATE_PCT',
-            'R_TRAIL_PCT',
-            'S_BREAKOUT_VOL_MULT', 'S_HOD_TOLERANCE_PCT', 'S_MAX_ENTRY_CANDLE', 'S_MIN_GAP_PCT',
-            'S_MIN_HOD_TESTS', 'S_PARTIAL_SELL_PCT', 'S_REJECTION_PCT', 'S_STOP_PCT',
-            'S_TARGET1_PCT', 'S_TARGET2_PCT', 'S_TIME_LIMIT_MINUTES', 'S_TRAIL_ACTIVATE_PCT',
-            'S_TRAIL_PCT',
-            'VOL_CAP_PCT',
-            'V_MAX_ENTRY_CANDLE', 'V_MIN_BELOW_CANDLES', 'V_MIN_BELOW_PCT', 'V_MIN_GAP_PCT',
-            'V_PARTIAL_SELL_PCT', 'V_STOP_PCT', 'V_TARGET1_PCT', 'V_TARGET2_PCT',
-            'V_TIME_LIMIT_MINUTES', 'V_TRAIL_ACTIVATE_PCT', 'V_TRAIL_PCT', 'V_VOL_SPIKE_RATIO',
-            'W_CONSOL_START', 'W_EARLIEST_CANDLE', 'W_LATEST_CANDLE', 'W_MAX_HOD_BREAKS',
-            'W_MAX_RANGE_PCT', 'W_MAX_VWAP_DEV_PCT', 'W_MIN_GAP_PCT', 'W_MIN_MORNING_RUN',
-            'W_REQUIRE_ABOVE_VWAP', 'W_STOP_PCT', 'W_TARGET_PCT', 'W_TRAIL_ACTIVATE_PCT',
-            'W_TRAIL_PCT', 'W_VOL_SURGE_MULT', 'W_VOL_VS_MORNING_MULT',
-            'X_MIN_PULLBACK_PCT', 'X_MIN_RECOVERY_PCT', 'X_MIN_BARS_SINCE_PEAK',
-            'X_TARGET_PCT_OF_PEAK', 'X_STOP_PCT_BELOW_TROUGH', 'X_TRAIL_PCT',
-            'X_TRAIL_ACTIVATE_PCT', 'X_TIME_LIMIT_MINUTES', 'X_MIN_ENTRY_ROOM_PCT',
-            'X_MIN_FIRST_LEG_GAIN_PCT', 'X_FIRST_LEG_WINDOW_BARS',
-            'X_ENTRY_REQUIRE_GREEN', 'X_MIN_VOL_VS_AVG', 'X_VOL_AVG_BARS',
-            'X_MAX_ENTRY_HHMM',
-        )}
+        params = {
+            n: _g[n]
+            for n in (
+                # Names consumed by helper functions (_classify_candle2, _get_tiered_targets)
+                "H_MIN_GAP_PCT",
+                "G_MIN_GAP_PCT",
+                "A_MIN_GAP_PCT",
+                "F_MIN_GAP_PCT",
+                "L_TIER1_FLOAT",
+                "L_TIER2_FLOAT",
+                "L_TIER1_TARGET1_PCT",
+                "L_TIER1_TARGET2_PCT",
+                "L_TIER2_TARGET1_PCT",
+                "L_TIER2_TARGET2_PCT",
+                "L_TIER3_TARGET1_PCT",
+                "L_TIER3_TARGET2_PCT",
+                "A_STOP_PCT",
+                "A_TARGET_PCT",
+                "A_TIME_LIMIT_MINUTES",
+                "A_TRAIL_ACTIVATE_PCT",
+                "A_TRAIL_PCT",
+                "B_MAX_DIP_PCT",
+                "B_MAX_ENTRY_CANDLE",
+                "B_MIN_GAP_PCT",
+                "B_MIN_RECLAIM_VOL_MULT",
+                "B_PARTIAL_SELL_PCT",
+                "B_STOP_PCT",
+                "B_TARGET1_PCT",
+                "B_TARGET2_PCT",
+                "B_TIME_LIMIT_MINUTES",
+                "B_TRAIL_ACTIVATE_PCT",
+                "B_TRAIL_PCT",
+                "C_BREAKOUT_VOL_MULT",
+                "C_MAX_BASE_CANDLES",
+                "C_MAX_BASE_RANGE_PCT",
+                "C_MAX_ENTRY_CANDLE",
+                "C_MIN_BASE_CANDLES",
+                "C_MIN_GAP_PCT",
+                "C_MIN_SPIKE_PCT",
+                "C_PARTIAL_SELL_PCT",
+                "C_STOP_PCT",
+                "C_TARGET1_PCT",
+                "C_TARGET2_PCT",
+                "C_TIME_LIMIT_MINUTES",
+                "C_TRAIL_ACTIVATE_PCT",
+                "C_TRAIL_PCT",
+                "D_DIP_PCT",
+                "D_ENTRY_MODE",
+                "D_MAX_ENTRY_CANDLE",
+                "D_MIN_GAP_PCT",
+                "D_MIN_SPIKE_PCT",
+                "D_PARTIAL_SELL_PCT",
+                "D_SPIKE_WINDOW",
+                "D_STOP_PCT",
+                "D_TARGET1_PCT",
+                "D_TARGET2_PCT",
+                "D_TIME_LIMIT_MINUTES",
+                "D_TRAIL_ACTIVATE_PCT",
+                "D_TRAIL_PCT",
+                "EOD_EXIT_MINUTES",
+                "E_MAX_ENTRY_CANDLE",
+                "E_MIN_GAP_PCT",
+                "E_MIN_PM_VOL_MULT",
+                "E_PARTIAL_SELL_PCT",
+                "E_STOP_PCT",
+                "E_TARGET1_PCT",
+                "E_TARGET2_PCT",
+                "E_TIME_LIMIT_MINUTES",
+                "E_TRAIL_ACTIVATE_PCT",
+                "E_TRAIL_PCT",
+                "F_STOP_PCT",
+                "F_TARGET_PCT",
+                "F_TIME_LIMIT_MINUTES",
+                "F_TRAIL_ACTIVATE_PCT",
+                "F_TRAIL_PCT",
+                "G_PARTIAL_SELL_PCT",
+                "G_STOP_PCT",
+                "G_TARGET_PCT",
+                "G_TARGET2_PCT",
+                "G_TIME_LIMIT_MINUTES",
+                "G_TRAIL_ACTIVATE_PCT",
+                "G_TRAIL_PCT",
+                "H_STOP_PCT",
+                "H_TARGET_PCT",
+                "H_TIME_LIMIT_MINUTES",
+                "H_TRAIL_ACTIVATE_PCT",
+                "H_TRAIL_PCT",
+                "I_BREAKOUT_VOL_MULT",
+                "I_MAX_ENTRY_CANDLE",
+                "I_MIN_GAP_PCT",
+                "I_PARTIAL_SELL_PCT",
+                "I_STOP_PCT",
+                "I_TARGET1_PCT",
+                "I_TARGET2_PCT",
+                "I_TIME_LIMIT_MINUTES",
+                "I_TRAIL_ACTIVATE_PCT",
+                "I_TRAIL_PCT",
+                "J_MAX_ENTRY_CANDLE",
+                "J_MIN_GAP_PCT",
+                "J_PARTIAL_SELL_PCT",
+                "J_STOP_PCT",
+                "J_TARGET1_PCT",
+                "J_TARGET2_PCT",
+                "J_TIME_LIMIT_MINUTES",
+                "J_TRAIL_ACTIVATE_PCT",
+                "J_TRAIL_PCT",
+                "J_VWAP_PROXIMITY_PCT",
+                "K_BOUNCE_VOL_MULT",
+                "K_MAX_ENTRY_CANDLE",
+                "K_MIN_GAP_PCT",
+                "K_MIN_RUN_PCT",
+                "K_PARTIAL_SELL_PCT",
+                "K_PULLBACK_PCT",
+                "K_PULLBACK_VOL_RATIO",
+                "K_RUN_WINDOW",
+                "K_STOP_PCT",
+                "K_TARGET1_PCT",
+                "K_TARGET2_PCT",
+                "K_TIME_LIMIT_MINUTES",
+                "K_TRAIL_ACTIVATE_PCT",
+                "K_TRAIL_PCT",
+                "L_EARLIEST_CANDLE",
+                "L_HOD_BREAK_REQUIRED",
+                "L_LATEST_CANDLE",
+                "L_MAX_FLOAT",
+                "L_MIN_GAP_PCT",
+                "L_MIN_PRICE_ACCEL_PCT",
+                "L_PARTIAL_SELL_PCT",
+                "L_REQUIRE_ABOVE_VWAP",
+                "L_STOP_PCT",
+                "L_TIME_LIMIT_MINUTES",
+                "L_TRAIL_ACTIVATE_PCT",
+                "L_TRAIL_PCT",
+                "L_VOL_SURGE_MULT",
+                "M_CONSOLIDATION_LEN",
+                "M_MAX_ENTRY_CANDLE",
+                "M_MAX_RANGE_PCT",
+                "M_MIN_GAP_PCT",
+                "M_MORNING_CANDLES",
+                "M_MORNING_SPIKE_PCT",
+                "M_PARTIAL_SELL_PCT",
+                "M_RANGE_START_CANDLE",
+                "M_STOP_PCT",
+                "M_TARGET1_PCT",
+                "M_TIME_LIMIT_MINUTES",
+                "M_TRAIL_ACTIVATE_PCT",
+                "M_TRAIL_PCT",
+                "M_VOL_RATIO",
+                "N_MAX_ENTRY_CANDLE",
+                "N_MIN_GAP_PCT",
+                "N_MIN_HOD_AGE",
+                "N_PARTIAL_SELL_PCT",
+                "N_PULLBACK_FROM_HOD_PCT",
+                "N_STOP_PCT",
+                "N_TARGET1_PCT",
+                "N_TARGET2_PCT",
+                "N_TIME_LIMIT_MINUTES",
+                "N_TRAIL_ACTIVATE_PCT",
+                "N_TRAIL_PCT",
+                "O_BREAKOUT_VOL_MULT",
+                "O_MAX_ENTRY_CANDLE",
+                "O_MIN_GAP_PCT",
+                "O_PARTIAL_SELL_PCT",
+                "O_RANGE_CANDLES",
+                "O_STOP_PCT",
+                "O_TARGET1_PCT",
+                "O_TARGET2_PCT",
+                "O_TIME_LIMIT_MINUTES",
+                "O_TRAIL_ACTIVATE_PCT",
+                "O_TRAIL_PCT",
+                "P_CONFIRM_ABOVE",
+                "P_CONFIRM_WINDOW",
+                "P_MAX_ENTRY_CANDLE",
+                "P_MIN_GAP_PCT",
+                "P_PARTIAL_SELL_PCT",
+                "P_PULLBACK_PCT",
+                "P_PULLBACK_TIMEOUT",
+                "P_STOP_PCT",
+                "P_TARGET1_PCT",
+                "P_TARGET2_PCT",
+                "P_TIME_LIMIT_MINUTES",
+                "P_TRAIL_ACTIVATE_PCT",
+                "P_TRAIL_PCT",
+                "R_BOUNCE_REF",
+                "R_D2_PULLBACK_PCT",
+                "R_MAX_ENTRY_CANDLE",
+                "R_PULLBACK_WINDOW",
+                "R_STOP_PCT",
+                "R_TARGET1_PCT",
+                "R_TIME_LIMIT_MINUTES",
+                "R_TRAIL_ACTIVATE_PCT",
+                "R_TRAIL_PCT",
+                "S_BREAKOUT_VOL_MULT",
+                "S_HOD_TOLERANCE_PCT",
+                "S_MAX_ENTRY_CANDLE",
+                "S_MIN_GAP_PCT",
+                "S_MIN_HOD_TESTS",
+                "S_PARTIAL_SELL_PCT",
+                "S_REJECTION_PCT",
+                "S_STOP_PCT",
+                "S_TARGET1_PCT",
+                "S_TARGET2_PCT",
+                "S_TIME_LIMIT_MINUTES",
+                "S_TRAIL_ACTIVATE_PCT",
+                "S_TRAIL_PCT",
+                "VOL_CAP_PCT",
+                "V_MAX_ENTRY_CANDLE",
+                "V_MIN_BELOW_CANDLES",
+                "V_MIN_BELOW_PCT",
+                "V_MIN_GAP_PCT",
+                "V_PARTIAL_SELL_PCT",
+                "V_STOP_PCT",
+                "V_TARGET1_PCT",
+                "V_TARGET2_PCT",
+                "V_TIME_LIMIT_MINUTES",
+                "V_TRAIL_ACTIVATE_PCT",
+                "V_TRAIL_PCT",
+                "V_VOL_SPIKE_RATIO",
+                "W_CONSOL_START",
+                "W_EARLIEST_CANDLE",
+                "W_LATEST_CANDLE",
+                "W_MAX_HOD_BREAKS",
+                "W_MAX_RANGE_PCT",
+                "W_MAX_VWAP_DEV_PCT",
+                "W_MIN_GAP_PCT",
+                "W_MIN_MORNING_RUN",
+                "W_REQUIRE_ABOVE_VWAP",
+                "W_STOP_PCT",
+                "W_TARGET_PCT",
+                "W_TRAIL_ACTIVATE_PCT",
+                "W_TRAIL_PCT",
+                "W_VOL_SURGE_MULT",
+                "W_VOL_VS_MORNING_MULT",
+                "X_MIN_PULLBACK_PCT",
+                "X_MIN_RECOVERY_PCT",
+                "X_MIN_BARS_SINCE_PEAK",
+                "X_TARGET_PCT_OF_PEAK",
+                "X_STOP_PCT_BELOW_TROUGH",
+                "X_TRAIL_PCT",
+                "X_TRAIL_ACTIVATE_PCT",
+                "X_TIME_LIMIT_MINUTES",
+                "X_MIN_ENTRY_ROOM_PCT",
+                "X_MIN_FIRST_LEG_GAIN_PCT",
+                "X_FIRST_LEG_WINDOW_BARS",
+                "X_ENTRY_REQUIRE_GREEN",
+                "X_MIN_VOL_VS_AVG",
+                "X_VOL_AVG_BARS",
+                "X_MAX_ENTRY_HHMM",
+            )
+        }
 
     # Unpack snapshot to locals — these shadow module globals throughout the function body.
-    A_STOP_PCT = params['A_STOP_PCT']; A_TARGET_PCT = params['A_TARGET_PCT']
-    A_TIME_LIMIT_MINUTES = params['A_TIME_LIMIT_MINUTES']
-    A_TRAIL_ACTIVATE_PCT = params['A_TRAIL_ACTIVATE_PCT']; A_TRAIL_PCT = params['A_TRAIL_PCT']
-    B_MAX_DIP_PCT = params['B_MAX_DIP_PCT']; B_MAX_ENTRY_CANDLE = params['B_MAX_ENTRY_CANDLE']
-    B_MIN_GAP_PCT = params['B_MIN_GAP_PCT']; B_MIN_RECLAIM_VOL_MULT = params['B_MIN_RECLAIM_VOL_MULT']
-    B_PARTIAL_SELL_PCT = params['B_PARTIAL_SELL_PCT']; B_STOP_PCT = params['B_STOP_PCT']
-    B_TARGET1_PCT = params['B_TARGET1_PCT']; B_TARGET2_PCT = params['B_TARGET2_PCT']
-    B_TIME_LIMIT_MINUTES = params['B_TIME_LIMIT_MINUTES']
-    B_TRAIL_ACTIVATE_PCT = params['B_TRAIL_ACTIVATE_PCT']; B_TRAIL_PCT = params['B_TRAIL_PCT']
-    C_BREAKOUT_VOL_MULT = params['C_BREAKOUT_VOL_MULT']
-    C_MAX_BASE_CANDLES = params['C_MAX_BASE_CANDLES']; C_MAX_BASE_RANGE_PCT = params['C_MAX_BASE_RANGE_PCT']
-    C_MAX_ENTRY_CANDLE = params['C_MAX_ENTRY_CANDLE']; C_MIN_BASE_CANDLES = params['C_MIN_BASE_CANDLES']
-    C_MIN_GAP_PCT = params['C_MIN_GAP_PCT']; C_MIN_SPIKE_PCT = params['C_MIN_SPIKE_PCT']
-    C_PARTIAL_SELL_PCT = params['C_PARTIAL_SELL_PCT']; C_STOP_PCT = params['C_STOP_PCT']
-    C_TARGET1_PCT = params['C_TARGET1_PCT']; C_TARGET2_PCT = params['C_TARGET2_PCT']
-    C_TIME_LIMIT_MINUTES = params['C_TIME_LIMIT_MINUTES']
-    C_TRAIL_ACTIVATE_PCT = params['C_TRAIL_ACTIVATE_PCT']; C_TRAIL_PCT = params['C_TRAIL_PCT']
-    D_DIP_PCT = params['D_DIP_PCT']; D_ENTRY_MODE = params['D_ENTRY_MODE']
-    D_MAX_ENTRY_CANDLE = params['D_MAX_ENTRY_CANDLE']; D_MIN_GAP_PCT = params['D_MIN_GAP_PCT']
-    D_MIN_SPIKE_PCT = params['D_MIN_SPIKE_PCT']; D_PARTIAL_SELL_PCT = params['D_PARTIAL_SELL_PCT']
-    D_SPIKE_WINDOW = params['D_SPIKE_WINDOW']; D_STOP_PCT = params['D_STOP_PCT']
-    D_TARGET1_PCT = params['D_TARGET1_PCT']; D_TARGET2_PCT = params['D_TARGET2_PCT']
-    D_TIME_LIMIT_MINUTES = params['D_TIME_LIMIT_MINUTES']
-    D_TRAIL_ACTIVATE_PCT = params['D_TRAIL_ACTIVATE_PCT']; D_TRAIL_PCT = params['D_TRAIL_PCT']
-    EOD_EXIT_MINUTES = params['EOD_EXIT_MINUTES']
-    E_MAX_ENTRY_CANDLE = params['E_MAX_ENTRY_CANDLE']; E_MIN_GAP_PCT = params['E_MIN_GAP_PCT']
-    E_MIN_PM_VOL_MULT = params['E_MIN_PM_VOL_MULT']; E_PARTIAL_SELL_PCT = params['E_PARTIAL_SELL_PCT']
-    E_STOP_PCT = params['E_STOP_PCT']; E_TARGET1_PCT = params['E_TARGET1_PCT']
-    E_TARGET2_PCT = params['E_TARGET2_PCT']; E_TIME_LIMIT_MINUTES = params['E_TIME_LIMIT_MINUTES']
-    E_TRAIL_ACTIVATE_PCT = params['E_TRAIL_ACTIVATE_PCT']; E_TRAIL_PCT = params['E_TRAIL_PCT']
-    F_STOP_PCT = params['F_STOP_PCT']; F_TARGET_PCT = params['F_TARGET_PCT']
-    F_TIME_LIMIT_MINUTES = params['F_TIME_LIMIT_MINUTES']
-    F_TRAIL_ACTIVATE_PCT = params['F_TRAIL_ACTIVATE_PCT']; F_TRAIL_PCT = params['F_TRAIL_PCT']
-    G_PARTIAL_SELL_PCT = params['G_PARTIAL_SELL_PCT']
-    G_STOP_PCT = params['G_STOP_PCT']; G_TARGET_PCT = params['G_TARGET_PCT']; G_TARGET2_PCT = params['G_TARGET2_PCT']
-    G_TIME_LIMIT_MINUTES = params['G_TIME_LIMIT_MINUTES']
-    G_TRAIL_ACTIVATE_PCT = params['G_TRAIL_ACTIVATE_PCT']; G_TRAIL_PCT = params['G_TRAIL_PCT']
-    H_STOP_PCT = params['H_STOP_PCT']; H_TARGET_PCT = params['H_TARGET_PCT']
-    H_TIME_LIMIT_MINUTES = params['H_TIME_LIMIT_MINUTES']
-    H_TRAIL_ACTIVATE_PCT = params['H_TRAIL_ACTIVATE_PCT']; H_TRAIL_PCT = params['H_TRAIL_PCT']
-    I_BREAKOUT_VOL_MULT = params['I_BREAKOUT_VOL_MULT']; I_MAX_ENTRY_CANDLE = params['I_MAX_ENTRY_CANDLE']
-    I_MIN_GAP_PCT = params['I_MIN_GAP_PCT']; I_PARTIAL_SELL_PCT = params['I_PARTIAL_SELL_PCT']
-    I_STOP_PCT = params['I_STOP_PCT']; I_TARGET1_PCT = params['I_TARGET1_PCT']
-    I_TARGET2_PCT = params['I_TARGET2_PCT']; I_TIME_LIMIT_MINUTES = params['I_TIME_LIMIT_MINUTES']
-    I_TRAIL_ACTIVATE_PCT = params['I_TRAIL_ACTIVATE_PCT']; I_TRAIL_PCT = params['I_TRAIL_PCT']
-    J_MAX_ENTRY_CANDLE = params['J_MAX_ENTRY_CANDLE']; J_MIN_GAP_PCT = params['J_MIN_GAP_PCT']
-    J_PARTIAL_SELL_PCT = params['J_PARTIAL_SELL_PCT']; J_STOP_PCT = params['J_STOP_PCT']
-    J_TARGET1_PCT = params['J_TARGET1_PCT']; J_TARGET2_PCT = params['J_TARGET2_PCT']
-    J_TIME_LIMIT_MINUTES = params['J_TIME_LIMIT_MINUTES']
-    J_TRAIL_ACTIVATE_PCT = params['J_TRAIL_ACTIVATE_PCT']; J_TRAIL_PCT = params['J_TRAIL_PCT']
-    J_VWAP_PROXIMITY_PCT = params['J_VWAP_PROXIMITY_PCT']
-    K_BOUNCE_VOL_MULT = params['K_BOUNCE_VOL_MULT']; K_MAX_ENTRY_CANDLE = params['K_MAX_ENTRY_CANDLE']
-    K_MIN_GAP_PCT = params['K_MIN_GAP_PCT']; K_MIN_RUN_PCT = params['K_MIN_RUN_PCT']
-    K_PARTIAL_SELL_PCT = params['K_PARTIAL_SELL_PCT']; K_PULLBACK_PCT = params['K_PULLBACK_PCT']
-    K_PULLBACK_VOL_RATIO = params['K_PULLBACK_VOL_RATIO']; K_RUN_WINDOW = params['K_RUN_WINDOW']
-    K_STOP_PCT = params['K_STOP_PCT']; K_TARGET1_PCT = params['K_TARGET1_PCT']
-    K_TARGET2_PCT = params['K_TARGET2_PCT']; K_TIME_LIMIT_MINUTES = params['K_TIME_LIMIT_MINUTES']
-    K_TRAIL_ACTIVATE_PCT = params['K_TRAIL_ACTIVATE_PCT']; K_TRAIL_PCT = params['K_TRAIL_PCT']
-    L_EARLIEST_CANDLE = params['L_EARLIEST_CANDLE']
-    L_HOD_BREAK_REQUIRED = params['L_HOD_BREAK_REQUIRED']; L_LATEST_CANDLE = params['L_LATEST_CANDLE']
-    L_MAX_FLOAT = params['L_MAX_FLOAT']; L_MIN_GAP_PCT = params['L_MIN_GAP_PCT']
-    L_MIN_PRICE_ACCEL_PCT = params['L_MIN_PRICE_ACCEL_PCT']
-    L_PARTIAL_SELL_PCT = params['L_PARTIAL_SELL_PCT']
-    L_REQUIRE_ABOVE_VWAP = params['L_REQUIRE_ABOVE_VWAP']; L_STOP_PCT = params['L_STOP_PCT']
-    L_TIME_LIMIT_MINUTES = params['L_TIME_LIMIT_MINUTES']
-    L_TRAIL_ACTIVATE_PCT = params['L_TRAIL_ACTIVATE_PCT']; L_TRAIL_PCT = params['L_TRAIL_PCT']
-    L_VOL_SURGE_MULT = params['L_VOL_SURGE_MULT']
-    M_CONSOLIDATION_LEN = params['M_CONSOLIDATION_LEN']; M_MAX_ENTRY_CANDLE = params['M_MAX_ENTRY_CANDLE']
-    M_MAX_RANGE_PCT = params['M_MAX_RANGE_PCT']; M_MIN_GAP_PCT = params['M_MIN_GAP_PCT']
-    M_MORNING_CANDLES = params['M_MORNING_CANDLES']; M_MORNING_SPIKE_PCT = params['M_MORNING_SPIKE_PCT']
-    M_PARTIAL_SELL_PCT = params['M_PARTIAL_SELL_PCT']; M_RANGE_START_CANDLE = params['M_RANGE_START_CANDLE']
-    M_STOP_PCT = params['M_STOP_PCT']; M_TARGET1_PCT = params['M_TARGET1_PCT']
-    M_TIME_LIMIT_MINUTES = params['M_TIME_LIMIT_MINUTES']
-    M_TRAIL_ACTIVATE_PCT = params['M_TRAIL_ACTIVATE_PCT']; M_TRAIL_PCT = params['M_TRAIL_PCT']
-    M_VOL_RATIO = params['M_VOL_RATIO']
-    N_MAX_ENTRY_CANDLE = params['N_MAX_ENTRY_CANDLE']; N_MIN_GAP_PCT = params['N_MIN_GAP_PCT']
-    N_MIN_HOD_AGE = params['N_MIN_HOD_AGE']; N_PARTIAL_SELL_PCT = params['N_PARTIAL_SELL_PCT']
-    N_PULLBACK_FROM_HOD_PCT = params['N_PULLBACK_FROM_HOD_PCT']; N_STOP_PCT = params['N_STOP_PCT']
-    N_TARGET1_PCT = params['N_TARGET1_PCT']; N_TARGET2_PCT = params['N_TARGET2_PCT']
-    N_TIME_LIMIT_MINUTES = params['N_TIME_LIMIT_MINUTES']
-    N_TRAIL_ACTIVATE_PCT = params['N_TRAIL_ACTIVATE_PCT']; N_TRAIL_PCT = params['N_TRAIL_PCT']
-    O_BREAKOUT_VOL_MULT = params['O_BREAKOUT_VOL_MULT']; O_MAX_ENTRY_CANDLE = params['O_MAX_ENTRY_CANDLE']
-    O_MIN_GAP_PCT = params['O_MIN_GAP_PCT']; O_PARTIAL_SELL_PCT = params['O_PARTIAL_SELL_PCT']
-    O_RANGE_CANDLES = params['O_RANGE_CANDLES']; O_STOP_PCT = params['O_STOP_PCT']
-    O_TARGET1_PCT = params['O_TARGET1_PCT']; O_TARGET2_PCT = params['O_TARGET2_PCT']
-    O_TIME_LIMIT_MINUTES = params['O_TIME_LIMIT_MINUTES']
-    O_TRAIL_ACTIVATE_PCT = params['O_TRAIL_ACTIVATE_PCT']; O_TRAIL_PCT = params['O_TRAIL_PCT']
-    P_CONFIRM_ABOVE = params['P_CONFIRM_ABOVE']; P_CONFIRM_WINDOW = params['P_CONFIRM_WINDOW']
-    P_MAX_ENTRY_CANDLE = params['P_MAX_ENTRY_CANDLE']; P_MIN_GAP_PCT = params['P_MIN_GAP_PCT']
-    P_PARTIAL_SELL_PCT = params['P_PARTIAL_SELL_PCT']; P_PULLBACK_PCT = params['P_PULLBACK_PCT']
-    P_PULLBACK_TIMEOUT = params['P_PULLBACK_TIMEOUT']; P_STOP_PCT = params['P_STOP_PCT']
-    P_TARGET1_PCT = params['P_TARGET1_PCT']; P_TARGET2_PCT = params['P_TARGET2_PCT']
-    P_TIME_LIMIT_MINUTES = params['P_TIME_LIMIT_MINUTES']
-    P_TRAIL_ACTIVATE_PCT = params['P_TRAIL_ACTIVATE_PCT']; P_TRAIL_PCT = params['P_TRAIL_PCT']
-    R_BOUNCE_REF = params['R_BOUNCE_REF']; R_D2_PULLBACK_PCT = params['R_D2_PULLBACK_PCT']
-    R_MAX_ENTRY_CANDLE = params['R_MAX_ENTRY_CANDLE']; R_PULLBACK_WINDOW = params['R_PULLBACK_WINDOW']
-    R_STOP_PCT = params['R_STOP_PCT']; R_TARGET1_PCT = params['R_TARGET1_PCT']
-    R_TIME_LIMIT_MINUTES = params['R_TIME_LIMIT_MINUTES']
-    R_TRAIL_ACTIVATE_PCT = params['R_TRAIL_ACTIVATE_PCT']; R_TRAIL_PCT = params['R_TRAIL_PCT']
-    S_BREAKOUT_VOL_MULT = params['S_BREAKOUT_VOL_MULT']
-    S_HOD_TOLERANCE_PCT = params['S_HOD_TOLERANCE_PCT']; S_MAX_ENTRY_CANDLE = params['S_MAX_ENTRY_CANDLE']
-    S_MIN_GAP_PCT = params['S_MIN_GAP_PCT']; S_MIN_HOD_TESTS = params['S_MIN_HOD_TESTS']
-    S_PARTIAL_SELL_PCT = params['S_PARTIAL_SELL_PCT']; S_REJECTION_PCT = params['S_REJECTION_PCT']
-    S_STOP_PCT = params['S_STOP_PCT']; S_TARGET1_PCT = params['S_TARGET1_PCT']
-    S_TARGET2_PCT = params['S_TARGET2_PCT']; S_TIME_LIMIT_MINUTES = params['S_TIME_LIMIT_MINUTES']
-    S_TRAIL_ACTIVATE_PCT = params['S_TRAIL_ACTIVATE_PCT']; S_TRAIL_PCT = params['S_TRAIL_PCT']
-    VOL_CAP_PCT = params['VOL_CAP_PCT']
-    V_MAX_ENTRY_CANDLE = params['V_MAX_ENTRY_CANDLE']; V_MIN_BELOW_CANDLES = params['V_MIN_BELOW_CANDLES']
-    V_MIN_BELOW_PCT = params['V_MIN_BELOW_PCT']; V_MIN_GAP_PCT = params['V_MIN_GAP_PCT']
-    V_PARTIAL_SELL_PCT = params['V_PARTIAL_SELL_PCT']; V_STOP_PCT = params['V_STOP_PCT']
-    V_TARGET1_PCT = params['V_TARGET1_PCT']; V_TARGET2_PCT = params['V_TARGET2_PCT']
-    V_TIME_LIMIT_MINUTES = params['V_TIME_LIMIT_MINUTES']
-    V_TRAIL_ACTIVATE_PCT = params['V_TRAIL_ACTIVATE_PCT']; V_TRAIL_PCT = params['V_TRAIL_PCT']
-    V_VOL_SPIKE_RATIO = params['V_VOL_SPIKE_RATIO']
-    W_CONSOL_START = params['W_CONSOL_START']; W_EARLIEST_CANDLE = params['W_EARLIEST_CANDLE']
-    W_LATEST_CANDLE = params['W_LATEST_CANDLE']; W_MAX_HOD_BREAKS = params['W_MAX_HOD_BREAKS']
-    W_MAX_RANGE_PCT = params['W_MAX_RANGE_PCT']; W_MAX_VWAP_DEV_PCT = params['W_MAX_VWAP_DEV_PCT']
-    W_MIN_GAP_PCT = params['W_MIN_GAP_PCT']; W_MIN_MORNING_RUN = params['W_MIN_MORNING_RUN']
-    W_REQUIRE_ABOVE_VWAP = params['W_REQUIRE_ABOVE_VWAP']; W_STOP_PCT = params['W_STOP_PCT']
-    W_TARGET_PCT = params['W_TARGET_PCT']
-    W_TRAIL_ACTIVATE_PCT = params['W_TRAIL_ACTIVATE_PCT']; W_TRAIL_PCT = params['W_TRAIL_PCT']
-    W_VOL_SURGE_MULT = params['W_VOL_SURGE_MULT']
-    W_VOL_VS_MORNING_MULT = params['W_VOL_VS_MORNING_MULT']
-    X_MIN_PULLBACK_PCT = params['X_MIN_PULLBACK_PCT']
-    X_MIN_RECOVERY_PCT = params['X_MIN_RECOVERY_PCT']
-    X_MIN_BARS_SINCE_PEAK = params['X_MIN_BARS_SINCE_PEAK']
-    X_TARGET_PCT_OF_PEAK = params['X_TARGET_PCT_OF_PEAK']
-    X_STOP_PCT_BELOW_TROUGH = params['X_STOP_PCT_BELOW_TROUGH']
-    X_TRAIL_PCT = params['X_TRAIL_PCT']
-    X_TRAIL_ACTIVATE_PCT = params['X_TRAIL_ACTIVATE_PCT']
-    X_TIME_LIMIT_MINUTES = params['X_TIME_LIMIT_MINUTES']
-    X_MIN_ENTRY_ROOM_PCT = params['X_MIN_ENTRY_ROOM_PCT']
-    X_MIN_FIRST_LEG_GAIN_PCT = params['X_MIN_FIRST_LEG_GAIN_PCT']
-    X_FIRST_LEG_WINDOW_BARS = params['X_FIRST_LEG_WINDOW_BARS']
-    X_ENTRY_REQUIRE_GREEN = params['X_ENTRY_REQUIRE_GREEN']
-    X_MIN_VOL_VS_AVG = params['X_MIN_VOL_VS_AVG']
-    X_VOL_AVG_BARS = params['X_VOL_AVG_BARS']
-    X_MAX_ENTRY_HHMM = params['X_MAX_ENTRY_HHMM']
+    A_STOP_PCT = params["A_STOP_PCT"]
+    A_TARGET_PCT = params["A_TARGET_PCT"]
+    A_TIME_LIMIT_MINUTES = params["A_TIME_LIMIT_MINUTES"]
+    A_TRAIL_ACTIVATE_PCT = params["A_TRAIL_ACTIVATE_PCT"]
+    A_TRAIL_PCT = params["A_TRAIL_PCT"]
+    B_MAX_DIP_PCT = params["B_MAX_DIP_PCT"]
+    B_MAX_ENTRY_CANDLE = params["B_MAX_ENTRY_CANDLE"]
+    B_MIN_GAP_PCT = params["B_MIN_GAP_PCT"]
+    B_MIN_RECLAIM_VOL_MULT = params["B_MIN_RECLAIM_VOL_MULT"]
+    B_PARTIAL_SELL_PCT = params["B_PARTIAL_SELL_PCT"]
+    B_STOP_PCT = params["B_STOP_PCT"]
+    B_TARGET1_PCT = params["B_TARGET1_PCT"]
+    B_TARGET2_PCT = params["B_TARGET2_PCT"]
+    B_TIME_LIMIT_MINUTES = params["B_TIME_LIMIT_MINUTES"]
+    B_TRAIL_ACTIVATE_PCT = params["B_TRAIL_ACTIVATE_PCT"]
+    B_TRAIL_PCT = params["B_TRAIL_PCT"]
+    C_BREAKOUT_VOL_MULT = params["C_BREAKOUT_VOL_MULT"]
+    C_MAX_BASE_CANDLES = params["C_MAX_BASE_CANDLES"]
+    C_MAX_BASE_RANGE_PCT = params["C_MAX_BASE_RANGE_PCT"]
+    C_MAX_ENTRY_CANDLE = params["C_MAX_ENTRY_CANDLE"]
+    C_MIN_BASE_CANDLES = params["C_MIN_BASE_CANDLES"]
+    C_MIN_GAP_PCT = params["C_MIN_GAP_PCT"]
+    C_MIN_SPIKE_PCT = params["C_MIN_SPIKE_PCT"]
+    C_PARTIAL_SELL_PCT = params["C_PARTIAL_SELL_PCT"]
+    C_STOP_PCT = params["C_STOP_PCT"]
+    C_TARGET1_PCT = params["C_TARGET1_PCT"]
+    C_TARGET2_PCT = params["C_TARGET2_PCT"]
+    C_TIME_LIMIT_MINUTES = params["C_TIME_LIMIT_MINUTES"]
+    C_TRAIL_ACTIVATE_PCT = params["C_TRAIL_ACTIVATE_PCT"]
+    C_TRAIL_PCT = params["C_TRAIL_PCT"]
+    D_DIP_PCT = params["D_DIP_PCT"]
+    D_ENTRY_MODE = params["D_ENTRY_MODE"]
+    D_MAX_ENTRY_CANDLE = params["D_MAX_ENTRY_CANDLE"]
+    D_MIN_GAP_PCT = params["D_MIN_GAP_PCT"]
+    D_MIN_SPIKE_PCT = params["D_MIN_SPIKE_PCT"]
+    D_PARTIAL_SELL_PCT = params["D_PARTIAL_SELL_PCT"]
+    D_SPIKE_WINDOW = params["D_SPIKE_WINDOW"]
+    D_STOP_PCT = params["D_STOP_PCT"]
+    D_TARGET1_PCT = params["D_TARGET1_PCT"]
+    D_TARGET2_PCT = params["D_TARGET2_PCT"]
+    D_TIME_LIMIT_MINUTES = params["D_TIME_LIMIT_MINUTES"]
+    D_TRAIL_ACTIVATE_PCT = params["D_TRAIL_ACTIVATE_PCT"]
+    D_TRAIL_PCT = params["D_TRAIL_PCT"]
+    EOD_EXIT_MINUTES = params["EOD_EXIT_MINUTES"]
+    E_MAX_ENTRY_CANDLE = params["E_MAX_ENTRY_CANDLE"]
+    E_MIN_GAP_PCT = params["E_MIN_GAP_PCT"]
+    E_MIN_PM_VOL_MULT = params["E_MIN_PM_VOL_MULT"]
+    E_PARTIAL_SELL_PCT = params["E_PARTIAL_SELL_PCT"]
+    E_STOP_PCT = params["E_STOP_PCT"]
+    E_TARGET1_PCT = params["E_TARGET1_PCT"]
+    E_TARGET2_PCT = params["E_TARGET2_PCT"]
+    E_TIME_LIMIT_MINUTES = params["E_TIME_LIMIT_MINUTES"]
+    E_TRAIL_ACTIVATE_PCT = params["E_TRAIL_ACTIVATE_PCT"]
+    E_TRAIL_PCT = params["E_TRAIL_PCT"]
+    F_STOP_PCT = params["F_STOP_PCT"]
+    F_TARGET_PCT = params["F_TARGET_PCT"]
+    F_TIME_LIMIT_MINUTES = params["F_TIME_LIMIT_MINUTES"]
+    F_TRAIL_ACTIVATE_PCT = params["F_TRAIL_ACTIVATE_PCT"]
+    F_TRAIL_PCT = params["F_TRAIL_PCT"]
+    G_PARTIAL_SELL_PCT = params["G_PARTIAL_SELL_PCT"]
+    G_STOP_PCT = params["G_STOP_PCT"]
+    G_TARGET_PCT = params["G_TARGET_PCT"]
+    G_TARGET2_PCT = params["G_TARGET2_PCT"]
+    G_TIME_LIMIT_MINUTES = params["G_TIME_LIMIT_MINUTES"]
+    G_TRAIL_ACTIVATE_PCT = params["G_TRAIL_ACTIVATE_PCT"]
+    G_TRAIL_PCT = params["G_TRAIL_PCT"]
+    H_STOP_PCT = params["H_STOP_PCT"]
+    H_TARGET_PCT = params["H_TARGET_PCT"]
+    H_TIME_LIMIT_MINUTES = params["H_TIME_LIMIT_MINUTES"]
+    H_TRAIL_ACTIVATE_PCT = params["H_TRAIL_ACTIVATE_PCT"]
+    H_TRAIL_PCT = params["H_TRAIL_PCT"]
+    I_BREAKOUT_VOL_MULT = params["I_BREAKOUT_VOL_MULT"]
+    I_MAX_ENTRY_CANDLE = params["I_MAX_ENTRY_CANDLE"]
+    I_MIN_GAP_PCT = params["I_MIN_GAP_PCT"]
+    I_PARTIAL_SELL_PCT = params["I_PARTIAL_SELL_PCT"]
+    I_STOP_PCT = params["I_STOP_PCT"]
+    I_TARGET1_PCT = params["I_TARGET1_PCT"]
+    I_TARGET2_PCT = params["I_TARGET2_PCT"]
+    I_TIME_LIMIT_MINUTES = params["I_TIME_LIMIT_MINUTES"]
+    I_TRAIL_ACTIVATE_PCT = params["I_TRAIL_ACTIVATE_PCT"]
+    I_TRAIL_PCT = params["I_TRAIL_PCT"]
+    J_MAX_ENTRY_CANDLE = params["J_MAX_ENTRY_CANDLE"]
+    J_MIN_GAP_PCT = params["J_MIN_GAP_PCT"]
+    J_PARTIAL_SELL_PCT = params["J_PARTIAL_SELL_PCT"]
+    J_STOP_PCT = params["J_STOP_PCT"]
+    J_TARGET1_PCT = params["J_TARGET1_PCT"]
+    J_TARGET2_PCT = params["J_TARGET2_PCT"]
+    J_TIME_LIMIT_MINUTES = params["J_TIME_LIMIT_MINUTES"]
+    J_TRAIL_ACTIVATE_PCT = params["J_TRAIL_ACTIVATE_PCT"]
+    J_TRAIL_PCT = params["J_TRAIL_PCT"]
+    J_VWAP_PROXIMITY_PCT = params["J_VWAP_PROXIMITY_PCT"]
+    K_BOUNCE_VOL_MULT = params["K_BOUNCE_VOL_MULT"]
+    K_MAX_ENTRY_CANDLE = params["K_MAX_ENTRY_CANDLE"]
+    K_MIN_GAP_PCT = params["K_MIN_GAP_PCT"]
+    K_MIN_RUN_PCT = params["K_MIN_RUN_PCT"]
+    K_PARTIAL_SELL_PCT = params["K_PARTIAL_SELL_PCT"]
+    K_PULLBACK_PCT = params["K_PULLBACK_PCT"]
+    K_PULLBACK_VOL_RATIO = params["K_PULLBACK_VOL_RATIO"]
+    K_RUN_WINDOW = params["K_RUN_WINDOW"]
+    K_STOP_PCT = params["K_STOP_PCT"]
+    K_TARGET1_PCT = params["K_TARGET1_PCT"]
+    K_TARGET2_PCT = params["K_TARGET2_PCT"]
+    K_TIME_LIMIT_MINUTES = params["K_TIME_LIMIT_MINUTES"]
+    K_TRAIL_ACTIVATE_PCT = params["K_TRAIL_ACTIVATE_PCT"]
+    K_TRAIL_PCT = params["K_TRAIL_PCT"]
+    L_EARLIEST_CANDLE = params["L_EARLIEST_CANDLE"]
+    L_HOD_BREAK_REQUIRED = params["L_HOD_BREAK_REQUIRED"]
+    L_LATEST_CANDLE = params["L_LATEST_CANDLE"]
+    L_MAX_FLOAT = params["L_MAX_FLOAT"]
+    L_MIN_GAP_PCT = params["L_MIN_GAP_PCT"]
+    L_MIN_PRICE_ACCEL_PCT = params["L_MIN_PRICE_ACCEL_PCT"]
+    L_PARTIAL_SELL_PCT = params["L_PARTIAL_SELL_PCT"]
+    L_REQUIRE_ABOVE_VWAP = params["L_REQUIRE_ABOVE_VWAP"]
+    L_STOP_PCT = params["L_STOP_PCT"]
+    L_TIME_LIMIT_MINUTES = params["L_TIME_LIMIT_MINUTES"]
+    L_TRAIL_ACTIVATE_PCT = params["L_TRAIL_ACTIVATE_PCT"]
+    L_TRAIL_PCT = params["L_TRAIL_PCT"]
+    L_VOL_SURGE_MULT = params["L_VOL_SURGE_MULT"]
+    M_CONSOLIDATION_LEN = params["M_CONSOLIDATION_LEN"]
+    M_MAX_ENTRY_CANDLE = params["M_MAX_ENTRY_CANDLE"]
+    M_MAX_RANGE_PCT = params["M_MAX_RANGE_PCT"]
+    M_MIN_GAP_PCT = params["M_MIN_GAP_PCT"]
+    M_MORNING_CANDLES = params["M_MORNING_CANDLES"]
+    M_MORNING_SPIKE_PCT = params["M_MORNING_SPIKE_PCT"]
+    M_PARTIAL_SELL_PCT = params["M_PARTIAL_SELL_PCT"]
+    M_RANGE_START_CANDLE = params["M_RANGE_START_CANDLE"]
+    M_STOP_PCT = params["M_STOP_PCT"]
+    M_TARGET1_PCT = params["M_TARGET1_PCT"]
+    M_TIME_LIMIT_MINUTES = params["M_TIME_LIMIT_MINUTES"]
+    M_TRAIL_ACTIVATE_PCT = params["M_TRAIL_ACTIVATE_PCT"]
+    M_TRAIL_PCT = params["M_TRAIL_PCT"]
+    M_VOL_RATIO = params["M_VOL_RATIO"]
+    N_MAX_ENTRY_CANDLE = params["N_MAX_ENTRY_CANDLE"]
+    N_MIN_GAP_PCT = params["N_MIN_GAP_PCT"]
+    N_MIN_HOD_AGE = params["N_MIN_HOD_AGE"]
+    N_PARTIAL_SELL_PCT = params["N_PARTIAL_SELL_PCT"]
+    N_PULLBACK_FROM_HOD_PCT = params["N_PULLBACK_FROM_HOD_PCT"]
+    N_STOP_PCT = params["N_STOP_PCT"]
+    N_TARGET1_PCT = params["N_TARGET1_PCT"]
+    N_TARGET2_PCT = params["N_TARGET2_PCT"]
+    N_TIME_LIMIT_MINUTES = params["N_TIME_LIMIT_MINUTES"]
+    N_TRAIL_ACTIVATE_PCT = params["N_TRAIL_ACTIVATE_PCT"]
+    N_TRAIL_PCT = params["N_TRAIL_PCT"]
+    O_BREAKOUT_VOL_MULT = params["O_BREAKOUT_VOL_MULT"]
+    O_MAX_ENTRY_CANDLE = params["O_MAX_ENTRY_CANDLE"]
+    O_MIN_GAP_PCT = params["O_MIN_GAP_PCT"]
+    O_PARTIAL_SELL_PCT = params["O_PARTIAL_SELL_PCT"]
+    O_RANGE_CANDLES = params["O_RANGE_CANDLES"]
+    O_STOP_PCT = params["O_STOP_PCT"]
+    O_TARGET1_PCT = params["O_TARGET1_PCT"]
+    O_TARGET2_PCT = params["O_TARGET2_PCT"]
+    O_TIME_LIMIT_MINUTES = params["O_TIME_LIMIT_MINUTES"]
+    O_TRAIL_ACTIVATE_PCT = params["O_TRAIL_ACTIVATE_PCT"]
+    O_TRAIL_PCT = params["O_TRAIL_PCT"]
+    P_CONFIRM_ABOVE = params["P_CONFIRM_ABOVE"]
+    P_CONFIRM_WINDOW = params["P_CONFIRM_WINDOW"]
+    P_MAX_ENTRY_CANDLE = params["P_MAX_ENTRY_CANDLE"]
+    P_MIN_GAP_PCT = params["P_MIN_GAP_PCT"]
+    P_PARTIAL_SELL_PCT = params["P_PARTIAL_SELL_PCT"]
+    P_PULLBACK_PCT = params["P_PULLBACK_PCT"]
+    P_PULLBACK_TIMEOUT = params["P_PULLBACK_TIMEOUT"]
+    P_STOP_PCT = params["P_STOP_PCT"]
+    P_TARGET1_PCT = params["P_TARGET1_PCT"]
+    P_TARGET2_PCT = params["P_TARGET2_PCT"]
+    P_TIME_LIMIT_MINUTES = params["P_TIME_LIMIT_MINUTES"]
+    P_TRAIL_ACTIVATE_PCT = params["P_TRAIL_ACTIVATE_PCT"]
+    P_TRAIL_PCT = params["P_TRAIL_PCT"]
+    R_BOUNCE_REF = params["R_BOUNCE_REF"]
+    R_D2_PULLBACK_PCT = params["R_D2_PULLBACK_PCT"]
+    R_MAX_ENTRY_CANDLE = params["R_MAX_ENTRY_CANDLE"]
+    R_PULLBACK_WINDOW = params["R_PULLBACK_WINDOW"]
+    R_STOP_PCT = params["R_STOP_PCT"]
+    R_TARGET1_PCT = params["R_TARGET1_PCT"]
+    R_TIME_LIMIT_MINUTES = params["R_TIME_LIMIT_MINUTES"]
+    R_TRAIL_ACTIVATE_PCT = params["R_TRAIL_ACTIVATE_PCT"]
+    R_TRAIL_PCT = params["R_TRAIL_PCT"]
+    S_BREAKOUT_VOL_MULT = params["S_BREAKOUT_VOL_MULT"]
+    S_HOD_TOLERANCE_PCT = params["S_HOD_TOLERANCE_PCT"]
+    S_MAX_ENTRY_CANDLE = params["S_MAX_ENTRY_CANDLE"]
+    S_MIN_GAP_PCT = params["S_MIN_GAP_PCT"]
+    S_MIN_HOD_TESTS = params["S_MIN_HOD_TESTS"]
+    S_PARTIAL_SELL_PCT = params["S_PARTIAL_SELL_PCT"]
+    S_REJECTION_PCT = params["S_REJECTION_PCT"]
+    S_STOP_PCT = params["S_STOP_PCT"]
+    S_TARGET1_PCT = params["S_TARGET1_PCT"]
+    S_TARGET2_PCT = params["S_TARGET2_PCT"]
+    S_TIME_LIMIT_MINUTES = params["S_TIME_LIMIT_MINUTES"]
+    S_TRAIL_ACTIVATE_PCT = params["S_TRAIL_ACTIVATE_PCT"]
+    S_TRAIL_PCT = params["S_TRAIL_PCT"]
+    VOL_CAP_PCT = params["VOL_CAP_PCT"]
+    V_MAX_ENTRY_CANDLE = params["V_MAX_ENTRY_CANDLE"]
+    V_MIN_BELOW_CANDLES = params["V_MIN_BELOW_CANDLES"]
+    V_MIN_BELOW_PCT = params["V_MIN_BELOW_PCT"]
+    V_MIN_GAP_PCT = params["V_MIN_GAP_PCT"]
+    V_PARTIAL_SELL_PCT = params["V_PARTIAL_SELL_PCT"]
+    V_STOP_PCT = params["V_STOP_PCT"]
+    V_TARGET1_PCT = params["V_TARGET1_PCT"]
+    V_TARGET2_PCT = params["V_TARGET2_PCT"]
+    V_TIME_LIMIT_MINUTES = params["V_TIME_LIMIT_MINUTES"]
+    V_TRAIL_ACTIVATE_PCT = params["V_TRAIL_ACTIVATE_PCT"]
+    V_TRAIL_PCT = params["V_TRAIL_PCT"]
+    V_VOL_SPIKE_RATIO = params["V_VOL_SPIKE_RATIO"]
+    W_CONSOL_START = params["W_CONSOL_START"]
+    W_EARLIEST_CANDLE = params["W_EARLIEST_CANDLE"]
+    W_LATEST_CANDLE = params["W_LATEST_CANDLE"]
+    W_MAX_HOD_BREAKS = params["W_MAX_HOD_BREAKS"]
+    W_MAX_RANGE_PCT = params["W_MAX_RANGE_PCT"]
+    W_MAX_VWAP_DEV_PCT = params["W_MAX_VWAP_DEV_PCT"]
+    W_MIN_GAP_PCT = params["W_MIN_GAP_PCT"]
+    W_MIN_MORNING_RUN = params["W_MIN_MORNING_RUN"]
+    W_REQUIRE_ABOVE_VWAP = params["W_REQUIRE_ABOVE_VWAP"]
+    W_STOP_PCT = params["W_STOP_PCT"]
+    W_TARGET_PCT = params["W_TARGET_PCT"]
+    W_TRAIL_ACTIVATE_PCT = params["W_TRAIL_ACTIVATE_PCT"]
+    W_TRAIL_PCT = params["W_TRAIL_PCT"]
+    W_VOL_SURGE_MULT = params["W_VOL_SURGE_MULT"]
+    W_VOL_VS_MORNING_MULT = params["W_VOL_VS_MORNING_MULT"]
+    X_MIN_PULLBACK_PCT = params["X_MIN_PULLBACK_PCT"]
+    X_MIN_RECOVERY_PCT = params["X_MIN_RECOVERY_PCT"]
+    X_MIN_BARS_SINCE_PEAK = params["X_MIN_BARS_SINCE_PEAK"]
+    X_TARGET_PCT_OF_PEAK = params["X_TARGET_PCT_OF_PEAK"]
+    X_STOP_PCT_BELOW_TROUGH = params["X_STOP_PCT_BELOW_TROUGH"]
+    X_TRAIL_PCT = params["X_TRAIL_PCT"]
+    X_TRAIL_ACTIVATE_PCT = params["X_TRAIL_ACTIVATE_PCT"]
+    X_TIME_LIMIT_MINUTES = params["X_TIME_LIMIT_MINUTES"]
+    X_MIN_ENTRY_ROOM_PCT = params["X_MIN_ENTRY_ROOM_PCT"]
+    X_MIN_FIRST_LEG_GAIN_PCT = params["X_MIN_FIRST_LEG_GAIN_PCT"]
+    X_FIRST_LEG_WINDOW_BARS = params["X_FIRST_LEG_WINDOW_BARS"]
+    X_ENTRY_REQUIRE_GREEN = params["X_ENTRY_REQUIRE_GREEN"]
+    X_MIN_VOL_VS_AVG = params["X_MIN_VOL_VS_AVG"]
+    X_VOL_AVG_BARS = params["X_VOL_AVG_BARS"]
+    X_MAX_ENTRY_HHMM = params["X_MAX_ENTRY_HHMM"]
 
     cash_box = [float(cash)]
     unsettled_box = [0.0]
@@ -1110,7 +1477,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         _ts0 = all_timestamps[0]
         try:
             from zoneinfo import ZoneInfo as _ZI
-            _trade_date_str = _ts0.astimezone(_ZI("America/New_York")).strftime("%Y-%m-%d")
+
+            _trade_date_str = _ts0.astimezone(_ZI("America/New_York")).strftime(
+                "%Y-%m-%d"
+            )
         except Exception:
             _trade_date_str = str(_ts0)[:10]
 
@@ -1126,220 +1496,227 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         vwap = _compute_vwap(mh)
         ticker = pick["ticker"]
         float_shares = FLOAT_DATA.get(ticker)
-        l_eligible = (float_shares is not None
-                      and float_shares <= L_MAX_FLOAT
-                      and pick["gap_pct"] >= L_MIN_GAP_PCT)
-        l_tgt1, l_tgt2 = _get_tiered_targets(float_shares, params=params) if l_eligible else (0, 0)
-        states.append({
-            "ticker": ticker,
-            "premarket_high": pick["premarket_high"],
-            "gap_pct": pick["gap_pct"],
-            "pm_volume": pick.get("pm_volume", 0),
-            "mh": mh,
-            "vwap": vwap,
-            # State — H/G/A/F candle classification
-            "candle_count": 0,
-            "first_candle_ok": False,
-            "first_candle_high": 0.0,
-            "first_candle_body_pct": 0.0,
-            "first_candle_volume": 0.0,      # For vol confirm (H)
-            "signal": False,
-            "signal_price": None,
-            "open_price": None,
-            "strategy": None,  # "H", "G", "A", "F", "D", or "P"
-            # State — D (Opening Dip Buy fallback)
-            "d_eligible": False,         # Set True after candle 2 if H/G/A/F failed
-            "d_spike_high": 0.0,         # Highest high in spike window
-            "d_spike_detected": False,   # Spike >= min_spike_pct above open
-            "d_dip_detected": False,     # Low hit dip level
-            "d_below_vwap": False,       # For VWAP entry mode
-            "d_recent_closes": [],       # For 5-candle high tracking
-            # State — D advanced exit management
-            "d_highest_since_entry": 0.0,
-            "d_trailing_active": False,
-            "d_partial_taken": False,
-            "d_partial_proceeds": 0.0,
-            # State — M (Midday Range Break fallback)
-            "m_eligible": False,
-            "m_morning_spike_ok": False,
-            "m_consol_checked": False,
-            "m_consol_high": 0.0,
-            "m_breakout_ready": False,
-            # State — M advanced exit management
-            "m_highest_since_entry": 0.0,
-            "m_trailing_active": False,
-            "m_partial_taken": False,
-            "m_partial_proceeds": 0.0,
-            # State — V (VWAP Reclaim fallback)
-            "v_eligible": False,
-            "v_below_count": 0,
-            "v_max_below_pct": 0.0,
-            "v_reclaim_ready": False,
-            # State — V advanced exit management
-            "v_highest_since_entry": 0.0,
-            "v_trailing_active": False,
-            "v_partial_taken": False,
-            "v_partial_proceeds": 0.0,
-            # State — R (Multi-Day Runner)
-            "is_r_candidate": pick.get("is_r_candidate", False),
-            "r_day1_close": pick.get("r_day1_close", 0),
-            "r_eligible": pick.get("is_r_candidate", False),
-            "r_pullback_seen": False,
-            # State — R advanced exit management
-            "r_highest_since_entry": 0.0,
-            "r_trailing_active": False,
-            # State — P (PM high breakout fallback)
-            "p_eligible": False,         # Set True after candle 2 if H/G/A/F failed
-            "p_recent_closes": [],       # Track closes above PM high
-            "p_breakout_confirmed": False,
-            "p_pullback_detected": False,
-            "p_candles_since_confirm": 0,
-            # State — P advanced exit management
-            "p_highest_since_entry": 0.0,
-            "p_trailing_active": False,
-            "p_partial_taken": False,
-            "p_partial_proceeds": 0.0,
-            # State — W (Power Hour Breakout fallback)
-            "w_eligible": False,
-            "w_morning_run_ok": False,
-            "w_morning_high": 0.0,
-            "w_morning_spike_vol": 0.0,
-            "w_consol_checked": False,
-            "w_consol_high": 0.0,
-            "w_consol_avg_vol": 0.0,
-            "w_breakout_ready": False,
-            # State — W exit management
-            "w_highest_since_entry": 0.0,
-            "w_trailing_active": False,
-            # State — L (Low Float Squeeze)
-            "l_eligible": l_eligible,
-            "l_float_shares": float_shares or 0,
-            "l_running_hod": 0.0,
-            "l_target1_pct": l_tgt1,
-            "l_target2_pct": l_tgt2,
-            # State — L exit management
-            "l_highest_since_entry": 0.0,
-            "l_trailing_active": False,
-            "l_partial_taken": False,
-            "l_partial_proceeds": 0.0,
-            # State — O (Opening Range Breakout)
-            "o_eligible": pick["gap_pct"] >= O_MIN_GAP_PCT,
-            "o_range_high": 0.0,
-            "o_range_low": 999999.0,
-            "o_range_formed": False,
-            "o_range_avg_vol": 0.0,
-            "o_highest_since_entry": 0.0,
-            "o_trailing_active": False,
-            "o_partial_taken": False,
-            "o_partial_proceeds": 0.0,
-            "o_dynamic_stop": 0.0,       # range low used as stop
-            # State — B (Red-to-Green R2G)
-            "b_eligible": pick["gap_pct"] >= B_MIN_GAP_PCT,
-            "b_candle1_red": False,
-            "b_open_price": 0.0,
-            "b_dip_seen": False,
-            "b_avg_vol_sum": 0.0,
-            "b_avg_vol_count": 0,
-            "b_highest_since_entry": 0.0,
-            "b_trailing_active": False,
-            "b_partial_taken": False,
-            "b_partial_proceeds": 0.0,
-            # State — K (First Pullback Buy)
-            "k_eligible": False,
-            "k_run_high": 0.0,
-            "k_run_detected": False,
-            "k_run_vol_sum": 0.0,
-            "k_pullback_low": 999999.0,
-            "k_pullback_detected": False,
-            "k_pullback_vol_sum": 0.0,
-            "k_pullback_candles": 0,
-            "k_highest_since_entry": 0.0,
-            "k_trailing_active": False,
-            "k_partial_taken": False,
-            "k_partial_proceeds": 0.0,
-            # State — C (Micro Flag / Base Pattern)
-            "c_eligible": False,
-            "c_spike_detected": False,
-            "c_spike_high": 0.0,
-            "c_base_start_candle": 0,
-            "c_base_candle_count": 0,
-            "c_base_high": 0.0,
-            "c_base_low": 999999.0,
-            "c_highest_since_entry": 0.0,
-            "c_trailing_active": False,
-            "c_partial_taken": False,
-            "c_partial_proceeds": 0.0,
-            # State — S (Stuff-and-Break)
-            "s_eligible": False,
-            "s_hod": 0.0,
-            "s_hod_candle": 0,
-            "s_hod_tests": 0,
-            "s_last_test_candle": 0,
-            "s_rejected": False,
-            "s_highest_since_entry": 0.0,
-            "s_trailing_active": False,
-            "s_partial_taken": False,
-            "s_partial_proceeds": 0.0,
-            # State — E (Gap-and-Go RelVol)
-            "e_eligible": (pick["gap_pct"] >= E_MIN_GAP_PCT
-                           and pick.get("pm_volume", 0) > 0),
-            "e_pm_vol_ok": False,        # checked at candle 1
-            "e_highest_since_entry": 0.0,
-            "e_trailing_active": False,
-            "e_partial_taken": False,
-            "e_partial_proceeds": 0.0,
-            # State — I (P1 Immediate PM High Breakout)
-            "i_eligible": False,
-            "i_highest_since_entry": 0.0,
-            "i_trailing_active": False,
-            "i_partial_taken": False,
-            "i_partial_proceeds": 0.0,
-            # State — J (P3 VWAP + PM High Breakout)
-            "j_eligible": False,
-            "j_highest_since_entry": 0.0,
-            "j_trailing_active": False,
-            "j_partial_taken": False,
-            "j_partial_proceeds": 0.0,
-            # State — N (P4 HOD Reclaim)
-            "n_eligible": False,
-            "n_hod": 0.0,
-            "n_hod_candle": 0,
-            "n_pullback_seen": False,
-            "n_pullback_low": 999999.0,
-            "n_highest_since_entry": 0.0,
-            "n_trailing_active": False,
-            "n_partial_taken": False,
-            "n_partial_proceeds": 0.0,
-            # State — X (Range Reversion — second-leg pattern)
-            "x_eligible": False,             # True after first-leg window closes with valid pattern
-            "x_open_price": 0.0,             # open price for first-leg gain reference
-            "x_first_leg_peak_high": 0.0,    # highest price in first X_FIRST_LEG_WINDOW_BARS bars
-            "x_first_leg_peak_idx": 0,       # bar index where first-leg peak occurred
-            "x_trough_low": 0.0,             # lowest price since first-leg peak
-            "x_trough_idx": 0,               # bar index where trough occurred
-            "x_recent_volumes": [],          # rolling window for X_VOL_AVG_BARS volume check
-            "x_target_price": 0.0,           # cached target (set on entry)
-            "x_stop_price": 0.0,             # cached stop (set on entry)
-            "x_highest_since_entry": 0.0,
-            "x_trailing_active": False,
-            # State — H/G/A/F trail tracking
-            "hgaf_trail_stop": 0.0,
-            # State — G partial exit tracking
-            "g_partial_taken": False,
-            "g_partial_proceeds": 0.0,
-            "g_highest_since_entry": 0.0,
-            # Position
-            "entry_price": None,
-            "entry_time": None,
-            "exit_price": None,
-            "exit_time": None,
-            "exit_reason": None,
-            "shares": 0,
-            "position_cost": 0.0,
-            "pnl": 0.0,
-            "vol_capped": False,
-            "done": False,
-        })
+        l_eligible = (
+            float_shares is not None
+            and float_shares <= L_MAX_FLOAT
+            and pick["gap_pct"] >= L_MIN_GAP_PCT
+        )
+        l_tgt1, l_tgt2 = (
+            _get_tiered_targets(float_shares, params=params) if l_eligible else (0, 0)
+        )
+        states.append(
+            {
+                "ticker": ticker,
+                "premarket_high": pick["premarket_high"],
+                "gap_pct": pick["gap_pct"],
+                "pm_volume": pick.get("pm_volume", 0),
+                "mh": mh,
+                "vwap": vwap,
+                # State — H/G/A/F candle classification
+                "candle_count": 0,
+                "first_candle_ok": False,
+                "first_candle_high": 0.0,
+                "first_candle_body_pct": 0.0,
+                "first_candle_volume": 0.0,  # For vol confirm (H)
+                "signal": False,
+                "signal_price": None,
+                "open_price": None,
+                "strategy": None,  # "H", "G", "A", "F", "D", or "P"
+                # State — D (Opening Dip Buy fallback)
+                "d_eligible": False,  # Set True after candle 2 if H/G/A/F failed
+                "d_spike_high": 0.0,  # Highest high in spike window
+                "d_spike_detected": False,  # Spike >= min_spike_pct above open
+                "d_dip_detected": False,  # Low hit dip level
+                "d_below_vwap": False,  # For VWAP entry mode
+                "d_recent_closes": [],  # For 5-candle high tracking
+                # State — D advanced exit management
+                "d_highest_since_entry": 0.0,
+                "d_trailing_active": False,
+                "d_partial_taken": False,
+                "d_partial_proceeds": 0.0,
+                # State — M (Midday Range Break fallback)
+                "m_eligible": False,
+                "m_morning_spike_ok": False,
+                "m_consol_checked": False,
+                "m_consol_high": 0.0,
+                "m_breakout_ready": False,
+                # State — M advanced exit management
+                "m_highest_since_entry": 0.0,
+                "m_trailing_active": False,
+                "m_partial_taken": False,
+                "m_partial_proceeds": 0.0,
+                # State — V (VWAP Reclaim fallback)
+                "v_eligible": False,
+                "v_below_count": 0,
+                "v_max_below_pct": 0.0,
+                "v_reclaim_ready": False,
+                # State — V advanced exit management
+                "v_highest_since_entry": 0.0,
+                "v_trailing_active": False,
+                "v_partial_taken": False,
+                "v_partial_proceeds": 0.0,
+                # State — R (Multi-Day Runner)
+                "is_r_candidate": pick.get("is_r_candidate", False),
+                "r_day1_close": pick.get("r_day1_close", 0),
+                "r_eligible": pick.get("is_r_candidate", False),
+                "r_pullback_seen": False,
+                # State — R advanced exit management
+                "r_highest_since_entry": 0.0,
+                "r_trailing_active": False,
+                # State — P (PM high breakout fallback)
+                "p_eligible": False,  # Set True after candle 2 if H/G/A/F failed
+                "p_recent_closes": [],  # Track closes above PM high
+                "p_breakout_confirmed": False,
+                "p_pullback_detected": False,
+                "p_candles_since_confirm": 0,
+                # State — P advanced exit management
+                "p_highest_since_entry": 0.0,
+                "p_trailing_active": False,
+                "p_partial_taken": False,
+                "p_partial_proceeds": 0.0,
+                # State — W (Power Hour Breakout fallback)
+                "w_eligible": False,
+                "w_morning_run_ok": False,
+                "w_morning_high": 0.0,
+                "w_morning_spike_vol": 0.0,
+                "w_consol_checked": False,
+                "w_consol_high": 0.0,
+                "w_consol_avg_vol": 0.0,
+                "w_breakout_ready": False,
+                # State — W exit management
+                "w_highest_since_entry": 0.0,
+                "w_trailing_active": False,
+                # State — L (Low Float Squeeze)
+                "l_eligible": l_eligible,
+                "l_float_shares": float_shares or 0,
+                "l_running_hod": 0.0,
+                "l_target1_pct": l_tgt1,
+                "l_target2_pct": l_tgt2,
+                # State — L exit management
+                "l_highest_since_entry": 0.0,
+                "l_trailing_active": False,
+                "l_partial_taken": False,
+                "l_partial_proceeds": 0.0,
+                # State — O (Opening Range Breakout)
+                "o_eligible": pick["gap_pct"] >= O_MIN_GAP_PCT,
+                "o_range_high": 0.0,
+                "o_range_low": 999999.0,
+                "o_range_formed": False,
+                "o_range_avg_vol": 0.0,
+                "o_highest_since_entry": 0.0,
+                "o_trailing_active": False,
+                "o_partial_taken": False,
+                "o_partial_proceeds": 0.0,
+                "o_dynamic_stop": 0.0,  # range low used as stop
+                # State — B (Red-to-Green R2G)
+                "b_eligible": pick["gap_pct"] >= B_MIN_GAP_PCT,
+                "b_candle1_red": False,
+                "b_open_price": 0.0,
+                "b_dip_seen": False,
+                "b_avg_vol_sum": 0.0,
+                "b_avg_vol_count": 0,
+                "b_highest_since_entry": 0.0,
+                "b_trailing_active": False,
+                "b_partial_taken": False,
+                "b_partial_proceeds": 0.0,
+                # State — K (First Pullback Buy)
+                "k_eligible": False,
+                "k_run_high": 0.0,
+                "k_run_detected": False,
+                "k_run_vol_sum": 0.0,
+                "k_pullback_low": 999999.0,
+                "k_pullback_detected": False,
+                "k_pullback_vol_sum": 0.0,
+                "k_pullback_candles": 0,
+                "k_highest_since_entry": 0.0,
+                "k_trailing_active": False,
+                "k_partial_taken": False,
+                "k_partial_proceeds": 0.0,
+                # State — C (Micro Flag / Base Pattern)
+                "c_eligible": False,
+                "c_spike_detected": False,
+                "c_spike_high": 0.0,
+                "c_base_start_candle": 0,
+                "c_base_candle_count": 0,
+                "c_base_high": 0.0,
+                "c_base_low": 999999.0,
+                "c_highest_since_entry": 0.0,
+                "c_trailing_active": False,
+                "c_partial_taken": False,
+                "c_partial_proceeds": 0.0,
+                # State — S (Stuff-and-Break)
+                "s_eligible": False,
+                "s_hod": 0.0,
+                "s_hod_candle": 0,
+                "s_hod_tests": 0,
+                "s_last_test_candle": 0,
+                "s_rejected": False,
+                "s_highest_since_entry": 0.0,
+                "s_trailing_active": False,
+                "s_partial_taken": False,
+                "s_partial_proceeds": 0.0,
+                # State — E (Gap-and-Go RelVol)
+                "e_eligible": (
+                    pick["gap_pct"] >= E_MIN_GAP_PCT and pick.get("pm_volume", 0) > 0
+                ),
+                "e_pm_vol_ok": False,  # checked at candle 1
+                "e_highest_since_entry": 0.0,
+                "e_trailing_active": False,
+                "e_partial_taken": False,
+                "e_partial_proceeds": 0.0,
+                # State — I (P1 Immediate PM High Breakout)
+                "i_eligible": False,
+                "i_highest_since_entry": 0.0,
+                "i_trailing_active": False,
+                "i_partial_taken": False,
+                "i_partial_proceeds": 0.0,
+                # State — J (P3 VWAP + PM High Breakout)
+                "j_eligible": False,
+                "j_highest_since_entry": 0.0,
+                "j_trailing_active": False,
+                "j_partial_taken": False,
+                "j_partial_proceeds": 0.0,
+                # State — N (P4 HOD Reclaim)
+                "n_eligible": False,
+                "n_hod": 0.0,
+                "n_hod_candle": 0,
+                "n_pullback_seen": False,
+                "n_pullback_low": 999999.0,
+                "n_highest_since_entry": 0.0,
+                "n_trailing_active": False,
+                "n_partial_taken": False,
+                "n_partial_proceeds": 0.0,
+                # State — X (Range Reversion — second-leg pattern)
+                "x_eligible": False,  # True after first-leg window closes with valid pattern
+                "x_open_price": 0.0,  # open price for first-leg gain reference
+                "x_first_leg_peak_high": 0.0,  # highest price in first X_FIRST_LEG_WINDOW_BARS bars
+                "x_first_leg_peak_idx": 0,  # bar index where first-leg peak occurred
+                "x_trough_low": 0.0,  # lowest price since first-leg peak
+                "x_trough_idx": 0,  # bar index where trough occurred
+                "x_recent_volumes": [],  # rolling window for X_VOL_AVG_BARS volume check
+                "x_target_price": 0.0,  # cached target (set on entry)
+                "x_stop_price": 0.0,  # cached stop (set on entry)
+                "x_highest_since_entry": 0.0,
+                "x_trailing_active": False,
+                # State — H/G/A/F trail tracking
+                "hgaf_trail_stop": 0.0,
+                # State — G partial exit tracking
+                "g_partial_taken": False,
+                "g_partial_proceeds": 0.0,
+                "g_highest_since_entry": 0.0,
+                # Position
+                "entry_price": None,
+                "entry_time": None,
+                "exit_price": None,
+                "exit_time": None,
+                "exit_reason": None,
+                "shares": 0,
+                "position_cost": 0.0,
+                "pnl": 0.0,
+                "vol_capped": False,
+                "done": False,
+            }
+        )
 
     # Create dedicated L-only states for cross-pool signal independence.
     # Without this, H/G/A/F claim signal=True first and L never gets checked
@@ -1398,17 +1775,30 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     # all non-X strategies disabled on it.
     x_only_states = []
     for st in states:
-        if (st.get("l_only") or st.get("o_only") or st.get("b_only")
-                or st.get("e_only")):
+        if st.get("l_only") or st.get("o_only") or st.get("b_only") or st.get("e_only"):
             continue
         x_st = dict(st)  # shallow copy — shares mh/vwap (read-only)
         x_st["x_only"] = True
         # Disable all other strategies on this state
-        for k in ("d_eligible", "v_eligible", "m_eligible", "p_eligible",
-                  "w_eligible", "is_r_candidate", "r_eligible",
-                  "o_eligible", "b_eligible", "e_eligible",
-                  "k_eligible", "c_eligible", "s_eligible",
-                  "i_eligible", "j_eligible", "n_eligible", "l_eligible"):
+        for k in (
+            "d_eligible",
+            "v_eligible",
+            "m_eligible",
+            "p_eligible",
+            "w_eligible",
+            "is_r_candidate",
+            "r_eligible",
+            "o_eligible",
+            "b_eligible",
+            "e_eligible",
+            "k_eligible",
+            "c_eligible",
+            "s_eligible",
+            "i_eligible",
+            "j_eligible",
+            "n_eligible",
+            "l_eligible",
+        ):
             x_st[k] = False
         x_st["r_pullback_seen"] = False
         # Reset per-instance signal/entry state
@@ -1455,8 +1845,19 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             o_st = dict(st)
             o_st["o_only"] = True
             # Disable everything except O
-            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
-                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+            for k in [
+                "d_eligible",
+                "v_eligible",
+                "m_eligible",
+                "p_eligible",
+                "w_eligible",
+                "k_eligible",
+                "c_eligible",
+                "s_eligible",
+                "i_eligible",
+                "j_eligible",
+                "n_eligible",
+            ]:
                 o_st[k] = False
             o_st["l_eligible"] = False
             o_st["is_r_candidate"] = False
@@ -1497,8 +1898,19 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         if st["b_eligible"]:
             b_st = dict(st)
             b_st["b_only"] = True
-            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
-                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+            for k in [
+                "d_eligible",
+                "v_eligible",
+                "m_eligible",
+                "p_eligible",
+                "w_eligible",
+                "k_eligible",
+                "c_eligible",
+                "s_eligible",
+                "i_eligible",
+                "j_eligible",
+                "n_eligible",
+            ]:
                 b_st[k] = False
             b_st["l_eligible"] = False
             b_st["o_eligible"] = False
@@ -1539,8 +1951,19 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         if st["e_eligible"]:
             e_st = dict(st)
             e_st["e_only"] = True
-            for k in ["d_eligible","v_eligible","m_eligible","p_eligible","w_eligible",
-                       "k_eligible","c_eligible","s_eligible","i_eligible","j_eligible","n_eligible"]:
+            for k in [
+                "d_eligible",
+                "v_eligible",
+                "m_eligible",
+                "p_eligible",
+                "w_eligible",
+                "k_eligible",
+                "c_eligible",
+                "s_eligible",
+                "i_eligible",
+                "j_eligible",
+                "n_eligible",
+            ]:
                 e_st[k] = False
             e_st["l_eligible"] = False
             e_st["o_eligible"] = False
@@ -1597,27 +2020,33 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     entry_et = entry_et.astimezone(ET_TZ)
                 except Exception:
                     pass
-                minutes_in_trade = (ts_et.hour * 60 + ts_et.minute) - (entry_et.hour * 60 + entry_et.minute)
+                minutes_in_trade = (ts_et.hour * 60 + ts_et.minute) - (
+                    entry_et.hour * 60 + entry_et.minute
+                )
 
                 # --- Helper: close entire remaining position ---
                 def _close_position(st, price, reason, ts_now):
-                    sell_price = price * (1 - _exit_slip_pct(price, st["shares"], st, ts_now) / 100)
+                    sell_price = price * (
+                        1 - _exit_slip_pct(price, st["shares"], st, ts_now) / 100
+                    )
                     proceeds = st["shares"] * sell_price
-                    partial_procs = (st.get("g_partial_proceeds", 0)
-                                     + st.get("p_partial_proceeds", 0)
-                                     + st.get("d_partial_proceeds", 0)
-                                     + st.get("m_partial_proceeds", 0)
-                                     + st.get("v_partial_proceeds", 0)
-                                     + st.get("l_partial_proceeds", 0)
-                                     + st.get("o_partial_proceeds", 0)
-                                     + st.get("b_partial_proceeds", 0)
-                                     + st.get("k_partial_proceeds", 0)
-                                     + st.get("c_partial_proceeds", 0)
-                                     + st.get("s_partial_proceeds", 0)
-                                     + st.get("e_partial_proceeds", 0)
-                                     + st.get("i_partial_proceeds", 0)
-                                     + st.get("j_partial_proceeds", 0)
-                                     + st.get("n_partial_proceeds", 0))
+                    partial_procs = (
+                        st.get("g_partial_proceeds", 0)
+                        + st.get("p_partial_proceeds", 0)
+                        + st.get("d_partial_proceeds", 0)
+                        + st.get("m_partial_proceeds", 0)
+                        + st.get("v_partial_proceeds", 0)
+                        + st.get("l_partial_proceeds", 0)
+                        + st.get("o_partial_proceeds", 0)
+                        + st.get("b_partial_proceeds", 0)
+                        + st.get("k_partial_proceeds", 0)
+                        + st.get("c_partial_proceeds", 0)
+                        + st.get("s_partial_proceeds", 0)
+                        + st.get("e_partial_proceeds", 0)
+                        + st.get("i_partial_proceeds", 0)
+                        + st.get("j_partial_proceeds", 0)
+                        + st.get("n_partial_proceeds", 0)
+                    )
                     st["pnl"] = partial_procs + proceeds - st["position_cost"]
                     st["exit_price"] = price
                     st["exit_time"] = ts_now
@@ -1643,7 +2072,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["p_trailing_active"]:
-                        trail_stop = st["p_highest_since_entry"] * (1 - P_TRAIL_PCT / 100)
+                        trail_stop = st["p_highest_since_entry"] * (
+                            1 - P_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1665,7 +2096,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         tgt1 = st["entry_price"] * (1 + P_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (P_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
+                            sell_price = tgt1 * (
+                                1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
+                            )
                             partial_proceeds = partial_shares * sell_price
                             st["p_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
@@ -1673,7 +2106,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
                                 # Sold everything (shouldn't happen with 25%)
-                                st["pnl"] = st["p_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["p_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -1704,7 +2139,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["d_trailing_active"]:
-                        trail_stop = st["d_highest_since_entry"] * (1 - D_TRAIL_PCT / 100)
+                        trail_stop = st["d_highest_since_entry"] * (
+                            1 - D_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1726,14 +2163,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         tgt1 = st["entry_price"] * (1 + D_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (D_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
+                            sell_price = tgt1 * (
+                                1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
+                            )
                             partial_proceeds = partial_shares * sell_price
                             st["d_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
                             st["d_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
-                                st["pnl"] = st["d_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["d_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -1764,7 +2205,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["m_trailing_active"]:
-                        trail_stop = st["m_highest_since_entry"] * (1 - M_TRAIL_PCT / 100)
+                        trail_stop = st["m_highest_since_entry"] * (
+                            1 - M_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1786,14 +2229,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         tgt1 = st["entry_price"] * (1 + M_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (M_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
+                            sell_price = tgt1 * (
+                                1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
+                            )
                             partial_proceeds = partial_shares * sell_price
                             st["m_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
                             st["m_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
-                                st["pnl"] = st["m_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["m_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -1816,7 +2263,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["v_trailing_active"]:
-                        trail_stop = st["v_highest_since_entry"] * (1 - V_TRAIL_PCT / 100)
+                        trail_stop = st["v_highest_since_entry"] * (
+                            1 - V_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1837,14 +2286,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         tgt1 = st["entry_price"] * (1 + V_TARGET1_PCT / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (V_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
+                            sell_price = tgt1 * (
+                                1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
+                            )
                             partial_proceeds = partial_shares * sell_price
                             st["v_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
                             st["v_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
-                                st["pnl"] = st["v_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["v_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -1873,7 +2326,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["l_trailing_active"]:
-                        trail_stop = st["l_highest_since_entry"] * (1 - L_TRAIL_PCT / 100)
+                        trail_stop = st["l_highest_since_entry"] * (
+                            1 - L_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1895,14 +2350,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         tgt1 = st["entry_price"] * (1 + st["l_target1_pct"] / 100)
                         if c_high >= tgt1:
                             partial_shares = st["shares"] * (L_PARTIAL_SELL_PCT / 100)
-                            sell_price = tgt1 * (1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100)
+                            sell_price = tgt1 * (
+                                1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
+                            )
                             partial_proceeds = partial_shares * sell_price
                             st["l_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
                             st["l_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
-                                st["pnl"] = st["l_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["l_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -1931,8 +2390,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["x_trailing_active"]:
-                        trail_stop = (st["x_highest_since_entry"]
-                                      * (1 - X_TRAIL_PCT / 100))
+                        trail_stop = st["x_highest_since_entry"] * (
+                            1 - X_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -1967,7 +2427,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["r_trailing_active"]:
-                        trail_stop = st["r_highest_since_entry"] * (1 - R_TRAIL_PCT / 100)
+                        trail_stop = st["r_highest_since_entry"] * (
+                            1 - R_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -2003,7 +2465,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 1. Trailing stop (if active)
                     if st["w_trailing_active"]:
-                        trail_stop = st["w_highest_since_entry"] * (1 - W_TRAIL_PCT / 100)
+                        trail_stop = st["w_highest_since_entry"] * (
+                            1 - W_TRAIL_PCT / 100
+                        )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
@@ -2029,21 +2493,101 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     continue
 
                 # ===== NEW STRATEGIES (O,B,K,C,S,E,I,J,N): generic exit logic =====
-                if st["strategy"] in ("O","B","K","C","S","E","I","J","N"):
+                if st["strategy"] in ("O", "B", "K", "C", "S", "E", "I", "J", "N"):
                     _strat = st["strategy"].lower()
                     # Strategy-specific params lookup
                     _exit_cfg = {
-                        "o": (O_TARGET1_PCT, O_TARGET2_PCT, O_STOP_PCT, O_TRAIL_PCT, O_TRAIL_ACTIVATE_PCT, O_PARTIAL_SELL_PCT, O_TIME_LIMIT_MINUTES),
-                        "b": (B_TARGET1_PCT, B_TARGET2_PCT, B_STOP_PCT, B_TRAIL_PCT, B_TRAIL_ACTIVATE_PCT, B_PARTIAL_SELL_PCT, B_TIME_LIMIT_MINUTES),
-                        "k": (K_TARGET1_PCT, K_TARGET2_PCT, K_STOP_PCT, K_TRAIL_PCT, K_TRAIL_ACTIVATE_PCT, K_PARTIAL_SELL_PCT, K_TIME_LIMIT_MINUTES),
-                        "c": (C_TARGET1_PCT, C_TARGET2_PCT, C_STOP_PCT, C_TRAIL_PCT, C_TRAIL_ACTIVATE_PCT, C_PARTIAL_SELL_PCT, C_TIME_LIMIT_MINUTES),
-                        "s": (S_TARGET1_PCT, S_TARGET2_PCT, S_STOP_PCT, S_TRAIL_PCT, S_TRAIL_ACTIVATE_PCT, S_PARTIAL_SELL_PCT, S_TIME_LIMIT_MINUTES),
-                        "e": (E_TARGET1_PCT, E_TARGET2_PCT, E_STOP_PCT, E_TRAIL_PCT, E_TRAIL_ACTIVATE_PCT, E_PARTIAL_SELL_PCT, E_TIME_LIMIT_MINUTES),
-                        "i": (I_TARGET1_PCT, I_TARGET2_PCT, I_STOP_PCT, I_TRAIL_PCT, I_TRAIL_ACTIVATE_PCT, I_PARTIAL_SELL_PCT, I_TIME_LIMIT_MINUTES),
-                        "j": (J_TARGET1_PCT, J_TARGET2_PCT, J_STOP_PCT, J_TRAIL_PCT, J_TRAIL_ACTIVATE_PCT, J_PARTIAL_SELL_PCT, J_TIME_LIMIT_MINUTES),
-                        "n": (N_TARGET1_PCT, N_TARGET2_PCT, N_STOP_PCT, N_TRAIL_PCT, N_TRAIL_ACTIVATE_PCT, N_PARTIAL_SELL_PCT, N_TIME_LIMIT_MINUTES),
+                        "o": (
+                            O_TARGET1_PCT,
+                            O_TARGET2_PCT,
+                            O_STOP_PCT,
+                            O_TRAIL_PCT,
+                            O_TRAIL_ACTIVATE_PCT,
+                            O_PARTIAL_SELL_PCT,
+                            O_TIME_LIMIT_MINUTES,
+                        ),
+                        "b": (
+                            B_TARGET1_PCT,
+                            B_TARGET2_PCT,
+                            B_STOP_PCT,
+                            B_TRAIL_PCT,
+                            B_TRAIL_ACTIVATE_PCT,
+                            B_PARTIAL_SELL_PCT,
+                            B_TIME_LIMIT_MINUTES,
+                        ),
+                        "k": (
+                            K_TARGET1_PCT,
+                            K_TARGET2_PCT,
+                            K_STOP_PCT,
+                            K_TRAIL_PCT,
+                            K_TRAIL_ACTIVATE_PCT,
+                            K_PARTIAL_SELL_PCT,
+                            K_TIME_LIMIT_MINUTES,
+                        ),
+                        "c": (
+                            C_TARGET1_PCT,
+                            C_TARGET2_PCT,
+                            C_STOP_PCT,
+                            C_TRAIL_PCT,
+                            C_TRAIL_ACTIVATE_PCT,
+                            C_PARTIAL_SELL_PCT,
+                            C_TIME_LIMIT_MINUTES,
+                        ),
+                        "s": (
+                            S_TARGET1_PCT,
+                            S_TARGET2_PCT,
+                            S_STOP_PCT,
+                            S_TRAIL_PCT,
+                            S_TRAIL_ACTIVATE_PCT,
+                            S_PARTIAL_SELL_PCT,
+                            S_TIME_LIMIT_MINUTES,
+                        ),
+                        "e": (
+                            E_TARGET1_PCT,
+                            E_TARGET2_PCT,
+                            E_STOP_PCT,
+                            E_TRAIL_PCT,
+                            E_TRAIL_ACTIVATE_PCT,
+                            E_PARTIAL_SELL_PCT,
+                            E_TIME_LIMIT_MINUTES,
+                        ),
+                        "i": (
+                            I_TARGET1_PCT,
+                            I_TARGET2_PCT,
+                            I_STOP_PCT,
+                            I_TRAIL_PCT,
+                            I_TRAIL_ACTIVATE_PCT,
+                            I_PARTIAL_SELL_PCT,
+                            I_TIME_LIMIT_MINUTES,
+                        ),
+                        "j": (
+                            J_TARGET1_PCT,
+                            J_TARGET2_PCT,
+                            J_STOP_PCT,
+                            J_TRAIL_PCT,
+                            J_TRAIL_ACTIVATE_PCT,
+                            J_PARTIAL_SELL_PCT,
+                            J_TIME_LIMIT_MINUTES,
+                        ),
+                        "n": (
+                            N_TARGET1_PCT,
+                            N_TARGET2_PCT,
+                            N_STOP_PCT,
+                            N_TRAIL_PCT,
+                            N_TRAIL_ACTIVATE_PCT,
+                            N_PARTIAL_SELL_PCT,
+                            N_TIME_LIMIT_MINUTES,
+                        ),
                     }
-                    tgt1_pct, tgt2_pct, stop_pct, trail_pct, trail_act, partial_pct, time_lim = _exit_cfg[_strat]
+                    (
+                        tgt1_pct,
+                        tgt2_pct,
+                        stop_pct,
+                        trail_pct,
+                        trail_act,
+                        partial_pct,
+                        time_lim,
+                    ) = _exit_cfg[_strat]
                     hkey = f"{_strat}_highest_since_entry"
                     tkey = f"{_strat}_trailing_active"
                     pkey = f"{_strat}_partial_taken"
@@ -2084,7 +2628,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if c_high >= tgt1_price:
                             sell_shares = int(st["shares"] * partial_pct / 100)
                             if sell_shares > 0:
-                                sell_price = tgt1_price * (1 - _exit_slip_pct(tgt1_price, sell_shares, st, ts) / 100)
+                                sell_price = tgt1_price * (
+                                    1
+                                    - _exit_slip_pct(tgt1_price, sell_shares, st, ts)
+                                    / 100
+                                )
                                 proceeds = sell_shares * sell_price
                                 st["shares"] -= sell_shares
                                 st[ppkey] += proceeds
@@ -2116,16 +2664,32 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             _close_position(st, stop_price, "STOP", ts)
                             continue
 
+                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
                     # Trailing stop (active once trail_activate threshold reached)
                     if G_TRAIL_PCT > 0:
-                        unrealized_pct = (st["g_highest_since_entry"] / st["entry_price"] - 1) * 100
+                        unrealized_pct = (
+                            st["g_highest_since_entry"] / st["entry_price"] - 1
+                        ) * 100
                         if unrealized_pct >= G_TRAIL_ACTIVATE_PCT:
-                            trail_stop = st["g_highest_since_entry"] * (1 - G_TRAIL_PCT / 100)
+                            trail_stop = st["g_highest_since_entry"] * (
+                                1 - G_TRAIL_PCT / 100
+                            )
                             if trail_stop > st.get("hgaf_trail_stop", 0):
                                 st["hgaf_trail_stop"] = trail_stop
-                        if st.get("hgaf_trail_stop", 0) > 0 and c_low <= st["hgaf_trail_stop"]:
+                        if (
+                            st.get("hgaf_trail_stop", 0) > 0
+                            and c_low <= st["hgaf_trail_stop"]
+                        ):
                             _close_position(st, st["hgaf_trail_stop"], "TRAIL", ts)
                             continue
+
+                    # Time stop
+                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
 
                     # Partial sell at target1 (G_TARGET_PCT)
                     if G_PARTIAL_SELL_PCT > 0 and not st["g_partial_taken"]:
@@ -2133,14 +2697,20 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if c_high >= tgt1_price:
                             sell_shares = int(st["shares"] * G_PARTIAL_SELL_PCT / 100)
                             if sell_shares > 0:
-                                sell_price = tgt1_price * (1 - _exit_slip_pct(tgt1_price, sell_shares, st, ts) / 100)
+                                sell_price = tgt1_price * (
+                                    1
+                                    - _exit_slip_pct(tgt1_price, sell_shares, st, ts)
+                                    / 100
+                                )
                                 proceeds = sell_shares * sell_price
                                 st["shares"] -= sell_shares
                                 st["g_partial_proceeds"] += proceeds
                                 _receive_proceeds(proceeds)
                             st["g_partial_taken"] = True
                             if st["shares"] <= 0.001:
-                                st["pnl"] = st["g_partial_proceeds"] - st["position_cost"]
+                                st["pnl"] = (
+                                    st["g_partial_proceeds"] - st["position_cost"]
+                                )
                                 st["exit_price"] = tgt1_price
                                 st["exit_time"] = ts
                                 st["exit_reason"] = "TARGET"
@@ -2171,12 +2741,31 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                 # ===== STRATEGIES H/A/F: target + stop + trail + time stop =====
                 strat_map = {
-                    "H": (H_TARGET_PCT, H_TIME_LIMIT_MINUTES, H_STOP_PCT, H_TRAIL_PCT, H_TRAIL_ACTIVATE_PCT),
-                    "A": (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, A_STOP_PCT, A_TRAIL_PCT, A_TRAIL_ACTIVATE_PCT),
-                    "F": (F_TARGET_PCT, F_TIME_LIMIT_MINUTES, F_STOP_PCT, F_TRAIL_PCT, F_TRAIL_ACTIVATE_PCT),
+                    "H": (
+                        H_TARGET_PCT,
+                        H_TIME_LIMIT_MINUTES,
+                        H_STOP_PCT,
+                        H_TRAIL_PCT,
+                        H_TRAIL_ACTIVATE_PCT,
+                    ),
+                    "A": (
+                        A_TARGET_PCT,
+                        A_TIME_LIMIT_MINUTES,
+                        A_STOP_PCT,
+                        A_TRAIL_PCT,
+                        A_TRAIL_ACTIVATE_PCT,
+                    ),
+                    "F": (
+                        F_TARGET_PCT,
+                        F_TIME_LIMIT_MINUTES,
+                        F_STOP_PCT,
+                        F_TRAIL_PCT,
+                        F_TRAIL_ACTIVATE_PCT,
+                    ),
                 }
                 target_pct, time_limit, stop_pct, trail_pct, trail_act = strat_map.get(
-                    st["strategy"], (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, 0, 0, 0))
+                    st["strategy"], (A_TARGET_PCT, A_TIME_LIMIT_MINUTES, 0, 0, 0)
+                )
 
                 # Target hit
                 target_price = st["entry_price"] * (1 + target_pct / 100)
@@ -2198,7 +2787,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         trail_stop = c_high * (1 - trail_pct / 100)
                         if trail_stop > st.get("hgaf_trail_stop", 0):
                             st["hgaf_trail_stop"] = trail_stop
-                    if st.get("hgaf_trail_stop", 0) > 0 and c_low <= st["hgaf_trail_stop"]:
+                    if (
+                        st.get("hgaf_trail_stop", 0) > 0
+                        and c_low <= st["hgaf_trail_stop"]
+                    ):
                         _close_position(st, st["hgaf_trail_stop"], "TRAIL", ts)
                         continue
 
@@ -2223,14 +2815,21 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     st["open_price"] = c_open
 
                 # Phase 1: Pullback from D2 open
-                if not st["r_pullback_seen"] and st["candle_count"] <= R_PULLBACK_WINDOW:
+                if (
+                    not st["r_pullback_seen"]
+                    and st["candle_count"] <= R_PULLBACK_WINDOW
+                ):
                     pullback_level = st["open_price"] * (1 - R_D2_PULLBACK_PCT / 100)
                     if c_low <= pullback_level:
                         st["r_pullback_seen"] = True
 
                 # Phase 2: Bounce above reference
                 if st["r_pullback_seen"] and not st["signal"]:
-                    ref_price = st["r_day1_close"] if R_BOUNCE_REF == "d1_close" else st["open_price"]
+                    ref_price = (
+                        st["r_day1_close"]
+                        if R_BOUNCE_REF == "d1_close"
+                        else st["open_price"]
+                    )
                     if c_close > ref_price:
                         st["strategy"] = "R"
                         st["signal"] = True
@@ -2249,7 +2848,13 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     st["open_price"] = c_open
                     if body_pct > 0:
                         st["first_candle_ok"] = True
-                if not st["first_candle_ok"] and not st.get("l_only") and not st.get("o_only") and not st.get("b_only") and not st.get("e_only"):
+                if (
+                    not st["first_candle_ok"]
+                    and not st.get("l_only")
+                    and not st.get("o_only")
+                    and not st.get("b_only")
+                    and not st.get("e_only")
+                ):
                     st["done"] = True
 
                 # B-only: on candle 1, check if it's RED (that's what R2G needs)
@@ -2270,14 +2875,24 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             st["e_pm_vol_ok"] = True
 
             # CANDLE 2: Classify for H, G, A, F (skip for L/O/B/E-only states)
-            elif st["candle_count"] == 2 and st["first_candle_ok"] and not st.get("l_only") and not st.get("o_only") and not st.get("b_only") and not st.get("e_only"):
+            elif (
+                st["candle_count"] == 2
+                and st["first_candle_ok"]
+                and not st.get("l_only")
+                and not st.get("o_only")
+                and not st.get("b_only")
+                and not st.get("e_only")
+            ):
                 second_green = c_close > c_open
                 second_new_high = c_high > st["first_candle_high"]
                 vol_confirm = float(candle["Volume"]) > st["first_candle_volume"]
 
                 strategy = _classify_candle2(
-                    st["gap_pct"], st["first_candle_body_pct"],
-                    second_green, second_new_high, vol_confirm,
+                    st["gap_pct"],
+                    st["first_candle_body_pct"],
+                    second_green,
+                    second_new_high,
+                    vol_confirm,
                     params=params,
                 )
                 if strategy:
@@ -2334,41 +2949,108 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     entry_candidates.append(st)
 
             # --- All fallback strategies track simultaneously, first to fire wins ---
-            elif (st["d_eligible"] or st["v_eligible"] or st["m_eligible"] or st["p_eligible"] or st["w_eligible"]
-                  or st["l_eligible"] or st["k_eligible"] or st["c_eligible"] or st["s_eligible"]
-                  or st["i_eligible"] or st["j_eligible"] or st["n_eligible"]
-                  or st.get("o_only") or st.get("b_only") or st.get("e_only")) and st["entry_price"] is None and not st["done"]:
+            elif (
+                (
+                    st["d_eligible"]
+                    or st["v_eligible"]
+                    or st["m_eligible"]
+                    or st["p_eligible"]
+                    or st["w_eligible"]
+                    or st["l_eligible"]
+                    or st["k_eligible"]
+                    or st["c_eligible"]
+                    or st["s_eligible"]
+                    or st["i_eligible"]
+                    or st["j_eligible"]
+                    or st["n_eligible"]
+                    or st.get("o_only")
+                    or st.get("b_only")
+                    or st.get("e_only")
+                )
+                and st["entry_price"] is None
+                and not st["done"]
+            ):
                 # Check if ALL strategies have timed out
-                d_timed_out = not st["d_eligible"] or st["candle_count"] > D_MAX_ENTRY_CANDLE
-                v_timed_out = not st["v_eligible"] or st["candle_count"] > V_MAX_ENTRY_CANDLE
-                m_timed_out = not st["m_eligible"] or st["candle_count"] > M_MAX_ENTRY_CANDLE
-                p_timed_out = not st["p_eligible"] or st["candle_count"] > P_MAX_ENTRY_CANDLE
-                w_timed_out = not st["w_eligible"] or st["candle_count"] > W_LATEST_CANDLE
-                l_timed_out = not st["l_eligible"] or st["candle_count"] > L_LATEST_CANDLE
-                k_timed_out = not st["k_eligible"] or st["candle_count"] > K_MAX_ENTRY_CANDLE
-                c_timed_out = not st["c_eligible"] or st["candle_count"] > C_MAX_ENTRY_CANDLE
-                s_timed_out = not st["s_eligible"] or st["candle_count"] > S_MAX_ENTRY_CANDLE
-                o_timed_out = not st["o_eligible"] or st["candle_count"] > O_MAX_ENTRY_CANDLE
-                b_timed_out = not st["b_eligible"] or st["candle_count"] > B_MAX_ENTRY_CANDLE
-                e_timed_out = not st["e_eligible"] or st["candle_count"] > E_MAX_ENTRY_CANDLE
-                i_timed_out = not st["i_eligible"] or st["candle_count"] > I_MAX_ENTRY_CANDLE
-                j_timed_out = not st["j_eligible"] or st["candle_count"] > J_MAX_ENTRY_CANDLE
-                n_timed_out = not st["n_eligible"] or st["candle_count"] > N_MAX_ENTRY_CANDLE
-                if (d_timed_out and v_timed_out and m_timed_out and p_timed_out and w_timed_out
-                    and l_timed_out and k_timed_out and c_timed_out and s_timed_out
-                    and o_timed_out and b_timed_out and e_timed_out
-                    and i_timed_out and j_timed_out and n_timed_out):
+                d_timed_out = (
+                    not st["d_eligible"] or st["candle_count"] > D_MAX_ENTRY_CANDLE
+                )
+                v_timed_out = (
+                    not st["v_eligible"] or st["candle_count"] > V_MAX_ENTRY_CANDLE
+                )
+                m_timed_out = (
+                    not st["m_eligible"] or st["candle_count"] > M_MAX_ENTRY_CANDLE
+                )
+                p_timed_out = (
+                    not st["p_eligible"] or st["candle_count"] > P_MAX_ENTRY_CANDLE
+                )
+                w_timed_out = (
+                    not st["w_eligible"] or st["candle_count"] > W_LATEST_CANDLE
+                )
+                l_timed_out = (
+                    not st["l_eligible"] or st["candle_count"] > L_LATEST_CANDLE
+                )
+                k_timed_out = (
+                    not st["k_eligible"] or st["candle_count"] > K_MAX_ENTRY_CANDLE
+                )
+                c_timed_out = (
+                    not st["c_eligible"] or st["candle_count"] > C_MAX_ENTRY_CANDLE
+                )
+                s_timed_out = (
+                    not st["s_eligible"] or st["candle_count"] > S_MAX_ENTRY_CANDLE
+                )
+                o_timed_out = (
+                    not st["o_eligible"] or st["candle_count"] > O_MAX_ENTRY_CANDLE
+                )
+                b_timed_out = (
+                    not st["b_eligible"] or st["candle_count"] > B_MAX_ENTRY_CANDLE
+                )
+                e_timed_out = (
+                    not st["e_eligible"] or st["candle_count"] > E_MAX_ENTRY_CANDLE
+                )
+                i_timed_out = (
+                    not st["i_eligible"] or st["candle_count"] > I_MAX_ENTRY_CANDLE
+                )
+                j_timed_out = (
+                    not st["j_eligible"] or st["candle_count"] > J_MAX_ENTRY_CANDLE
+                )
+                n_timed_out = (
+                    not st["n_eligible"] or st["candle_count"] > N_MAX_ENTRY_CANDLE
+                )
+                if (
+                    d_timed_out
+                    and v_timed_out
+                    and m_timed_out
+                    and p_timed_out
+                    and w_timed_out
+                    and l_timed_out
+                    and k_timed_out
+                    and c_timed_out
+                    and s_timed_out
+                    and o_timed_out
+                    and b_timed_out
+                    and e_timed_out
+                    and i_timed_out
+                    and j_timed_out
+                    and n_timed_out
+                ):
                     st["done"] = True
                     continue
 
                 # --- D: Opening Dip Buy detection ---
-                if st["d_eligible"] and st["candle_count"] <= D_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["d_eligible"]
+                    and st["candle_count"] <= D_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     # Update spike high
                     if c_high > st["d_spike_high"]:
                         st["d_spike_high"] = c_high
 
                     # Check spike magnitude once we have enough candles
-                    if not st["d_spike_detected"] and st["candle_count"] >= D_SPIKE_WINDOW:
+                    if (
+                        not st["d_spike_detected"]
+                        and st["candle_count"] >= D_SPIKE_WINDOW
+                    ):
                         open_p = st["open_price"]
                         if open_p and open_p > 0:
                             spike_pct = (st["d_spike_high"] / open_p - 1) * 100
@@ -2387,7 +3069,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     if st["d_dip_detected"]:
                         # Get candle index for VWAP lookup
                         candle_idx = st["candle_count"] - 1
-                        vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                        vwap_val = (
+                            st["vwap"][candle_idx]
+                            if candle_idx < len(st["vwap"])
+                            else 0
+                        )
 
                         # Track below-VWAP state
                         if c_close < vwap_val:
@@ -2415,13 +3101,21 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                     entry_candidates.append(st)
 
                 # --- M: Midday Range Break detection ---
-                if st["m_eligible"] and st["candle_count"] <= M_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["m_eligible"]
+                    and st["candle_count"] <= M_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     candle_idx = st["candle_count"] - 1  # 0-based index into mh
 
                     # Phase 1: Morning spike check (once)
                     if not st["m_morning_spike_ok"]:
                         if st["candle_count"] >= M_MORNING_CANDLES:
-                            morning_highs = st["mh"].iloc[:M_MORNING_CANDLES]["High"].values.astype(float)
+                            morning_highs = (
+                                st["mh"]
+                                .iloc[:M_MORNING_CANDLES]["High"]
+                                .values.astype(float)
+                            )
                             morning_high = float(np.max(morning_highs))
                             open_p = st["open_price"]
                             if open_p and open_p > 0:
@@ -2436,7 +3130,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         consol_end_candle = M_RANGE_START_CANDLE + M_CONSOLIDATION_LEN
                         if st["candle_count"] >= consol_end_candle:
                             if len(st["mh"]) >= consol_end_candle:
-                                consol_slice = st["mh"].iloc[M_RANGE_START_CANDLE:consol_end_candle]
+                                consol_slice = st["mh"].iloc[
+                                    M_RANGE_START_CANDLE:consol_end_candle
+                                ]
                                 c_highs = consol_slice["High"].values.astype(float)
                                 c_lows = consol_slice["Low"].values.astype(float)
                                 c_vols = consol_slice["Volume"].values.astype(float)
@@ -2445,15 +3141,28 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 consol_low = float(np.min(c_lows))
 
                                 # Range check
-                                range_pct = (consol_high - consol_low) / consol_high * 100 if consol_high > 0 else 999
+                                range_pct = (
+                                    (consol_high - consol_low) / consol_high * 100
+                                    if consol_high > 0
+                                    else 999
+                                )
                                 if range_pct > M_MAX_RANGE_PCT:
                                     st["m_eligible"] = False
                                 else:
                                     # Volume contraction check
-                                    morning_avg_vol = float(np.mean(
-                                        st["mh"].iloc[:min(30, len(st["mh"]))]["Volume"].values.astype(float)))
+                                    morning_avg_vol = float(
+                                        np.mean(
+                                            st["mh"]
+                                            .iloc[: min(30, len(st["mh"]))]["Volume"]
+                                            .values.astype(float)
+                                        )
+                                    )
                                     consol_avg_vol = float(np.mean(c_vols))
-                                    if morning_avg_vol > 0 and consol_avg_vol / morning_avg_vol > M_VOL_RATIO:
+                                    if (
+                                        morning_avg_vol > 0
+                                        and consol_avg_vol / morning_avg_vol
+                                        > M_VOL_RATIO
+                                    ):
                                         st["m_eligible"] = False
                                     else:
                                         st["m_consol_high"] = consol_high
@@ -2471,9 +3180,15 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             entry_candidates.append(st)
 
                 # --- V: VWAP Reclaim detection ---
-                if st["v_eligible"] and st["candle_count"] <= V_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["v_eligible"]
+                    and st["candle_count"] <= V_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     candle_idx = st["candle_count"] - 1
-                    vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                    vwap_val = (
+                        st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                    )
 
                     if vwap_val > 0:
                         # Track consecutive closes below VWAP
@@ -2485,16 +3200,29 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["v_max_below_pct"] = below_pct
                         else:
                             # Close above VWAP: check if reclaim conditions met
-                            if (st["v_below_count"] >= V_MIN_BELOW_CANDLES
-                                    and st["v_max_below_pct"] >= V_MIN_BELOW_PCT):
+                            if (
+                                st["v_below_count"] >= V_MIN_BELOW_CANDLES
+                                and st["v_max_below_pct"] >= V_MIN_BELOW_PCT
+                            ):
                                 # Volume spike check
                                 if candle_idx >= 10:
-                                    recent_vols = st["mh"].iloc[candle_idx-10:candle_idx]["Volume"].values.astype(float)
-                                    avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+                                    recent_vols = (
+                                        st["mh"]
+                                        .iloc[candle_idx - 10 : candle_idx]["Volume"]
+                                        .values.astype(float)
+                                    )
+                                    avg_vol = (
+                                        float(np.mean(recent_vols))
+                                        if len(recent_vols) > 0
+                                        else 0
+                                    )
                                 else:
                                     avg_vol = 0
                                 cur_vol = float(candle["Volume"])
-                                if avg_vol <= 0 or cur_vol >= avg_vol * V_VOL_SPIKE_RATIO:
+                                if (
+                                    avg_vol <= 0
+                                    or cur_vol >= avg_vol * V_VOL_SPIKE_RATIO
+                                ):
                                     st["strategy"] = "V"
                                     st["signal"] = True
                                     st["signal_price"] = c_close
@@ -2502,17 +3230,25 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 else:
                                     st["v_below_count"] = 0  # Reset, keep tracking
                             else:
-                                st["v_below_count"] = 0  # Reset, not enough below candles
+                                st["v_below_count"] = (
+                                    0  # Reset, not enough below candles
+                                )
 
                 # --- P: PM high breakout + pullback + bounce ---
-                if st["p_eligible"] and st["candle_count"] <= P_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["p_eligible"]
+                    and st["candle_count"] <= P_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     pm_high = st["premarket_high"]
 
                     # Phase 1: Breakout confirmation
                     if not st["p_breakout_confirmed"]:
                         st["p_recent_closes"].append(c_close > pm_high)
                         if len(st["p_recent_closes"]) > P_CONFIRM_WINDOW:
-                            st["p_recent_closes"] = st["p_recent_closes"][-P_CONFIRM_WINDOW:]
+                            st["p_recent_closes"] = st["p_recent_closes"][
+                                -P_CONFIRM_WINDOW:
+                            ]
                         if sum(st["p_recent_closes"]) >= P_CONFIRM_ABOVE:
                             st["p_breakout_confirmed"] = True
 
@@ -2545,22 +3281,32 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             entry_candidates.append(st)
 
                 # --- W: Power Hour Breakout detection ---
-                if st["w_eligible"] and st["candle_count"] <= W_LATEST_CANDLE and not st["signal"]:
+                if (
+                    st["w_eligible"]
+                    and st["candle_count"] <= W_LATEST_CANDLE
+                    and not st["signal"]
+                ):
                     candle_idx = st["candle_count"] - 1
 
                     # Phase 1: Morning run check (at candle 30)
                     if not st["w_morning_run_ok"]:
                         if st["candle_count"] >= 30:
-                            morning_highs = st["mh"].iloc[:30]["High"].values.astype(float)
+                            morning_highs = (
+                                st["mh"].iloc[:30]["High"].values.astype(float)
+                            )
                             morning_high = float(np.max(morning_highs))
-                            morning_vols = st["mh"].iloc[:30]["Volume"].values.astype(float)
+                            morning_vols = (
+                                st["mh"].iloc[:30]["Volume"].values.astype(float)
+                            )
                             open_p = st["open_price"]
                             if open_p and open_p > 0:
                                 run_pct = (morning_high / open_p - 1) * 100
                                 if run_pct >= W_MIN_MORNING_RUN:
                                     st["w_morning_run_ok"] = True
                                     st["w_morning_high"] = morning_high
-                                    st["w_morning_spike_vol"] = float(np.max(morning_vols))
+                                    st["w_morning_spike_vol"] = float(
+                                        np.max(morning_vols)
+                                    )
                                 else:
                                     st["w_eligible"] = False
 
@@ -2568,7 +3314,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     elif not st["w_consol_checked"]:
                         if st["candle_count"] >= W_EARLIEST_CANDLE:
                             if len(st["mh"]) >= W_EARLIEST_CANDLE:
-                                consol_slice = st["mh"].iloc[W_CONSOL_START:W_EARLIEST_CANDLE]
+                                consol_slice = st["mh"].iloc[
+                                    W_CONSOL_START:W_EARLIEST_CANDLE
+                                ]
                                 c_highs_w = consol_slice["High"].values.astype(float)
                                 c_lows_w = consol_slice["Low"].values.astype(float)
                                 c_closes_w = consol_slice["Close"].values.astype(float)
@@ -2578,23 +3326,40 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 w_consol_low = float(np.min(c_lows_w))
 
                                 # Range check
-                                w_range_pct = (w_consol_high - w_consol_low) / w_consol_high * 100 if w_consol_high > 0 else 999
+                                w_range_pct = (
+                                    (w_consol_high - w_consol_low) / w_consol_high * 100
+                                    if w_consol_high > 0
+                                    else 999
+                                )
                                 if w_range_pct > W_MAX_RANGE_PCT:
                                     st["w_eligible"] = False
                                 else:
                                     # VWAP deviation check
-                                    c_vwap_w = st["vwap"][W_CONSOL_START:W_EARLIEST_CANDLE]
+                                    c_vwap_w = st["vwap"][
+                                        W_CONSOL_START:W_EARLIEST_CANDLE
+                                    ]
                                     min_len = min(len(c_closes_w), len(c_vwap_w))
                                     if min_len > 0 and np.all(c_vwap_w[:min_len] > 0):
-                                        vwap_devs = np.abs(c_closes_w[:min_len] - c_vwap_w[:min_len]) / c_vwap_w[:min_len] * 100
+                                        vwap_devs = (
+                                            np.abs(
+                                                c_closes_w[:min_len]
+                                                - c_vwap_w[:min_len]
+                                            )
+                                            / c_vwap_w[:min_len]
+                                            * 100
+                                        )
                                         max_dev = float(np.max(vwap_devs))
                                         if max_dev > W_MAX_VWAP_DEV_PCT:
                                             st["w_eligible"] = False
                                         else:
                                             # HOD breaks check
                                             hod_breaks = 0
-                                            running_hod = float(st["mh"].iloc[0]["High"])
-                                            for k in range(1, min(W_EARLIEST_CANDLE, len(st["mh"]))):
+                                            running_hod = float(
+                                                st["mh"].iloc[0]["High"]
+                                            )
+                                            for k in range(
+                                                1, min(W_EARLIEST_CANDLE, len(st["mh"]))
+                                            ):
                                                 kh = float(st["mh"].iloc[k]["High"])
                                                 if kh > running_hod:
                                                     hod_breaks += 1
@@ -2604,7 +3369,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                             else:
                                                 st["w_consol_checked"] = True
                                                 st["w_consol_high"] = w_consol_high
-                                                st["w_consol_avg_vol"] = float(np.mean(c_vols_w))
+                                                st["w_consol_avg_vol"] = float(
+                                                    np.mean(c_vols_w)
+                                                )
                                                 st["w_breakout_ready"] = True
                                     else:
                                         st["w_eligible"] = False
@@ -2616,11 +3383,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if c_close > st["w_consol_high"]:
                             cur_vol = float(candle["Volume"])
                             # Volume surge vs consolidation avg
-                            vol_ok = (st["w_consol_avg_vol"] <= 0 or
-                                      cur_vol >= st["w_consol_avg_vol"] * W_VOL_SURGE_MULT)
+                            vol_ok = (
+                                st["w_consol_avg_vol"] <= 0
+                                or cur_vol >= st["w_consol_avg_vol"] * W_VOL_SURGE_MULT
+                            )
                             # Volume vs morning spike
-                            morning_vol_ok = (st["w_morning_spike_vol"] <= 0 or
-                                             cur_vol >= st["w_morning_spike_vol"] * W_VOL_VS_MORNING_MULT)
+                            morning_vol_ok = (
+                                st["w_morning_spike_vol"] <= 0
+                                or cur_vol
+                                >= st["w_morning_spike_vol"] * W_VOL_VS_MORNING_MULT
+                            )
                             # VWAP filter
                             vwap_ok = True
                             if W_REQUIRE_ABOVE_VWAP and candle_idx < len(st["vwap"]):
@@ -2633,7 +3405,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 entry_candidates.append(st)
 
                 # --- O: Opening Range Breakout detection (O-only states) ---
-                if st["o_eligible"] and st["candle_count"] <= O_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["o_eligible"]
+                    and st["candle_count"] <= O_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     if not st["o_range_formed"]:
                         # Building opening range
@@ -2649,8 +3425,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     else:
                         # Range formed — look for breakout above range high
                         if c_close > st["o_range_high"]:
-                            vol_ok = (st["o_range_avg_vol"] <= 0
-                                      or c_vol >= O_BREAKOUT_VOL_MULT * st["o_range_avg_vol"])
+                            vol_ok = (
+                                st["o_range_avg_vol"] <= 0
+                                or c_vol >= O_BREAKOUT_VOL_MULT * st["o_range_avg_vol"]
+                            )
                             if vol_ok:
                                 st["strategy"] = "O"
                                 st["signal"] = True
@@ -2658,7 +3436,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 entry_candidates.append(st)
 
                 # --- B: Red-to-Green (R2G) detection (B-only states) ---
-                if st["b_eligible"] and st.get("b_candle1_red") and st["candle_count"] <= B_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["b_eligible"]
+                    and st.get("b_candle1_red")
+                    and st["candle_count"] <= B_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     open_p = st["b_open_price"]
                     if open_p > 0:
@@ -2677,7 +3460,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                         # After dip: look for reclaim back above open with volume
                         if st["b_dip_seen"] and c_close > open_p:
-                            vol_ok = avg_vol <= 0 or c_vol >= B_MIN_RECLAIM_VOL_MULT * avg_vol
+                            vol_ok = (
+                                avg_vol <= 0
+                                or c_vol >= B_MIN_RECLAIM_VOL_MULT * avg_vol
+                            )
                             if vol_ok:
                                 st["strategy"] = "B"
                                 st["signal"] = True
@@ -2685,7 +3471,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 entry_candidates.append(st)
 
                 # --- K: First Pullback Buy detection ---
-                if st["k_eligible"] and st["candle_count"] <= K_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["k_eligible"]
+                    and st["candle_count"] <= K_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     open_p = st["open_price"] or c_open
                     if not st["k_run_detected"]:
@@ -2705,25 +3495,45 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             st["k_pullback_low"] = c_low
                         st["k_pullback_vol_sum"] += c_vol
                         st["k_pullback_candles"] += 1
-                        pullback_pct = (st["k_run_high"] - st["k_pullback_low"]) / st["k_run_high"] * 100
+                        pullback_pct = (
+                            (st["k_run_high"] - st["k_pullback_low"])
+                            / st["k_run_high"]
+                            * 100
+                        )
                         if pullback_pct >= K_PULLBACK_PCT:
                             # Check if pullback was orderly (low volume)
                             avg_run_vol = st["k_run_vol_sum"] / max(K_RUN_WINDOW, 1)
-                            avg_pb_vol = st["k_pullback_vol_sum"] / max(st["k_pullback_candles"], 1)
-                            if avg_run_vol <= 0 or avg_pb_vol <= K_PULLBACK_VOL_RATIO * avg_run_vol:
+                            avg_pb_vol = st["k_pullback_vol_sum"] / max(
+                                st["k_pullback_candles"], 1
+                            )
+                            if (
+                                avg_run_vol <= 0
+                                or avg_pb_vol <= K_PULLBACK_VOL_RATIO * avg_run_vol
+                            ):
                                 st["k_pullback_detected"] = True
                     else:
                         # Phase 3: Bounce with volume
-                        avg_pb_vol = st["k_pullback_vol_sum"] / max(st["k_pullback_candles"], 1)
-                        vol_ok = avg_pb_vol <= 0 or c_vol >= K_BOUNCE_VOL_MULT * avg_pb_vol
-                        if c_close > st["k_pullback_low"] * (1 + K_PULLBACK_PCT / 100) and vol_ok:
+                        avg_pb_vol = st["k_pullback_vol_sum"] / max(
+                            st["k_pullback_candles"], 1
+                        )
+                        vol_ok = (
+                            avg_pb_vol <= 0 or c_vol >= K_BOUNCE_VOL_MULT * avg_pb_vol
+                        )
+                        if (
+                            c_close > st["k_pullback_low"] * (1 + K_PULLBACK_PCT / 100)
+                            and vol_ok
+                        ):
                             st["strategy"] = "K"
                             st["signal"] = True
                             st["signal_price"] = c_close
                             entry_candidates.append(st)
 
                 # --- C: Micro Flag / Base Pattern detection ---
-                if st["c_eligible"] and st["candle_count"] <= C_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["c_eligible"]
+                    and st["candle_count"] <= C_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     open_p = st["open_price"] or c_open
                     if not st["c_spike_detected"]:
@@ -2744,7 +3554,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             st["c_base_low"] = c_low
                         # Check if range is still tight
                         if st["c_base_low"] > 0:
-                            base_range = (st["c_base_high"] - st["c_base_low"]) / st["c_base_low"] * 100
+                            base_range = (
+                                (st["c_base_high"] - st["c_base_low"])
+                                / st["c_base_low"]
+                                * 100
+                            )
                             if base_range > C_MAX_BASE_RANGE_PCT:
                                 # Range broken — reset base tracking
                                 st["c_spike_detected"] = False
@@ -2757,7 +3571,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if c_close > st["c_base_high"]:
                             # Need min candles in base
                             if st["c_base_candle_count"] >= C_MIN_BASE_CANDLES:
-                                vol_ok = c_vol >= C_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                                vol_ok = c_vol >= C_BREAKOUT_VOL_MULT * (
+                                    st.get("first_candle_volume", c_vol) or c_vol
+                                )
                                 if vol_ok:
                                     st["strategy"] = "C"
                                     st["signal"] = True
@@ -2767,7 +3583,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["c_eligible"] = False
 
                 # --- S: Stuff-and-Break detection ---
-                if st["s_eligible"] and st["candle_count"] <= S_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["s_eligible"]
+                    and st["candle_count"] <= S_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     # Track HOD
                     if c_high > st["s_hod"]:
@@ -2778,7 +3598,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if st["s_hod_tests"] >= S_MIN_HOD_TESTS and old_hod > 0:
                             break_pct = (c_high - old_hod) / old_hod * 100
                             if break_pct > 0:
-                                vol_ok = c_vol >= S_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                                vol_ok = c_vol >= S_BREAKOUT_VOL_MULT * (
+                                    st.get("first_candle_volume", c_vol) or c_vol
+                                )
                                 if vol_ok:
                                     st["strategy"] = "S"
                                     st["signal"] = True
@@ -2798,7 +3620,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["s_rejected"] = False  # Reset for next test
 
                 # --- E: Gap-and-Go RelVol detection (E-only states) ---
-                if st["e_eligible"] and st.get("e_pm_vol_ok") and st["candle_count"] <= E_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["e_eligible"]
+                    and st.get("e_pm_vol_ok")
+                    and st["candle_count"] <= E_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     # Enter on first green candle with elevated volume
                     if c_close > c_open:
                         st["strategy"] = "E"
@@ -2807,11 +3634,17 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         entry_candidates.append(st)
 
                 # --- I: P1 Immediate PM High Breakout detection ---
-                if st["i_eligible"] and st["candle_count"] <= I_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["i_eligible"]
+                    and st["candle_count"] <= I_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     c_vol = float(candle["Volume"])
                     pm_high = st["premarket_high"]
                     if pm_high > 0 and c_close > pm_high:
-                        vol_ok = c_vol >= I_BREAKOUT_VOL_MULT * (st.get("first_candle_volume", c_vol) or c_vol)
+                        vol_ok = c_vol >= I_BREAKOUT_VOL_MULT * (
+                            st.get("first_candle_volume", c_vol) or c_vol
+                        )
                         if vol_ok:
                             st["strategy"] = "I"
                             st["signal"] = True
@@ -2819,10 +3652,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             entry_candidates.append(st)
 
                 # --- J: P3 VWAP + PM High Breakout detection ---
-                if st["j_eligible"] and st["candle_count"] <= J_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["j_eligible"]
+                    and st["candle_count"] <= J_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     pm_high = st["premarket_high"]
                     candle_idx = st["candle_count"] - 1
-                    vwap_val = st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                    vwap_val = (
+                        st["vwap"][candle_idx] if candle_idx < len(st["vwap"]) else 0
+                    )
                     if pm_high > 0 and vwap_val > 0:
                         # Price must be near VWAP AND breaking above PM high
                         vwap_dist = abs(c_close - vwap_val) / vwap_val * 100
@@ -2833,7 +3672,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             entry_candidates.append(st)
 
                 # --- N: P4 HOD Reclaim detection ---
-                if st["n_eligible"] and st["candle_count"] <= N_MAX_ENTRY_CANDLE and not st["signal"]:
+                if (
+                    st["n_eligible"]
+                    and st["candle_count"] <= N_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
                     # Track HOD
                     if c_high > st["n_hod"]:
                         if st["n_hod"] > 0 and st["n_pullback_seen"]:
@@ -2855,24 +3698,51 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                 # --- L: Low Float Squeeze detection ---
                 # Always track HOD for L-eligible stocks
-                if st["l_eligible"] and not st["signal"] and c_high > st["l_running_hod"]:
+                if (
+                    st["l_eligible"]
+                    and not st["signal"]
+                    and c_high > st["l_running_hod"]
+                ):
                     st["l_running_hod"] = c_high
-                if st["l_eligible"] and st["candle_count"] >= L_EARLIEST_CANDLE and st["candle_count"] <= L_LATEST_CANDLE and not st["signal"]:
+                if (
+                    st["l_eligible"]
+                    and st["candle_count"] >= L_EARLIEST_CANDLE
+                    and st["candle_count"] <= L_LATEST_CANDLE
+                    and not st["signal"]
+                ):
                     candle_idx = st["candle_count"] - 1
 
                     # Check if this candle made a new HOD (already tracked above)
-                    is_new_hod = (c_high >= st["l_running_hod"]) and (st["l_running_hod"] > 0)
+                    is_new_hod = (c_high >= st["l_running_hod"]) and (
+                        st["l_running_hod"] > 0
+                    )
 
                     # 1. HOD break check
                     if not L_HOD_BREAK_REQUIRED or is_new_hod:
                         # 2. Volume surge check
                         c_vol = float(candle["Volume"])
                         if candle_idx >= 10:
-                            recent_vols = st["mh"].iloc[candle_idx-10:candle_idx]["Volume"].values.astype(float)
-                            avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+                            recent_vols = (
+                                st["mh"]
+                                .iloc[candle_idx - 10 : candle_idx]["Volume"]
+                                .values.astype(float)
+                            )
+                            avg_vol = (
+                                float(np.mean(recent_vols))
+                                if len(recent_vols) > 0
+                                else 0
+                            )
                         else:
-                            recent_vols = st["mh"].iloc[:candle_idx]["Volume"].values.astype(float)
-                            avg_vol = float(np.mean(recent_vols)) if len(recent_vols) > 0 else 0
+                            recent_vols = (
+                                st["mh"]
+                                .iloc[:candle_idx]["Volume"]
+                                .values.astype(float)
+                            )
+                            avg_vol = (
+                                float(np.mean(recent_vols))
+                                if len(recent_vols) > 0
+                                else 0
+                            )
 
                         vol_ok_l = avg_vol <= 0 or c_vol >= avg_vol * L_VOL_SURGE_MULT
 
@@ -2925,9 +3795,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         op = st["x_open_price"] or c_open
                         if op > 0 and st["x_first_leg_peak_high"] > 0:
                             first_leg_gain_pct = (
-                                st["x_first_leg_peak_high"] - op) / op * 100
-                            if (first_leg_gain_pct >= X_MIN_FIRST_LEG_GAIN_PCT
-                                    and st["x_first_leg_peak_idx"] > 0):
+                                (st["x_first_leg_peak_high"] - op) / op * 100
+                            )
+                            if (
+                                first_leg_gain_pct >= X_MIN_FIRST_LEG_GAIN_PCT
+                                and st["x_first_leg_peak_idx"] > 0
+                            ):
                                 st["x_eligible"] = True
                                 st["x_trough_low"] = c_low
                                 st["x_trough_idx"] = st["candle_count"]
@@ -2942,8 +3815,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         # Time-of-day cutoff
                         try:
                             ts_et_x = ts.astimezone(ET_TZ)
-                            hhmm_now = (f"{ts_et_x.hour:02d}:"
-                                        f"{ts_et_x.minute:02d}")
+                            hhmm_now = f"{ts_et_x.hour:02d}:{ts_et_x.minute:02d}"
                         except Exception:
                             hhmm_now = "00:00"
                         if hhmm_now > X_MAX_ENTRY_HHMM:
@@ -2953,39 +3825,50 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         trough = st["x_trough_low"]
                         if peak > 0 and trough > 0 and c_close > 0:
                             pullback_pct = (peak - trough) / peak * 100
-                            recovery_pct = (
-                                c_close - trough) / trough * 100
+                            recovery_pct = (c_close - trough) / trough * 100
                             bars_since_peak = (
-                                st["candle_count"] - st["x_first_leg_peak_idx"])
-                            is_green = ((not X_ENTRY_REQUIRE_GREEN)
-                                        or (c_close > c_open))
+                                st["candle_count"] - st["x_first_leg_peak_idx"]
+                            )
+                            is_green = (not X_ENTRY_REQUIRE_GREEN) or (c_close > c_open)
                             n_avg = max(1, len(st["x_recent_volumes"]) - 1)
                             vol_avg = (
                                 sum(st["x_recent_volumes"][:-1]) / n_avg
-                                if len(st["x_recent_volumes"]) > 1 else 0)
-                            vol_ok = (vol_avg <= 0
-                                      or cur_vol >= vol_avg * X_MIN_VOL_VS_AVG)
+                                if len(st["x_recent_volumes"]) > 1
+                                else 0
+                            )
+                            vol_ok = (
+                                vol_avg <= 0 or cur_vol >= vol_avg * X_MIN_VOL_VS_AVG
+                            )
 
                             # Pre-compute target so we can require c_close < target
                             # (no point entering above the target — guaranteed loss)
                             tentative_target = peak * X_TARGET_PCT_OF_PEAK / 100
                             entry_room = (tentative_target - c_close) / c_close * 100
 
-                            if (pullback_pct >= X_MIN_PULLBACK_PCT
-                                    and bars_since_peak >= X_MIN_BARS_SINCE_PEAK
-                                    and recovery_pct >= X_MIN_RECOVERY_PCT
-                                    and is_green and vol_ok
-                                    and entry_room >= X_MIN_ENTRY_ROOM_PCT):
+                            if (
+                                pullback_pct >= X_MIN_PULLBACK_PCT
+                                and bars_since_peak >= X_MIN_BARS_SINCE_PEAK
+                                and recovery_pct >= X_MIN_RECOVERY_PCT
+                                and is_green
+                                and vol_ok
+                                and entry_room >= X_MIN_ENTRY_ROOM_PCT
+                            ):
                                 st["x_target_price"] = tentative_target
-                                st["x_stop_price"] = (
-                                    trough * (1 - X_STOP_PCT_BELOW_TROUGH / 100))
+                                st["x_stop_price"] = trough * (
+                                    1 - X_STOP_PCT_BELOW_TROUGH / 100
+                                )
                                 st["strategy"] = "X"
                                 st["signal"] = True
                                 st["signal_price"] = c_close
                                 entry_candidates.append(st)
 
         # --- PASS 2: Capital allocation (single pool) ---
-        entry_candidates.sort(key=lambda s: (STRAT_PRIORITY.get(s["strategy"], 99), -s["first_candle_body_pct"]))
+        entry_candidates.sort(
+            key=lambda s: (
+                STRAT_PRIORITY.get(s["strategy"], 99),
+                -s["first_candle_body_pct"],
+            )
+        )
 
         filled_this_ts = []
         skipped_this_ts = []
@@ -3025,6 +3908,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             if NEWS_MODULATOR_ENABLED and _trade_date_str and st.get("ticker"):
                 try:
                     import news_filter as _nf
+
                     _n_art, _ = _nf.count_pit(st["ticker"], _trade_date_str)
                     if _n_art >= NEWS_OVERCROWDED_THRESHOLD:
                         _news_mult = NEWS_OVERCROWDED_MULT
@@ -3054,6 +3938,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 tr2 = (pre_atr_tail["High"] - prev_close).abs()
                 tr3 = (pre_atr_tail["Low"] - prev_close).abs()
                 import pandas as _pd
+
                 _atr = _pd.concat([tr1, tr2, tr3], axis=1).max(axis=1).mean()
                 last_close = float(pre_atr_tail["Close"].iloc[-1])
                 _atr_pct = (_atr / last_close * 100) if last_close > 0 else 0
@@ -3076,8 +3961,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 vol_limit = dollar_vol * (VOL_CAP_PCT / 100)
 
                 if USE_MULTIWINDOW_SLIPPAGE:
-                    v_eff_adj, dollar_vol_2min, _v_local, v_regime = \
+                    v_eff_adj, dollar_vol_2min, _v_local, v_regime = (
                         _multi_window_effective_volume(st["mh"], ts, fill_price)
+                    )
                     # Cap 2: regime cap (8% of 10-min)
                     if MAX_REGIME_PARTICIPATION > 0:
                         vol_limit = min(vol_limit, v_regime * MAX_REGIME_PARTICIPATION)
@@ -3113,7 +3999,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             # Pick the slippage-impact denominator that matches the binding liquidity model.
             if USE_MULTIWINDOW_SLIPPAGE:
                 if v_eff_adj == 0.0:
-                    v_eff_adj, _, _, _ = _multi_window_effective_volume(st["mh"], ts, fill_price)
+                    v_eff_adj, _, _, _ = _multi_window_effective_volume(
+                        st["mh"], ts, fill_price
+                    )
                 slip_dollar_vol = v_eff_adj
             elif USE_2MIN_SLIPPAGE:
                 if dollar_vol_2min == 0.0:
@@ -3153,10 +4041,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
         # Log selection decisions when strategies were skipped
         if filled_this_ts and skipped_this_ts:
-            selection_log.append({
-                "filled": list(filled_this_ts),
-                "skipped": list(skipped_this_ts),
-            })
+            selection_log.append(
+                {
+                    "filled": list(filled_this_ts),
+                    "skipped": list(skipped_this_ts),
+                }
+            )
 
     # EOD: close remaining (skipped in live mode — engine manages real EOD)
     if is_live:
@@ -3165,22 +4055,26 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
         if st["entry_price"] is not None and st["shares"] > 0:
             last_ts = st["mh"].index[-1]
             last_close = float(st["mh"].iloc[-1]["Close"])
-            sell_price = last_close * (1 - _exit_slip_pct(last_close, st["shares"], st, last_ts) / 100)
+            sell_price = last_close * (
+                1 - _exit_slip_pct(last_close, st["shares"], st, last_ts) / 100
+            )
             proceeds = st["shares"] * sell_price
-            partial_procs = (st.get("p_partial_proceeds", 0)
-                             + st.get("d_partial_proceeds", 0)
-                             + st.get("m_partial_proceeds", 0)
-                             + st.get("v_partial_proceeds", 0)
-                             + st.get("l_partial_proceeds", 0)
-                             + st.get("o_partial_proceeds", 0)
-                             + st.get("b_partial_proceeds", 0)
-                             + st.get("k_partial_proceeds", 0)
-                             + st.get("c_partial_proceeds", 0)
-                             + st.get("s_partial_proceeds", 0)
-                             + st.get("e_partial_proceeds", 0)
-                             + st.get("i_partial_proceeds", 0)
-                             + st.get("j_partial_proceeds", 0)
-                             + st.get("n_partial_proceeds", 0))
+            partial_procs = (
+                st.get("p_partial_proceeds", 0)
+                + st.get("d_partial_proceeds", 0)
+                + st.get("m_partial_proceeds", 0)
+                + st.get("v_partial_proceeds", 0)
+                + st.get("l_partial_proceeds", 0)
+                + st.get("o_partial_proceeds", 0)
+                + st.get("b_partial_proceeds", 0)
+                + st.get("k_partial_proceeds", 0)
+                + st.get("c_partial_proceeds", 0)
+                + st.get("s_partial_proceeds", 0)
+                + st.get("e_partial_proceeds", 0)
+                + st.get("i_partial_proceeds", 0)
+                + st.get("j_partial_proceeds", 0)
+                + st.get("n_partial_proceeds", 0)
+            )
             st["pnl"] = partial_procs + proceeds - st["position_cost"]
             st["exit_price"] = last_close
             st["exit_time"] = last_ts
@@ -3201,43 +4095,116 @@ if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if a not in ("--no-charts", "--explain")]
     data_dirs = args if args else ["stored_data_combined"]
 
-    STRAT_KEYS = ["H","G","A","F","D","V","P","M","R","W","O","B","K","C","S","E","I","J","N","L"]
+    STRAT_KEYS = [
+        "H",
+        "G",
+        "A",
+        "F",
+        "D",
+        "V",
+        "P",
+        "M",
+        "R",
+        "W",
+        "O",
+        "B",
+        "K",
+        "C",
+        "S",
+        "E",
+        "I",
+        "J",
+        "N",
+        "L",
+    ]
 
     print(f"Combined Green Candle Strategy (H+G+A+F+D+V+M+R+P+W) Backtest")
-    print(f"{'='*70}")
-    print(f"  Strategy H: Gap>={H_MIN_GAP_PCT}% + body>={H_MIN_BODY_PCT}% + 2nd green + new hi + vol confirm")
-    print(f"              Target: +{H_TARGET_PCT}% | Time Stop: {H_TIME_LIMIT_MINUTES} min")
+    print(f"{'=' * 70}")
+    print(
+        f"  Strategy H: Gap>={H_MIN_GAP_PCT}% + body>={H_MIN_BODY_PCT}% + 2nd green + new hi + vol confirm"
+    )
+    print(
+        f"              Target: +{H_TARGET_PCT}% | Time Stop: {H_TIME_LIMIT_MINUTES} min"
+    )
     print(f"  Strategy G: Gap>={G_MIN_GAP_PCT}% + 2nd green + new hi")
-    print(f"              Target: +{G_TARGET_PCT}% | Time Stop: {G_TIME_LIMIT_MINUTES} min")
-    print(f"  Strategy A: Gap>{A_MIN_GAP_PCT}% + body>={A_MIN_BODY_PCT}% + 2nd green + new hi")
-    print(f"              Target: +{A_TARGET_PCT}% | Time Stop: {A_TIME_LIMIT_MINUTES} min")
+    print(
+        f"              Target: +{G_TARGET_PCT}% | Time Stop: {G_TIME_LIMIT_MINUTES} min"
+    )
+    print(
+        f"  Strategy A: Gap>{A_MIN_GAP_PCT}% + body>={A_MIN_BODY_PCT}% + 2nd green + new hi"
+    )
+    print(
+        f"              Target: +{A_TARGET_PCT}% | Time Stop: {A_TIME_LIMIT_MINUTES} min"
+    )
     print(f"  Strategy F: Gap>{F_MIN_GAP_PCT}% + 2nd green (catch-all)")
-    print(f"              Target: +{F_TARGET_PCT}% | Time Stop: {F_TIME_LIMIT_MINUTES} min")
-    print(f"  Strategy D: Gap>{D_MIN_GAP_PCT}% + spike>={D_MIN_SPIKE_PCT}% + dip {D_DIP_PCT}% + {D_ENTRY_MODE}")
-    print(f"              Partial: sell {D_PARTIAL_SELL_PCT:.0f}% at +{D_TARGET1_PCT}% | Runner: +{D_TARGET2_PCT}%")
-    print(f"              Trail: {D_TRAIL_PCT}% (activates +{D_TRAIL_ACTIVATE_PCT}%) | Stop: -{D_STOP_PCT}% | {D_TIME_LIMIT_MINUTES}m")
-    print(f"  Strategy V: Gap>{V_MIN_GAP_PCT}% + {V_MIN_BELOW_CANDLES} closes below VWAP + reclaim w/ volume")
-    print(f"              Partial: sell {V_PARTIAL_SELL_PCT:.0f}% at +{V_TARGET1_PCT}% | Runner: +{V_TARGET2_PCT}%")
-    print(f"              Trail: {V_TRAIL_PCT}% (activates +{V_TRAIL_ACTIVATE_PCT}%) | Stop: -{V_STOP_PCT}% | {V_TIME_LIMIT_MINUTES}m")
-    print(f"  Strategy M: Gap>{M_MIN_GAP_PCT}% + morning spike {M_MORNING_SPIKE_PCT}% + consolidation + breakout")
-    print(f"              Partial: sell {M_PARTIAL_SELL_PCT:.0f}% at +{M_TARGET1_PCT}% | Trail: {M_TRAIL_PCT}%")
-    print(f"              Trail activates +{M_TRAIL_ACTIVATE_PCT}% | Stop: -{M_STOP_PCT}% | {M_TIME_LIMIT_MINUTES}m")
-    print(f"  Strategy R: Day1 gap>={R_DAY1_MIN_GAP:.0f}% + Day2 pullback {R_D2_PULLBACK_PCT:.0f}% + bounce > {R_BOUNCE_REF}")
-    print(f"              Target: +{R_TARGET1_PCT:.0f}% | Trail: {R_TRAIL_PCT}% (at +{R_TRAIL_ACTIVATE_PCT}%) | Stop: -{R_STOP_PCT}% | {R_TIME_LIMIT_MINUTES}m")
-    print(f"  Strategy P: Gap>{P_MIN_GAP_PCT}% + PM high breakout + pullback + bounce (fallback)")
-    print(f"              Partial: sell {P_PARTIAL_SELL_PCT:.0f}% at +{P_TARGET1_PCT}% | Runner: +{P_TARGET2_PCT}%")
-    print(f"              Trail: {P_TRAIL_PCT}% (activates +{P_TRAIL_ACTIVATE_PCT}%) | Stop: -{P_STOP_PCT}% | {P_TIME_LIMIT_MINUTES}m")
-    print(f"  Strategy W: Gap>{W_MIN_GAP_PCT}% + morning run {W_MIN_MORNING_RUN}% + power hour breakout")
-    print(f"              Target: +{W_TARGET_PCT}% | Trail: {W_TRAIL_PCT}% (at +{W_TRAIL_ACTIVATE_PCT}%) | Stop: -{W_STOP_PCT}%")
-    print(f"  Strategy L: Low float (<{L_MAX_FLOAT/1e6:.0f}M) + gap>{L_MIN_GAP_PCT}% + HOD break + vol surge")
-    print(f"              Tiered targets: T1(<{L_TIER1_FLOAT/1e6:.0f}M) +{L_TIER1_TARGET1_PCT}/{L_TIER1_TARGET2_PCT}% | T2(<{L_TIER2_FLOAT/1e6:.0f}M) +{L_TIER2_TARGET1_PCT}/{L_TIER2_TARGET2_PCT}% | T3 +{L_TIER3_TARGET1_PCT}/{L_TIER3_TARGET2_PCT}%")
-    print(f"              Trail: {L_TRAIL_PCT}% (at +{L_TRAIL_ACTIVATE_PCT}%) | Stop: -{L_STOP_PCT}% | {L_TIME_LIMIT_MINUTES}m")
-    priority_str = " > ".join(k for k, _ in sorted(STRAT_PRIORITY.items(), key=lambda x: x[1]))
+    print(
+        f"              Target: +{F_TARGET_PCT}% | Time Stop: {F_TIME_LIMIT_MINUTES} min"
+    )
+    print(
+        f"  Strategy D: Gap>{D_MIN_GAP_PCT}% + spike>={D_MIN_SPIKE_PCT}% + dip {D_DIP_PCT}% + {D_ENTRY_MODE}"
+    )
+    print(
+        f"              Partial: sell {D_PARTIAL_SELL_PCT:.0f}% at +{D_TARGET1_PCT}% | Runner: +{D_TARGET2_PCT}%"
+    )
+    print(
+        f"              Trail: {D_TRAIL_PCT}% (activates +{D_TRAIL_ACTIVATE_PCT}%) | Stop: -{D_STOP_PCT}% | {D_TIME_LIMIT_MINUTES}m"
+    )
+    print(
+        f"  Strategy V: Gap>{V_MIN_GAP_PCT}% + {V_MIN_BELOW_CANDLES} closes below VWAP + reclaim w/ volume"
+    )
+    print(
+        f"              Partial: sell {V_PARTIAL_SELL_PCT:.0f}% at +{V_TARGET1_PCT}% | Runner: +{V_TARGET2_PCT}%"
+    )
+    print(
+        f"              Trail: {V_TRAIL_PCT}% (activates +{V_TRAIL_ACTIVATE_PCT}%) | Stop: -{V_STOP_PCT}% | {V_TIME_LIMIT_MINUTES}m"
+    )
+    print(
+        f"  Strategy M: Gap>{M_MIN_GAP_PCT}% + morning spike {M_MORNING_SPIKE_PCT}% + consolidation + breakout"
+    )
+    print(
+        f"              Partial: sell {M_PARTIAL_SELL_PCT:.0f}% at +{M_TARGET1_PCT}% | Trail: {M_TRAIL_PCT}%"
+    )
+    print(
+        f"              Trail activates +{M_TRAIL_ACTIVATE_PCT}% | Stop: -{M_STOP_PCT}% | {M_TIME_LIMIT_MINUTES}m"
+    )
+    print(
+        f"  Strategy R: Day1 gap>={R_DAY1_MIN_GAP:.0f}% + Day2 pullback {R_D2_PULLBACK_PCT:.0f}% + bounce > {R_BOUNCE_REF}"
+    )
+    print(
+        f"              Target: +{R_TARGET1_PCT:.0f}% | Trail: {R_TRAIL_PCT}% (at +{R_TRAIL_ACTIVATE_PCT}%) | Stop: -{R_STOP_PCT}% | {R_TIME_LIMIT_MINUTES}m"
+    )
+    print(
+        f"  Strategy P: Gap>{P_MIN_GAP_PCT}% + PM high breakout + pullback + bounce (fallback)"
+    )
+    print(
+        f"              Partial: sell {P_PARTIAL_SELL_PCT:.0f}% at +{P_TARGET1_PCT}% | Runner: +{P_TARGET2_PCT}%"
+    )
+    print(
+        f"              Trail: {P_TRAIL_PCT}% (activates +{P_TRAIL_ACTIVATE_PCT}%) | Stop: -{P_STOP_PCT}% | {P_TIME_LIMIT_MINUTES}m"
+    )
+    print(
+        f"  Strategy W: Gap>{W_MIN_GAP_PCT}% + morning run {W_MIN_MORNING_RUN}% + power hour breakout"
+    )
+    print(
+        f"              Target: +{W_TARGET_PCT}% | Trail: {W_TRAIL_PCT}% (at +{W_TRAIL_ACTIVATE_PCT}%) | Stop: -{W_STOP_PCT}%"
+    )
+    print(
+        f"  Strategy L: Low float (<{L_MAX_FLOAT / 1e6:.0f}M) + gap>{L_MIN_GAP_PCT}% + HOD break + vol surge"
+    )
+    print(
+        f"              Tiered targets: T1(<{L_TIER1_FLOAT / 1e6:.0f}M) +{L_TIER1_TARGET1_PCT}/{L_TIER1_TARGET2_PCT}% | T2(<{L_TIER2_FLOAT / 1e6:.0f}M) +{L_TIER2_TARGET1_PCT}/{L_TIER2_TARGET2_PCT}% | T3 +{L_TIER3_TARGET1_PCT}/{L_TIER3_TARGET2_PCT}%"
+    )
+    print(
+        f"              Trail: {L_TRAIL_PCT}% (at +{L_TRAIL_ACTIVATE_PCT}%) | Stop: -{L_STOP_PCT}% | {L_TIME_LIMIT_MINUTES}m"
+    )
+    priority_str = " > ".join(
+        k for k, _ in sorted(STRAT_PRIORITY.items(), key=lambda x: x[1])
+    )
     print(f"  Priority:   {priority_str}")
     print(f"  Single pool: ${STARTING_CASH:,} | Full balance sizing")
     print(f"  No SPY regime filter")
     print(f"  Data: {data_dirs}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
     print("Loading data...")
     all_dates, daily_picks = load_all_picks(data_dirs)
@@ -3282,8 +4249,10 @@ if __name__ == "__main__":
     print(f"\n  Starting Cash: ${cash:,.0f}")
     print()
 
-    print(f"{'Date':<12} {'Strat':>5} {'Trades':>6} {'Win':>4} {'Loss':>5} "
-          f"{'Day P&L':>12} {'Balance':>14}")
+    print(
+        f"{'Date':<12} {'Strat':>5} {'Trades':>6} {'Win':>4} {'Loss':>5} "
+        f"{'Day P&L':>12} {'Balance':>14}"
+    )
     print("-" * 72)
 
     for d in all_dates:
@@ -3331,19 +4300,31 @@ if __name__ == "__main__":
                 parts.append(f"{key}{counts[key][0]}")
         strat_label = "".join(parts) if parts else ""
 
-        print(f"{d:<12} {strat_label:>5} {day_trades:>6} {day_wins:>4} {day_losses:>5} "
-              f"${day_pnl:>+11,.0f} ${equity:>13,.0f}")
+        print(
+            f"{d:<12} {strat_label:>5} {day_trades:>6} {day_wins:>4} {day_losses:>5} "
+            f"${day_pnl:>+11,.0f} ${equity:>13,.0f}"
+        )
 
         # Per-trade detail with % profit
         traded_states = [s for s in states if s["exit_reason"] is not None]
         for st in traded_states:
-            pct = (st["pnl"] / st["position_cost"] * 100) if st["position_cost"] > 0 else 0
-            reason_short = {"TARGET": "T", "TIME_STOP": "TS", "EOD_CLOSE": "EOD",
-                            "STOP": "SL", "TRAIL": "TR"}.get(
-                st["exit_reason"], st["exit_reason"][:3])
+            pct = (
+                (st["pnl"] / st["position_cost"] * 100)
+                if st["position_cost"] > 0
+                else 0
+            )
+            reason_short = {
+                "TARGET": "T",
+                "TIME_STOP": "TS",
+                "EOD_CLOSE": "EOD",
+                "STOP": "SL",
+                "TRAIL": "TR",
+            }.get(st["exit_reason"], st["exit_reason"][:3])
             vc_tag = " VC" if st.get("vol_capped") else ""
-            print(f"  -> [{st['strategy']}] {st['ticker']:<6} {reason_short:<3}  "
-                  f"${st['pnl']:>+10,.0f}  ({pct:>+6.2f}%){vc_tag}")
+            print(
+                f"  -> [{st['strategy']}] {st['ticker']:<6} {reason_short:<3}  "
+                f"${st['pnl']:>+10,.0f}  ({pct:>+6.2f}%){vc_tag}"
+            )
 
         # --explain: show per-ticker decisions
         if explain_mode:
@@ -3361,7 +4342,13 @@ if __name__ == "__main__":
                 cc = st.get("candle_count", 0)
                 if cc == 0:
                     reasons.append("no candles")
-                elif st.get("first_candle_body_pct", 0) == 0 and not st.get("o_eligible") and not st.get("b_eligible") and not st.get("e_eligible") and not st.get("l_eligible"):
+                elif (
+                    st.get("first_candle_body_pct", 0) == 0
+                    and not st.get("o_eligible")
+                    and not st.get("b_eligible")
+                    and not st.get("e_eligible")
+                    and not st.get("l_eligible")
+                ):
                     reasons.append("candle1 red/doji")
                 # Check what was eligible
                 elig = []
@@ -3380,27 +4367,45 @@ if __name__ == "__main__":
                     reasons.append("timed out / no signal")
                 elif not st.get("done") and not st.get("signal"):
                     reasons.append("no signal")
-                print(f"     [{tk:<6} gap={gap:>5.1f}%] NOT TRADED: {' | '.join(reasons)}")
+                print(
+                    f"     [{tk:<6} gap={gap:>5.1f}%] NOT TRADED: {' | '.join(reasons)}"
+                )
 
-        all_results.append({
-            "date": d, "picks": picks, "states": states,
-            "day_pnl": day_pnl, "equity": equity, "regime_skip": False,
-            "trades": day_trades, "wins": day_wins, "losses": day_losses,
-            **{f"{k.lower()}_trades": counts[k][0] for k in STRAT_KEYS},
-            **{f"{k.lower()}_wins": counts[k][1] for k in STRAT_KEYS},
-        })
+        all_results.append(
+            {
+                "date": d,
+                "picks": picks,
+                "states": states,
+                "day_pnl": day_pnl,
+                "equity": equity,
+                "regime_skip": False,
+                "trades": day_trades,
+                "wins": day_wins,
+                "losses": day_losses,
+                **{f"{k.lower()}_trades": counts[k][0] for k in STRAT_KEYS},
+                **{f"{k.lower()}_wins": counts[k][1] for k in STRAT_KEYS},
+            }
+        )
 
     # --- Summary ---
     final_equity = cash + unsettled
     total_trades = sum(r["trades"] for r in all_results)
     total_wins = sum(r["wins"] for r in all_results)
     total_losses = sum(r["losses"] for r in all_results)
-    strat_totals = {k: sum(r[f"{k.lower()}_trades"] for r in all_results) for k in STRAT_KEYS}
-    strat_wins = {k: sum(r[f"{k.lower()}_wins"] for r in all_results) for k in STRAT_KEYS}
+    strat_totals = {
+        k: sum(r[f"{k.lower()}_trades"] for r in all_results) for k in STRAT_KEYS
+    }
+    strat_wins = {
+        k: sum(r[f"{k.lower()}_wins"] for r in all_results) for k in STRAT_KEYS
+    }
     daily_pnls = [r["day_pnl"] for r in all_results if r["trades"] > 0]
     green = sum(1 for p in daily_pnls if p > 0) if daily_pnls else 0
     red = sum(1 for p in daily_pnls if p <= 0) if daily_pnls else 0
-    sharpe = (np.mean(daily_pnls) / np.std(daily_pnls)) * np.sqrt(252) if daily_pnls and np.std(daily_pnls) > 0 else 0
+    sharpe = (
+        (np.mean(daily_pnls) / np.std(daily_pnls)) * np.sqrt(252)
+        if daily_pnls and np.std(daily_pnls) > 0
+        else 0
+    )
 
     all_exits = {}
     all_trade_pnls = []
@@ -3428,25 +4433,33 @@ if __name__ == "__main__":
     # Daily equity % changes
     daily_eq_pcts = []
     for i in range(1, len(all_results)):
-        prev_eq = all_results[i-1]["equity"]
+        prev_eq = all_results[i - 1]["equity"]
         curr_eq = all_results[i]["equity"]
         if prev_eq > 0:
             daily_eq_pcts.append((curr_eq / prev_eq - 1) * 100)
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  COMBINED STRATEGY SUMMARY (H+G+A+F+D+V+P)")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"  Starting Cash:    ${STARTING_CASH:,}")
-    print(f"  Ending Equity:    ${final_equity:,.0f}  ({(final_equity/STARTING_CASH - 1)*100:+.1f}%)")
+    print(
+        f"  Ending Equity:    ${final_equity:,.0f}  ({(final_equity / STARTING_CASH - 1) * 100:+.1f}%)"
+    )
     if unsettled > 0:
         print(f"    (Cash: ${cash:,.0f} + Unsettled: ${unsettled:,.0f})")
     print(f"  Trading Days:     {len(all_dates)}")
     print(f"  Total Trades:     {total_trades}")
-    print(f"    Winners:        {total_wins} ({total_wins/max(total_trades,1)*100:.1f}%)")
+    print(
+        f"    Winners:        {total_wins} ({total_wins / max(total_trades, 1) * 100:.1f}%)"
+    )
     print(f"    Losers:         {total_losses}")
     print(f"  Avg Win:          ${avg_win:+,.0f}")
     print(f"  Avg Loss:         ${avg_loss:+,.0f}")
-    pf = abs(avg_win * total_wins / (avg_loss * total_losses)) if total_losses > 0 and avg_loss != 0 else 0
+    pf = (
+        abs(avg_win * total_wins / (avg_loss * total_losses))
+        if total_losses > 0 and avg_loss != 0
+        else 0
+    )
     print(f"  Profit Factor:    {pf:.2f}" if pf > 0 else "")
 
     # Daily % metrics
@@ -3472,26 +4485,36 @@ if __name__ == "__main__":
 
     # Per-strategy breakdown
     strat_info = [
-        ("H (High Conviction)", "H"), ("G (Big Gap Runner)", "G"),
-        ("A (Quick Scalp)", "A"), ("F (Catch-All)", "F"),
-        ("D (Dip Buy)", "D"), ("V (VWAP Reclaim)", "V"),
-        ("P (PM High Breakout)", "P"), ("M (Midday Breakout)", "M"),
-        ("R (Multi-Day Runner)", "R"), ("W (Power Hour)", "W"),
-        ("O (Opening Range Breakout)", "O"), ("B (Red-to-Green)", "B"),
-        ("K (First Pullback)", "K"), ("C (Micro Flag)", "C"),
-        ("S (Stuff-and-Break)", "S"), ("E (Gap-and-Go)", "E"),
-        ("I (PM High Immediate)", "I"), ("J (VWAP+PMH Breakout)", "J"),
-        ("N (HOD Reclaim)", "N"), ("L (Low Float Squeeze)", "L"),
+        ("H (High Conviction)", "H"),
+        ("G (Big Gap Runner)", "G"),
+        ("A (Quick Scalp)", "A"),
+        ("F (Catch-All)", "F"),
+        ("D (Dip Buy)", "D"),
+        ("V (VWAP Reclaim)", "V"),
+        ("P (PM High Breakout)", "P"),
+        ("M (Midday Breakout)", "M"),
+        ("R (Multi-Day Runner)", "R"),
+        ("W (Power Hour)", "W"),
+        ("O (Opening Range Breakout)", "O"),
+        ("B (Red-to-Green)", "B"),
+        ("K (First Pullback)", "K"),
+        ("C (Micro Flag)", "C"),
+        ("S (Stuff-and-Break)", "S"),
+        ("E (Gap-and-Go)", "E"),
+        ("I (PM High Immediate)", "I"),
+        ("J (VWAP+PMH Breakout)", "J"),
+        ("N (HOD Reclaim)", "N"),
+        ("L (Low Float Squeeze)", "L"),
     ]
     for label, key in strat_info:
         total_s = strat_totals[key]
         wins_s = strat_wins[key]
         pnls_s = strat_pnls[key]
-        print(f"\n  {'---'*17}")
+        print(f"\n  {'---' * 17}")
         print(f"  STRATEGY {label}")
-        print(f"  {'---'*17}")
+        print(f"  {'---' * 17}")
         print(f"    Trades:  {total_s}")
-        print(f"    Winners: {wins_s} ({wins_s/max(total_s,1)*100:.1f}%)")
+        print(f"    Winners: {wins_s} ({wins_s / max(total_s, 1) * 100:.1f}%)")
         if pnls_s:
             w = [p for p in pnls_s if p > 0]
             l = [p for p in pnls_s if p <= 0]
@@ -3503,10 +4526,14 @@ if __name__ == "__main__":
 
     print(f"\n  Exit Reasons:")
     for reason, count in sorted(all_exits.items(), key=lambda x: -x[1]):
-        print(f"    {reason:<20} {count:>4} ({count/max(total_trades,1)*100:.1f}%)")
+        print(
+            f"    {reason:<20} {count:>4} ({count / max(total_trades, 1) * 100:.1f}%)"
+        )
 
     if daily_pnls:
-        print(f"\n  Green Days:       {green}/{len(daily_pnls)} ({green/len(daily_pnls)*100:.1f}%)")
+        print(
+            f"\n  Green Days:       {green}/{len(daily_pnls)} ({green / len(daily_pnls) * 100:.1f}%)"
+        )
         print(f"  Red Days:         {red}/{len(daily_pnls)}")
         print(f"  Best Day:         ${max(daily_pnls):+,.0f}")
         print(f"  Worst Day:        ${min(daily_pnls):+,.0f}")
@@ -3515,9 +4542,9 @@ if __name__ == "__main__":
 
     # --- STRATEGY SELECTION ANALYSIS ---
     if all_selection_logs:
-        print(f"\n  {'='*50}")
+        print(f"\n  {'=' * 50}")
         print(f"  STRATEGY SELECTION ANALYSIS")
-        print(f"  {'='*50}")
+        print(f"  {'=' * 50}")
         skip_counts = {k: 0 for k in STRAT_KEYS}
         steal_counts = {k: {k2: 0 for k2 in STRAT_KEYS} for k in STRAT_KEYS}
         for entry in all_selection_logs:
@@ -3538,9 +4565,9 @@ if __name__ == "__main__":
         print(f"  Total skip events: {total_skips}")
 
     # --- STRESS TEST ---
-    print(f"\n  {'='*50}")
+    print(f"\n  {'=' * 50}")
     print(f"  STRESS TEST")
-    print(f"  {'='*50}")
+    print(f"  {'=' * 50}")
 
     # Max drawdown
     equities = [r["equity"] for r in all_results]
@@ -3556,7 +4583,7 @@ if __name__ == "__main__":
             max_dd_dollar = dd
         if dd_pct > max_dd_pct:
             max_dd_pct = dd_pct
-    print(f"  Max Drawdown:     ${max_dd_dollar:,.0f} ({max_dd_pct*100:.1f}%)")
+    print(f"  Max Drawdown:     ${max_dd_dollar:,.0f} ({max_dd_pct * 100:.1f}%)")
 
     # Consecutive losing days
     streak = 0
@@ -3578,8 +4605,10 @@ if __name__ == "__main__":
         rem_std = np.std(remaining) if len(remaining) > 1 else 1.0
         rem_sharpe = (np.mean(remaining) / rem_std) * np.sqrt(252) if rem_std > 0 else 0
         rem_pass = rem_total > 0
-        print(f"  Remove Top 10%:   ${rem_total:+,.0f} (Sharpe {rem_sharpe:.2f}) "
-              f"{'PASS' if rem_pass else 'FAIL'}")
+        print(
+            f"  Remove Top 10%:   ${rem_total:+,.0f} (Sharpe {rem_sharpe:.2f}) "
+            f"{'PASS' if rem_pass else 'FAIL'}"
+        )
 
     # Kelly criterion
     wins_pnls = [p for p in daily_pnls if p > 0]
@@ -3588,9 +4617,11 @@ if __name__ == "__main__":
         avg_w = np.mean(wins_pnls)
         avg_l = np.mean(loss_pnls_abs)
         p_w = len(wins_pnls) / len(daily_pnls)
-        b = avg_w / avg_l if avg_l > 0 else float('inf')
+        b = avg_w / avg_l if avg_l > 0 else float("inf")
         kelly = (b * p_w - (1 - p_w)) / b if b > 0 else 0
-        print(f"  Kelly Criterion:  {kelly*100:.1f}% {'PASS' if kelly > 0 else 'FAIL'}")
+        print(
+            f"  Kelly Criterion:  {kelly * 100:.1f}% {'PASS' if kelly > 0 else 'FAIL'}"
+        )
     else:
         kelly = 0
         print(f"  Kelly Criterion:  N/A")
@@ -3602,7 +4633,9 @@ if __name__ == "__main__":
     mc_profitable = 0
     all_daily = np.array(daily_pnls)
     for _ in range(n_sims):
-        indices = np.random.choice(len(all_daily), size=len(all_daily) - n_remove_mc, replace=False)
+        indices = np.random.choice(
+            len(all_daily), size=len(all_daily) - n_remove_mc, replace=False
+        )
         if all_daily[indices].sum() > 0:
             mc_profitable += 1
     mc_pct = mc_profitable / n_sims * 100
@@ -3610,14 +4643,18 @@ if __name__ == "__main__":
     print(f"  Monte Carlo:      {mc_pct:.1f}% profitable ({mc_verdict})")
 
     # Volume-capped trade count
-    vc_count = sum(1 for r in all_results for s in r["states"]
-                   if s["exit_reason"] is not None and s.get("vol_capped"))
+    vc_count = sum(
+        1
+        for r in all_results
+        for s in r["states"]
+        if s["exit_reason"] is not None and s.get("vol_capped")
+    )
     if vc_count > 0:
         print(f"  Vol-Capped Trades: {vc_count}")
 
     stress_pass = (rem_total > 0 and kelly > 0 and mc_pct > 80) if daily_pnls else False
     print(f"\n  OVERALL: {'ALL PASS' if stress_pass else 'SOME CONCERNS'}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     # --- CHARTS ---
     if no_charts:
@@ -3634,17 +4671,17 @@ if __name__ == "__main__":
             except Exception:
                 return ts_val
 
-        COLORS_H = ["#9C27B0", "#AB47BC", "#BA68C8"]   # Purple for H
-        COLORS_G = ["#4CAF50", "#66BB6A", "#81C784"]   # Greens for G
-        COLORS_A = ["#2196F3", "#42A5F5", "#64B5F6"]   # Blues for A
-        COLORS_F = ["#FF9800", "#FFA726", "#FFB74D"]    # Oranges for F
-        COLORS_D = ["#00BCD4", "#26C6DA", "#4DD0E1"]    # Cyan for D
-        COLORS_V = ["#607D8B", "#78909C", "#90A4AE"]    # Blue-grey for V
-        COLORS_M = ["#795548", "#8D6E63", "#A1887F"]    # Brown for M
-        COLORS_R = ["#009688", "#26A69A", "#4DB6AC"]    # Teal for R
-        COLORS_P = ["#E91E63", "#EC407A", "#F06292"]    # Pink for P
-        COLORS_W = ["#CDDC39", "#D4E157", "#DCE775"]    # Lime for W
-        COLORS_L = ["#FF5722", "#FF7043", "#FF8A65"]    # Deep orange for L
+        COLORS_H = ["#9C27B0", "#AB47BC", "#BA68C8"]  # Purple for H
+        COLORS_G = ["#4CAF50", "#66BB6A", "#81C784"]  # Greens for G
+        COLORS_A = ["#2196F3", "#42A5F5", "#64B5F6"]  # Blues for A
+        COLORS_F = ["#FF9800", "#FFA726", "#FFB74D"]  # Oranges for F
+        COLORS_D = ["#00BCD4", "#26C6DA", "#4DD0E1"]  # Cyan for D
+        COLORS_V = ["#607D8B", "#78909C", "#90A4AE"]  # Blue-grey for V
+        COLORS_M = ["#795548", "#8D6E63", "#A1887F"]  # Brown for M
+        COLORS_R = ["#009688", "#26A69A", "#4DB6AC"]  # Teal for R
+        COLORS_P = ["#E91E63", "#EC407A", "#F06292"]  # Pink for P
+        COLORS_W = ["#CDDC39", "#D4E157", "#DCE775"]  # Lime for W
+        COLORS_L = ["#FF5722", "#FF7043", "#FF8A65"]  # Deep orange for L
         DAYS_PER_PAGE = 5
 
         num_pages = math.ceil(len(all_dates) / DAYS_PER_PAGE)
@@ -3655,14 +4692,16 @@ if __name__ == "__main__":
             n_rows = len(page_results)
 
             fig, axes = plt.subplots(
-                n_rows, 2, figsize=(20, 4.5 * n_rows),
+                n_rows,
+                2,
+                figsize=(20, 4.5 * n_rows),
                 gridspec_kw={"width_ratios": [2.5, 1]},
             )
             if n_rows == 1:
                 axes = [axes]
 
             fig.suptitle(
-                f"Combined H+G+A+F+D+V+M+P Page {page+1}/{num_pages}: "
+                f"Combined H+G+A+F+D+V+M+P Page {page + 1}/{num_pages}: "
                 f"{page_results[0]['date']} to {page_results[-1]['date']}\n"
                 f"H: +{H_TARGET_PCT}%/{H_TIME_LIMIT_MINUTES}m (purple) | "
                 f"G: +{G_TARGET_PCT}%/{G_TIME_LIMIT_MINUTES}m (green) | "
@@ -3674,7 +4713,9 @@ if __name__ == "__main__":
                 f"R: +{R_TARGET1_PCT}%/{R_TIME_LIMIT_MINUTES}m (teal) | "
                 f"P: +{P_TARGET1_PCT}/{P_TARGET2_PCT}%/{P_TIME_LIMIT_MINUTES}m (pink) | "
                 f"L: tiered/{L_TIME_LIMIT_MINUTES}m (d.orange)",
-                fontsize=11, fontweight="bold", y=1.01,
+                fontsize=11,
+                fontweight="bold",
+                y=1.01,
             )
 
             for i, res in enumerate(page_results):
@@ -3685,7 +4726,19 @@ if __name__ == "__main__":
 
                 if traded:
                     color_idx = {k: 0 for k in STRAT_KEYS}
-                    color_map = {"H": COLORS_H, "G": COLORS_G, "A": COLORS_A, "F": COLORS_F, "D": COLORS_D, "V": COLORS_V, "M": COLORS_M, "R": COLORS_R, "P": COLORS_P, "W": COLORS_W, "L": COLORS_L}
+                    color_map = {
+                        "H": COLORS_H,
+                        "G": COLORS_G,
+                        "A": COLORS_A,
+                        "F": COLORS_F,
+                        "D": COLORS_D,
+                        "V": COLORS_V,
+                        "M": COLORS_M,
+                        "R": COLORS_R,
+                        "P": COLORS_P,
+                        "W": COLORS_W,
+                        "L": COLORS_L,
+                    }
                     for si, st in enumerate(traded):
                         mh = st["mh"]
                         if mh.index.tz is not None:
@@ -3700,28 +4753,57 @@ if __name__ == "__main__":
 
                         first_candle_close = float(mh.iloc[0]["Close"])
                         ref_price = first_candle_close
-                        pct_change = (mh["Close"].values.astype(float) / ref_price - 1) * 100
+                        pct_change = (
+                            mh["Close"].values.astype(float) / ref_price - 1
+                        ) * 100
 
                         strat_tag = st["strategy"]
                         vc_tag = " VC" if st.get("vol_capped") else ""
                         cost_k = st["position_cost"] / 1000
-                        label = (f"[{strat_tag}] {st['ticker']} ${cost_k:.0f}K{vc_tag} "
-                                 f"(gap {st['gap_pct']:.0f}%)")
-                        ax_price.plot(et_times, pct_change, color=color, linewidth=1.2,
-                                      label=label, alpha=0.85)
+                        label = (
+                            f"[{strat_tag}] {st['ticker']} ${cost_k:.0f}K{vc_tag} "
+                            f"(gap {st['gap_pct']:.0f}%)"
+                        )
+                        ax_price.plot(
+                            et_times,
+                            pct_change,
+                            color=color,
+                            linewidth=1.2,
+                            label=label,
+                            alpha=0.85,
+                        )
 
                         # BUY marker
                         if st["entry_time"] is not None:
                             et_buy = _to_et(st["entry_time"])
-                            buy_pct = (st.get("signal_price", ref_price) / ref_price - 1) * 100
-                            ax_price.plot(et_buy, buy_pct, marker="^", color=color,
-                                          markersize=10, zorder=5)
+                            buy_pct = (
+                                st.get("signal_price", ref_price) / ref_price - 1
+                            ) * 100
+                            ax_price.plot(
+                                et_buy,
+                                buy_pct,
+                                marker="^",
+                                color=color,
+                                markersize=10,
+                                zorder=5,
+                            )
                             ax_price.annotate(
-                                f"BUY({strat_tag})", xy=(et_buy, buy_pct), xytext=(0, 12),
-                                textcoords="offset points", ha="center", va="bottom",
-                                fontsize=6, fontweight="bold", color=color,
-                                bbox=dict(boxstyle="round,pad=0.15", fc="white",
-                                          ec=color, alpha=0.8, lw=0.5),
+                                f"BUY({strat_tag})",
+                                xy=(et_buy, buy_pct),
+                                xytext=(0, 12),
+                                textcoords="offset points",
+                                ha="center",
+                                va="bottom",
+                                fontsize=6,
+                                fontweight="bold",
+                                color=color,
+                                bbox=dict(
+                                    boxstyle="round,pad=0.15",
+                                    fc="white",
+                                    ec=color,
+                                    alpha=0.8,
+                                    lw=0.5,
+                                ),
                             )
 
                         # SELL marker
@@ -3731,30 +4813,55 @@ if __name__ == "__main__":
                             is_win = st["pnl"] > 0
                             marker = "v" if not is_win else "s"
                             sell_color = "#4CAF50" if is_win else "#f44336"
-                            ax_price.plot(et_sell, sell_pct, marker=marker, color=sell_color,
-                                          markersize=10, zorder=5,
-                                          markeredgecolor="white", markeredgewidth=1)
-                            reason_short = {"TARGET": "T", "STOP_LOSS": "SL", "STOP": "SL",
-                                            "EOD_CLOSE": "EOD", "TIME_STOP": "TS",
-                                            "TRAIL": "TR"}.get(
-                                st["exit_reason"], st["exit_reason"][:3])
+                            ax_price.plot(
+                                et_sell,
+                                sell_pct,
+                                marker=marker,
+                                color=sell_color,
+                                markersize=10,
+                                zorder=5,
+                                markeredgecolor="white",
+                                markeredgewidth=1,
+                            )
+                            reason_short = {
+                                "TARGET": "T",
+                                "STOP_LOSS": "SL",
+                                "STOP": "SL",
+                                "EOD_CLOSE": "EOD",
+                                "TIME_STOP": "TS",
+                                "TRAIL": "TR",
+                            }.get(st["exit_reason"], st["exit_reason"][:3])
                             ax_price.annotate(
-                                reason_short, xy=(et_sell, sell_pct),
+                                reason_short,
+                                xy=(et_sell, sell_pct),
                                 xytext=(0, -14 if sell_pct >= 0 else 12),
-                                textcoords="offset points", ha="center",
+                                textcoords="offset points",
+                                ha="center",
                                 va="top" if sell_pct >= 0 else "bottom",
-                                fontsize=6, fontweight="bold", color=sell_color,
-                                bbox=dict(boxstyle="round,pad=0.15", fc="white",
-                                          ec=sell_color, alpha=0.8, lw=0.5),
+                                fontsize=6,
+                                fontweight="bold",
+                                color=sell_color,
+                                bbox=dict(
+                                    boxstyle="round,pad=0.15",
+                                    fc="white",
+                                    ec=sell_color,
+                                    alpha=0.8,
+                                    lw=0.5,
+                                ),
                             )
 
-                    ax_price.axhline(y=0, color="gray", linestyle="-", alpha=0.4, linewidth=0.8)
+                    ax_price.axhline(
+                        y=0, color="gray", linestyle="-", alpha=0.4, linewidth=0.8
+                    )
                     # Show target lines for active strategies this day
                     day_strats = set(s["strategy"] for s in traded)
                     target_lines = {
-                        "H": (H_TARGET_PCT, "#9C27B0"), "G": (G_TARGET_PCT, "#4CAF50"),
-                        "A": (A_TARGET_PCT, "#2196F3"), "F": (F_TARGET_PCT, "#FF9800"),
-                        "D": (D_TARGET1_PCT, "#00BCD4"), "V": (V_TARGET1_PCT, "#607D8B"),
+                        "H": (H_TARGET_PCT, "#9C27B0"),
+                        "G": (G_TARGET_PCT, "#4CAF50"),
+                        "A": (A_TARGET_PCT, "#2196F3"),
+                        "F": (F_TARGET_PCT, "#FF9800"),
+                        "D": (D_TARGET1_PCT, "#00BCD4"),
+                        "V": (V_TARGET1_PCT, "#607D8B"),
                         "M": (M_TARGET1_PCT, "#795548"),
                         "R": (R_TARGET1_PCT, "#009688"),
                         "P": (P_TARGET1_PCT, "#E91E63"),
@@ -3764,13 +4871,20 @@ if __name__ == "__main__":
                     shown_targets = set()
                     for sk, (tv, tc_line) in target_lines.items():
                         if sk in day_strats and tv not in shown_targets:
-                            ax_price.axhline(y=tv, color=tc_line, linestyle=":", alpha=0.4)
+                            ax_price.axhline(
+                                y=tv, color=tc_line, linestyle=":", alpha=0.4
+                            )
                             shown_targets.add(tv)
-                    ax_price.set_title(f"{res['date']} - Price (% from 1st candle close)",
-                                       fontsize=10, fontweight="bold")
+                    ax_price.set_title(
+                        f"{res['date']} - Price (% from 1st candle close)",
+                        fontsize=10,
+                        fontweight="bold",
+                    )
                     ax_price.set_ylabel("% from Entry", fontsize=8)
                     ax_price.legend(fontsize=6, loc="upper left", ncol=2)
-                    ax_price.xaxis.set_major_formatter(mdates.DateFormatter("%I:%M %p", tz=ET_TZ))
+                    ax_price.xaxis.set_major_formatter(
+                        mdates.DateFormatter("%I:%M %p", tz=ET_TZ)
+                    )
                     ax_price.tick_params(axis="x", rotation=30, labelsize=7)
                     ax_price.grid(alpha=0.3)
 
@@ -3779,57 +4893,104 @@ if __name__ == "__main__":
                     for s in traded:
                         vc = " VC" if s.get("vol_capped") else ""
                         cost_k = s["position_cost"] / 1000
-                        tickers.append(f"[{s['strategy']}] {s['ticker']} ${cost_k:.0f}K{vc}")
+                        tickers.append(
+                            f"[{s['strategy']}] {s['ticker']} ${cost_k:.0f}K{vc}"
+                        )
                     pnls = [s["pnl"] for s in traded]
-                    pct_profits = [(s["pnl"] / s["position_cost"] * 100) if s["position_cost"] > 0 else 0 for s in traded]
+                    pct_profits = [
+                        (s["pnl"] / s["position_cost"] * 100)
+                        if s["position_cost"] > 0
+                        else 0
+                        for s in traded
+                    ]
                     reasons = [s["exit_reason"] for s in traded]
                     bar_colors = ["#4CAF50" if p > 0 else "#f44336" for p in pnls]
                     y_pos = range(len(tickers))
-                    bars = ax_pnl.barh(y_pos, pnls, color=bar_colors, edgecolor="white", height=0.6)
+                    bars = ax_pnl.barh(
+                        y_pos, pnls, color=bar_colors, edgecolor="white", height=0.6
+                    )
                     ax_pnl.set_yticks(y_pos)
-                    ax_pnl.set_yticklabels([f"{t} ({r[:3]})" for t, r in zip(tickers, reasons)], fontsize=7)
+                    ax_pnl.set_yticklabels(
+                        [f"{t} ({r[:3]})" for t, r in zip(tickers, reasons)], fontsize=7
+                    )
                     ax_pnl.axvline(x=0, color="gray", linestyle="-", alpha=0.5)
                     ax_pnl.invert_yaxis()
                     for j, (bar, pnl, pct) in enumerate(zip(bars, pnls, pct_profits)):
                         x_pos = bar.get_width()
                         align = "left" if pnl >= 0 else "right"
                         offset = 5 if pnl >= 0 else -5
-                        ax_pnl.annotate(f"${pnl:+.0f} ({pct:+.1f}%)", xy=(x_pos, j), xytext=(offset, 0),
-                                        textcoords="offset points", ha=align, va="center",
-                                        fontsize=7, fontweight="bold", color=bar_colors[j])
+                        ax_pnl.annotate(
+                            f"${pnl:+.0f} ({pct:+.1f}%)",
+                            xy=(x_pos, j),
+                            xytext=(offset, 0),
+                            textcoords="offset points",
+                            ha=align,
+                            va="center",
+                            fontsize=7,
+                            fontweight="bold",
+                            color=bar_colors[j],
+                        )
                     day_total = sum(pnls)
                     tc = "#4CAF50" if day_total >= 0 else "#f44336"
                     bal = res["equity"]
-                    ax_pnl.set_title(f"P&L: ${day_total:+,.0f} | Bal: ${bal:,.0f}",
-                                     fontsize=10, fontweight="bold", color=tc)
+                    ax_pnl.set_title(
+                        f"P&L: ${day_total:+,.0f} | Bal: ${bal:,.0f}",
+                        fontsize=10,
+                        fontweight="bold",
+                        color=tc,
+                    )
                     ax_pnl.set_xlabel("P&L ($)", fontsize=8)
                     ax_pnl.grid(alpha=0.3, axis="x")
                 else:
                     bal = res["equity"]
-                    ax_price.text(0.5, 0.5, f"{res['date']}\nNo signals",
-                                  ha="center", va="center", fontsize=12,
-                                  transform=ax_price.transAxes, color="gray")
+                    ax_price.text(
+                        0.5,
+                        0.5,
+                        f"{res['date']}\nNo signals",
+                        ha="center",
+                        va="center",
+                        fontsize=12,
+                        transform=ax_price.transAxes,
+                        color="gray",
+                    )
                     ax_price.set_title(f"{res['date']} - No Trades", fontsize=10)
-                    ax_pnl.text(0.5, 0.5, "0 trades", ha="center", va="center",
-                                fontsize=10, transform=ax_pnl.transAxes, color="gray")
-                    ax_pnl.set_title(f"P&L: $0 | Bal: ${bal:,.0f}", fontsize=10, color="gray")
+                    ax_pnl.text(
+                        0.5,
+                        0.5,
+                        "0 trades",
+                        ha="center",
+                        va="center",
+                        fontsize=10,
+                        transform=ax_pnl.transAxes,
+                        color="gray",
+                    )
+                    ax_pnl.set_title(
+                        f"P&L: $0 | Bal: ${bal:,.0f}", fontsize=10, color="gray"
+                    )
 
             plt.tight_layout(rect=[0, 0, 1, 0.97])
-            chart_path = os.path.join(run_dir, f"gc_page_{page+1:02d}.png")
+            chart_path = os.path.join(run_dir, f"gc_page_{page + 1:02d}.png")
             plt.savefig(chart_path, dpi=120, bbox_inches="tight")
             plt.close()
-            sys.stdout.write(f"\r  Charts: page {page+1}/{num_pages}")
+            sys.stdout.write(f"\r  Charts: page {page + 1}/{num_pages}")
             sys.stdout.flush()
 
         print(f"\r  {num_pages} chart pages saved to {run_dir}/          ")
 
         # --- SUMMARY CHART ---
         fig2 = plt.figure(figsize=(22, 18))
-        gs = fig2.add_gridspec(3, 3, width_ratios=[1.2, 1.2, 0.8],
-                               height_ratios=[1.0, 1.0, 1.0], hspace=0.35, wspace=0.3)
+        gs = fig2.add_gridspec(
+            3,
+            3,
+            width_ratios=[1.2, 1.2, 0.8],
+            height_ratios=[1.0, 1.0, 1.0],
+            hspace=0.35,
+            wspace=0.3,
+        )
         fig2.suptitle(
             f"Combined H+G+A+F+D+V+M+R+P Summary: {all_dates[0]} to {all_dates[-1]} ({len(all_dates)} days)",
-            fontsize=16, fontweight="bold",
+            fontsize=16,
+            fontweight="bold",
         )
 
         # 1. Daily P&L bars
@@ -3837,57 +4998,137 @@ if __name__ == "__main__":
         dates_list = [r["date"] for r in all_results]
         pnls_list = [r["day_pnl"] for r in all_results]
         bar_c = ["#4CAF50" if p >= 0 else "#f44336" for p in pnls_list]
-        ax.bar(range(len(dates_list)), pnls_list, color=bar_c, edgecolor="none", width=0.8)
+        ax.bar(
+            range(len(dates_list)), pnls_list, color=bar_c, edgecolor="none", width=0.8
+        )
         ax.set_xticks(range(0, len(dates_list), max(1, len(dates_list) // 15)))
-        ax.set_xticklabels([dates_list[i] for i in range(0, len(dates_list), max(1, len(dates_list) // 15))],
-                           rotation=45, fontsize=8, ha="right")
+        ax.set_xticklabels(
+            [
+                dates_list[i]
+                for i in range(0, len(dates_list), max(1, len(dates_list) // 15))
+            ],
+            rotation=45,
+            fontsize=8,
+            ha="right",
+        )
         ax.axhline(y=0, color="gray", linestyle="--", alpha=0.5)
         tp = sum(pnls_list)
         tc = "#4CAF50" if tp >= 0 else "#f44336"
-        ax.set_title(f"Daily P&L | Total: ${tp:+,.0f}", fontsize=13, fontweight="bold", color=tc)
+        ax.set_title(
+            f"Daily P&L | Total: ${tp:+,.0f}", fontsize=13, fontweight="bold", color=tc
+        )
         ax.set_ylabel("P&L ($)", fontsize=10)
         ax.grid(alpha=0.3, axis="y")
 
         # 2. Equity curve
         ax = fig2.add_subplot(gs[1, :])
         equities = [r["equity"] for r in all_results]
-        ax.plot(range(len(dates_list)), equities, color="#2196F3", linewidth=2, label="Combined H+G+A+F+D+V+M+R+P+W")
-        ax.fill_between(range(len(dates_list)), STARTING_CASH, equities,
-                        where=[e >= STARTING_CASH for e in equities], alpha=0.15, color="#4CAF50")
-        ax.fill_between(range(len(dates_list)), STARTING_CASH, equities,
-                        where=[e < STARTING_CASH for e in equities], alpha=0.15, color="#f44336")
-        ax.axhline(y=STARTING_CASH, color="gray", linestyle="--", alpha=0.5,
-                   label=f"Start: ${STARTING_CASH:,}")
-        ax.axhline(y=MARGIN_THRESHOLD, color="#FF9800", linestyle=":", alpha=0.6,
-                   label=f"Margin ${MARGIN_THRESHOLD/1000:.0f}K")
+        ax.plot(
+            range(len(dates_list)),
+            equities,
+            color="#2196F3",
+            linewidth=2,
+            label="Combined H+G+A+F+D+V+M+R+P+W",
+        )
+        ax.fill_between(
+            range(len(dates_list)),
+            STARTING_CASH,
+            equities,
+            where=[e >= STARTING_CASH for e in equities],
+            alpha=0.15,
+            color="#4CAF50",
+        )
+        ax.fill_between(
+            range(len(dates_list)),
+            STARTING_CASH,
+            equities,
+            where=[e < STARTING_CASH for e in equities],
+            alpha=0.15,
+            color="#f44336",
+        )
+        ax.axhline(
+            y=STARTING_CASH,
+            color="gray",
+            linestyle="--",
+            alpha=0.5,
+            label=f"Start: ${STARTING_CASH:,}",
+        )
+        ax.axhline(
+            y=MARGIN_THRESHOLD,
+            color="#FF9800",
+            linestyle=":",
+            alpha=0.6,
+            label=f"Margin ${MARGIN_THRESHOLD / 1000:.0f}K",
+        )
 
         # Milestone markers with vertical drop-lines and elevated labels
-        milestones = [(50_000, "$50K", "#FF9800"), (100_000, "$100K", "#E91E63"),
-                      (1_000_000, "$1M", "#9C27B0"), (10_000_000, "$10M", "#F44336")]
+        milestones = [
+            (50_000, "$50K", "#FF9800"),
+            (100_000, "$100K", "#E91E63"),
+            (1_000_000, "$1M", "#9C27B0"),
+            (10_000_000, "$10M", "#F44336"),
+        ]
         y_max = max(equities)
         for mi, (mlevel, mlabel, mcolor) in enumerate(milestones):
             if y_max >= mlevel:
-                ax.axhline(y=mlevel, color=mcolor, linestyle="--", alpha=0.3, linewidth=1)
+                ax.axhline(
+                    y=mlevel, color=mcolor, linestyle="--", alpha=0.3, linewidth=1
+                )
                 for midx, eq in enumerate(equities):
                     if eq >= mlevel:
                         # Vertical drop-line from label to the crossing point
                         label_y = y_max * (0.85 + mi * 0.04)  # stagger labels high
-                        ax.plot([midx, midx], [mlevel, label_y], color=mcolor,
-                                linestyle="-", linewidth=1, alpha=0.6)
-                        ax.plot(midx, mlevel, marker="o", color=mcolor, markersize=6, zorder=5)
-                        ax.annotate(f"{mlabel}\n{dates_list[midx]}",
-                                    xy=(midx, label_y), xytext=(0, 6),
-                                    textcoords="offset points", ha="center", va="bottom",
-                                    fontsize=8, color=mcolor, fontweight="bold",
-                                    bbox=dict(boxstyle="round,pad=0.3", fc="white",
-                                              ec=mcolor, alpha=0.9, lw=1))
+                        ax.plot(
+                            [midx, midx],
+                            [mlevel, label_y],
+                            color=mcolor,
+                            linestyle="-",
+                            linewidth=1,
+                            alpha=0.6,
+                        )
+                        ax.plot(
+                            midx,
+                            mlevel,
+                            marker="o",
+                            color=mcolor,
+                            markersize=6,
+                            zorder=5,
+                        )
+                        ax.annotate(
+                            f"{mlabel}\n{dates_list[midx]}",
+                            xy=(midx, label_y),
+                            xytext=(0, 6),
+                            textcoords="offset points",
+                            ha="center",
+                            va="bottom",
+                            fontsize=8,
+                            color=mcolor,
+                            fontweight="bold",
+                            bbox=dict(
+                                boxstyle="round,pad=0.3",
+                                fc="white",
+                                ec=mcolor,
+                                alpha=0.9,
+                                lw=1,
+                            ),
+                        )
                         break
 
         ax.set_xticks(range(0, len(dates_list), max(1, len(dates_list) // 15)))
-        ax.set_xticklabels([dates_list[i] for i in range(0, len(dates_list), max(1, len(dates_list) // 15))],
-                           rotation=45, fontsize=8, ha="right")
-        ax.set_title(f"Equity: ${STARTING_CASH:,} -> ${equities[-1]:,.0f} ({(equities[-1]/STARTING_CASH-1)*100:+.1f}%)",
-                     fontsize=13, fontweight="bold")
+        ax.set_xticklabels(
+            [
+                dates_list[i]
+                for i in range(0, len(dates_list), max(1, len(dates_list) // 15))
+            ],
+            rotation=45,
+            fontsize=8,
+            ha="right",
+        )
+        ax.set_title(
+            f"Equity: ${STARTING_CASH:,} -> ${equities[-1]:,.0f} ({(equities[-1] / STARTING_CASH - 1) * 100:+.1f}%)",
+            fontsize=13,
+            fontweight="bold",
+        )
         ax.set_ylabel("Balance ($)", fontsize=10)
         ax.legend(fontsize=9)
         ax.grid(alpha=0.3)
@@ -3896,54 +5137,86 @@ if __name__ == "__main__":
         ax = fig2.add_subplot(gs[2, 0])
         if all_exits:
             reason_colors = {
-                "H_TARGET": "#9C27B0", "H_TIME_STOP": "#BA68C8", "H_EOD_CLOSE": "#CE93D8",
-                "G_TARGET": "#4CAF50", "G_TIME_STOP": "#81C784", "G_EOD_CLOSE": "#C8E6C9",
-                "A_TARGET": "#2196F3", "A_TIME_STOP": "#64B5F6", "A_EOD_CLOSE": "#BBDEFB",
-                "F_TARGET": "#FF9800", "F_TIME_STOP": "#FFB74D", "F_EOD_CLOSE": "#FFE0B2",
-                "D_TARGET": "#00BCD4", "D_STOP": "#4DD0E1", "D_TRAIL": "#26C6DA",
-                "D_TIME_STOP": "#80DEEA", "D_EOD_CLOSE": "#B2EBF2",
-                "V_TARGET": "#607D8B", "V_STOP": "#90A4AE", "V_TRAIL": "#78909C",
-                "V_TIME_STOP": "#B0BEC5", "V_EOD_CLOSE": "#CFD8DC",
-                "M_TARGET": "#795548", "M_STOP": "#A1887F", "M_TRAIL": "#8D6E63",
-                "M_TIME_STOP": "#BCAAA4", "M_EOD_CLOSE": "#D7CCC8",
-                "R_TARGET": "#009688", "R_STOP": "#4DB6AC", "R_TRAIL": "#26A69A",
-                "R_TIME_STOP": "#80CBC4", "R_EOD_CLOSE": "#B2DFDB",
-                "P_TARGET": "#E91E63", "P_STOP": "#F48FB1", "P_TRAIL": "#F06292",
-                "P_TIME_STOP": "#F8BBD0", "P_EOD_CLOSE": "#FCE4EC",
-                "W_TARGET": "#CDDC39", "W_STOP": "#DCE775", "W_TRAIL": "#D4E157",
-                "W_TIME_STOP": "#E6EE9C", "W_EOD_CLOSE": "#F0F4C3",
+                "H_TARGET": "#9C27B0",
+                "H_TIME_STOP": "#BA68C8",
+                "H_EOD_CLOSE": "#CE93D8",
+                "G_TARGET": "#4CAF50",
+                "G_TIME_STOP": "#81C784",
+                "G_EOD_CLOSE": "#C8E6C9",
+                "A_TARGET": "#2196F3",
+                "A_TIME_STOP": "#64B5F6",
+                "A_EOD_CLOSE": "#BBDEFB",
+                "F_TARGET": "#FF9800",
+                "F_TIME_STOP": "#FFB74D",
+                "F_EOD_CLOSE": "#FFE0B2",
+                "D_TARGET": "#00BCD4",
+                "D_STOP": "#4DD0E1",
+                "D_TRAIL": "#26C6DA",
+                "D_TIME_STOP": "#80DEEA",
+                "D_EOD_CLOSE": "#B2EBF2",
+                "V_TARGET": "#607D8B",
+                "V_STOP": "#90A4AE",
+                "V_TRAIL": "#78909C",
+                "V_TIME_STOP": "#B0BEC5",
+                "V_EOD_CLOSE": "#CFD8DC",
+                "M_TARGET": "#795548",
+                "M_STOP": "#A1887F",
+                "M_TRAIL": "#8D6E63",
+                "M_TIME_STOP": "#BCAAA4",
+                "M_EOD_CLOSE": "#D7CCC8",
+                "R_TARGET": "#009688",
+                "R_STOP": "#4DB6AC",
+                "R_TRAIL": "#26A69A",
+                "R_TIME_STOP": "#80CBC4",
+                "R_EOD_CLOSE": "#B2DFDB",
+                "P_TARGET": "#E91E63",
+                "P_STOP": "#F48FB1",
+                "P_TRAIL": "#F06292",
+                "P_TIME_STOP": "#F8BBD0",
+                "P_EOD_CLOSE": "#FCE4EC",
+                "W_TARGET": "#CDDC39",
+                "W_STOP": "#DCE775",
+                "W_TRAIL": "#D4E157",
+                "W_TIME_STOP": "#E6EE9C",
+                "W_EOD_CLOSE": "#F0F4C3",
             }
             labels = list(all_exits.keys())
             sizes = list(all_exits.values())
             colors = [reason_colors.get(r, "#999") for r in labels]
-            ax.pie(sizes, labels=[f"{l}\n({s})" for l, s in zip(labels, sizes)],
-                   colors=colors, autopct="%1.0f%%", startangle=90, textprops={"fontsize": 8})
+            ax.pie(
+                sizes,
+                labels=[f"{l}\n({s})" for l, s in zip(labels, sizes)],
+                colors=colors,
+                autopct="%1.0f%%",
+                startangle=90,
+                textprops={"fontsize": 8},
+            )
         ax.set_title("Exit Reasons by Strategy", fontweight="bold")
 
         # 4. Stats + Stress Test
         ax = fig2.add_subplot(gs[2, 1])
         ax.axis("off")
         stats_text = (
-            f"PERFORMANCE\n{'='*38}\n"
+            f"PERFORMANCE\n{'=' * 38}\n"
             f"Starting:     ${STARTING_CASH:,}\n"
             f"Ending:       ${final_equity:,.0f}\n"
-            f"Return:       {(final_equity/STARTING_CASH-1)*100:+.1f}%\n"
-            f"{'─'*38}\n"
+            f"Return:       {(final_equity / STARTING_CASH - 1) * 100:+.1f}%\n"
+            f"{'─' * 38}\n"
             f"Total Trades: {total_trades}\n"
         )
         for k in STRAT_KEYS:
             st_t = strat_totals[k]
             st_w = strat_wins[k]
             st_pnl = sum(strat_pnls[k])
-            stats_text += f"  {k}: {st_t:>3} ({st_w}W {st_w/max(st_t,1)*100:.0f}%) ${st_pnl:+,.0f}\n"
+            stats_text += f"  {k}: {st_t:>3} ({st_w}W {st_w / max(st_t, 1) * 100:.0f}%) ${st_pnl:+,.0f}\n"
         stats_text += (
-            f"{'─'*38}\n"
-            f"Win Rate:     {total_wins/max(total_trades,1)*100:.1f}%\n"
+            f"{'─' * 38}\n"
+            f"Win Rate:     {total_wins / max(total_trades, 1) * 100:.1f}%\n"
             f"Avg Win:      ${avg_win:+,.0f}\n"
             f"Avg Loss:     ${avg_loss:+,.0f}\n"
             f"Profit Fac:   {pf:.2f}\n"
             f"Sharpe:       {sharpe:.2f}\n"
-            f"Green Days:   {green}/{len(daily_pnls)} ({green/max(len(daily_pnls),1)*100:.0f}%)\n"
+            f"Green Days:   {green}/{len(daily_pnls)} ({green / max(len(daily_pnls), 1) * 100:.0f}%)\n"
         )
         if daily_pnls:
             stats_text += (
@@ -3957,10 +5230,10 @@ if __name__ == "__main__":
         dd_mark = "OK" if max_dd_pct < 0.40 else "XX"
         overall_mark = "OK" if stress_pass else "XX"
         stats_text += (
-            f"\n{'='*38}\n"
+            f"\n{'=' * 38}\n"
             f"STRESS TEST\n"
-            f"{'='*38}\n"
-            f"[{dd_mark}] Max DD:      ${max_dd_dollar:,.0f} ({max_dd_pct*100:.1f}%)\n"
+            f"{'=' * 38}\n"
+            f"[{dd_mark}] Max DD:      ${max_dd_dollar:,.0f} ({max_dd_pct * 100:.1f}%)\n"
             f"     Loss Streak:  {max_streak} days\n"
         )
         if daily_pnls:
@@ -3973,41 +5246,50 @@ if __name__ == "__main__":
                     rem_sharpe = (np.mean(rem_pnls) / np.std(rem_pnls)) * np.sqrt(252)
             stats_text += (
                 f"[{rem_mark}] Rm Top 10%: ${rem_total:+,.0f} (Sh {rem_sharpe:.2f})\n"
-                f"[{kelly_mark}] Kelly:      {kelly*100:.1f}%\n"
+                f"[{kelly_mark}] Kelly:      {kelly * 100:.1f}%\n"
                 f"[{mc_mark}] Monte Carlo:{mc_pct:.0f}% profitable\n"
             )
         if vc_count > 0:
             stats_text += f"   Vol-Capped:  {vc_count}/{total_trades} trades\n"
-        stats_text += f"\n[{overall_mark}] OVERALL: {'ALL PASS' if stress_pass else 'CONCERNS'}\n"
-        ax.text(0.05, 0.95, stats_text, transform=ax.transAxes, fontsize=8,
-                verticalalignment="top", fontfamily="monospace",
-                bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5))
+        stats_text += (
+            f"\n[{overall_mark}] OVERALL: {'ALL PASS' if stress_pass else 'CONCERNS'}\n"
+        )
+        ax.text(
+            0.05,
+            0.95,
+            stats_text,
+            transform=ax.transAxes,
+            fontsize=8,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
+        )
 
         # 5. Config Parameters
         ax = fig2.add_subplot(gs[2, 2])
         ax.axis("off")
         config_text = (
-            f"PARAMETERS\n{'='*32}\n"
-            f"\nH (High Conviction)\n{'-'*32}\n"
+            f"PARAMETERS\n{'=' * 32}\n"
+            f"\nH (High Conviction)\n{'-' * 32}\n"
             f"  Gap >= {H_MIN_GAP_PCT:.0f}%\n"
             f"  Body >= {H_MIN_BODY_PCT:.0f}%\n"
             f"  2nd green + new hi\n"
             f"  Vol confirm: {H_REQUIRE_VOL_CONFIRM}\n"
             f"  Target: +{H_TARGET_PCT:.0f}%  Stop: {H_TIME_LIMIT_MINUTES}m\n"
-            f"\nG (Runner)\n{'-'*32}\n"
+            f"\nG (Runner)\n{'-' * 32}\n"
             f"  Gap >= {G_MIN_GAP_PCT:.0f}%\n"
             f"  2nd green + new hi\n"
             f"  Target: +{G_TARGET_PCT:.0f}%  Stop: {G_TIME_LIMIT_MINUTES}m\n"
-            f"\nA (Scalp)\n{'-'*32}\n"
+            f"\nA (Scalp)\n{'-' * 32}\n"
             f"  Gap >= {A_MIN_GAP_PCT:.0f}%\n"
             f"  Body >= {A_MIN_BODY_PCT:.0f}%\n"
             f"  2nd green + new hi\n"
             f"  Target: +{A_TARGET_PCT:.0f}%  Stop: {A_TIME_LIMIT_MINUTES}m\n"
-            f"\nF (Catch-All)\n{'-'*32}\n"
+            f"\nF (Catch-All)\n{'-' * 32}\n"
             f"  Gap >= {F_MIN_GAP_PCT:.0f}%\n"
             f"  2nd green (no hi req)\n"
             f"  Target: +{F_TARGET_PCT:.0f}%  Stop: {F_TIME_LIMIT_MINUTES}m\n"
-            f"\nD (Dip Buy)\n{'-'*32}\n"
+            f"\nD (Dip Buy)\n{'-' * 32}\n"
             f"  Gap >= {D_MIN_GAP_PCT:.0f}%\n"
             f"  Spike >= {D_MIN_SPIKE_PCT:.0f}% in {D_SPIKE_WINDOW}c\n"
             f"  Dip: {D_DIP_PCT:.0f}% | Mode: {D_ENTRY_MODE}\n"
@@ -4016,7 +5298,7 @@ if __name__ == "__main__":
             f"  Target2: +{D_TARGET2_PCT:.0f}% (runner)\n"
             f"  Stop: -{D_STOP_PCT:.0f}%  Trail: {D_TRAIL_PCT:.0f}% (at +{D_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {D_TIME_LIMIT_MINUTES}m\n"
-            f"\nV (VWAP Reclaim)\n{'-'*32}\n"
+            f"\nV (VWAP Reclaim)\n{'-' * 32}\n"
             f"  Gap >= {V_MIN_GAP_PCT:.0f}%\n"
             f"  Below VWAP: {V_MIN_BELOW_CANDLES}+ closes\n"
             f"  Min depth: {V_MIN_BELOW_PCT:.0f}% below VWAP\n"
@@ -4025,22 +5307,22 @@ if __name__ == "__main__":
             f"  Target2: +{V_TARGET2_PCT:.0f}% (runner)\n"
             f"  Stop: -{V_STOP_PCT:.0f}%  Trail: {V_TRAIL_PCT:.0f}% (at +{V_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {V_TIME_LIMIT_MINUTES}m\n"
-            f"\nM (Midday Break)\n{'-'*32}\n"
+            f"\nM (Midday Break)\n{'-' * 32}\n"
             f"  Gap >= {M_MIN_GAP_PCT:.0f}%\n"
             f"  Morning spike >= {M_MORNING_SPIKE_PCT:.0f}%\n"
-            f"  Consol: c{M_RANGE_START_CANDLE}-{M_RANGE_START_CANDLE+M_CONSOLIDATION_LEN}\n"
+            f"  Consol: c{M_RANGE_START_CANDLE}-{M_RANGE_START_CANDLE + M_CONSOLIDATION_LEN}\n"
             f"  Range <= {M_MAX_RANGE_PCT:.0f}%, Vol <= {M_VOL_RATIO:.1f}x\n"
             f"  Target1: +{M_TARGET1_PCT:.0f}% (sell {M_PARTIAL_SELL_PCT:.0f}%)\n"
             f"  Stop: -{M_STOP_PCT:.0f}%  Trail: {M_TRAIL_PCT:.0f}% (at +{M_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {M_TIME_LIMIT_MINUTES}m\n"
-            f"\nR (Multi-Day)\n{'-'*32}\n"
+            f"\nR (Multi-Day)\n{'-' * 32}\n"
             f"  Day1 gap >= {R_DAY1_MIN_GAP:.0f}%\n"
             f"  D2 pullback: {R_D2_PULLBACK_PCT:.0f}%\n"
             f"  Bounce > {R_BOUNCE_REF}\n"
             f"  Target: +{R_TARGET1_PCT:.0f}%\n"
             f"  Stop: -{R_STOP_PCT:.0f}%  Trail: {R_TRAIL_PCT:.0f}% (at +{R_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {R_TIME_LIMIT_MINUTES}m\n"
-            f"\nP (PM High Breakout)\n{'-'*32}\n"
+            f"\nP (PM High Breakout)\n{'-' * 32}\n"
             f"  Gap >= {P_MIN_GAP_PCT:.0f}%\n"
             f"  Confirm: {P_CONFIRM_ABOVE}/{P_CONFIRM_WINDOW} closes\n"
             f"  Pullback: {P_PULLBACK_PCT:.1f}%\n"
@@ -4049,7 +5331,7 @@ if __name__ == "__main__":
             f"  Target2: +{P_TARGET2_PCT:.0f}% (runner)\n"
             f"  Stop: -{P_STOP_PCT:.0f}%  Trail: {P_TRAIL_PCT:.0f}% (at +{P_TRAIL_ACTIVATE_PCT:.0f}%)\n"
             f"  Time: {P_TIME_LIMIT_MINUTES}m\n"
-            f"\nW (Power Hour)\n{'-'*32}\n"
+            f"\nW (Power Hour)\n{'-' * 32}\n"
             f"  Gap >= {W_MIN_GAP_PCT:.0f}%\n"
             f"  Morning run >= {W_MIN_MORNING_RUN:.0f}%\n"
             f"  Consol: c{W_CONSOL_START}-{W_EARLIEST_CANDLE}\n"
@@ -4058,7 +5340,7 @@ if __name__ == "__main__":
             f"  Vol surge >= {W_VOL_SURGE_MULT:.1f}x\n"
             f"  Target: +{W_TARGET_PCT:.0f}%\n"
             f"  Stop: -{W_STOP_PCT:.1f}%  Trail: {W_TRAIL_PCT:.0f}%\n"
-            f"\nSHARED\n{'-'*32}\n"
+            f"\nSHARED\n{'-' * 32}\n"
             f"  Priority:  H>G>A>F>D>V>M>R>P>W\n"
             f"  Sizing:    100% balance\n"
             f"  Slippage:  {SLIPPAGE_PCT}%\n"
@@ -4068,9 +5350,16 @@ if __name__ == "__main__":
             f"\n  {all_dates[0]} to {all_dates[-1]}\n"
             f"  {len(all_dates)} trading days\n"
         )
-        ax.text(0.05, 0.95, config_text, transform=ax.transAxes, fontsize=7.5,
-                verticalalignment="top", fontfamily="monospace",
-                bbox=dict(boxstyle="round", facecolor="#E3F2FD", alpha=0.7))
+        ax.text(
+            0.05,
+            0.95,
+            config_text,
+            transform=ax.transAxes,
+            fontsize=7.5,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox=dict(boxstyle="round", facecolor="#E3F2FD", alpha=0.7),
+        )
 
         plt.tight_layout()
         summary_path = os.path.join(run_dir, "gc_summary.png")
