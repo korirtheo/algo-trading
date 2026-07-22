@@ -455,11 +455,11 @@ export const Analytics = () => {
               <td>{new Date(e.timestamp).toLocaleTimeString()}</td>
               <td>{e.event_type}</td>
               <td>
-                <span className={`badge ${{
+                <span className={`badge ${
                   e.severity === 'critical' ? 'badge-error' :
                   e.severity === 'warning' ? 'badge-warning' :
                   'badge-info'
-                }}`}>
+                }`}>
                   {e.severity.toUpperCase()}
                 </span>
               </td>
