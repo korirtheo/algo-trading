@@ -90,6 +90,7 @@ def recover_open_positions(engine, executor, candidates, log):
     market_open_dt = datetime.combine(today, dt_time(9, 30), tzinfo=ET)
 
     for ticker, state in recovered.items():
+      try:
         entry_price = state["entry_price"]
         current_price = state["current_price"]
         strategy = state["strategy"]
@@ -172,9 +173,6 @@ def recover_open_positions(engine, executor, candidates, log):
             "exit_price": None,
         }
 
-        # Also update daily_state so it's tracked for time limits and done status
-        engine.daily_state.update_last_state(ticker, engine.last_states[ticker])
-
         # Add to candidates if not already there
         if ticker not in candidate_tickers:
             candidates = list(candidates) + [
@@ -211,6 +209,16 @@ def recover_open_positions(engine, executor, candidates, log):
                 f"RECOVERY: {ticker} orphan — defensive monitoring | "
                 f"stop=${stop_price:.2f} (-5%) target=${target_price:.2f} (+10%) trail=1%"
             )
+      except Exception as e:
+        log.error(f"RECOVERY: Failed to recover {ticker}: {e}", exc_info=True)
+        try:
+            if ticker in executor.get_positions():
+                log.warning(f"RECOVERY: Selling {ticker} due to recovery failure")
+                executor.sell(ticker, reason="RECOVERY_FAILED")
+                engine.position_state.remove_position(ticker)
+        except Exception as sell_err:
+            log.error(f"RECOVERY: Emergency sell failed for {ticker}: {sell_err}")
+        continue
 
     # Save account snapshot after recovery
     try:
