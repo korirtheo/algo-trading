@@ -137,6 +137,7 @@ interface SlippageRow {
   slip_bp: number | null;
   status: string | null;
   dollar_amount: number;
+  participation_rate: number | null;
 }
 
 interface FeedComparisonRow {
@@ -163,6 +164,10 @@ interface IntradayDiscovery {
   price: number;
   percent_change: number;
   source: string;
+  gap_pct: number | null;
+  cumulative_volume: number | null;
+  volume: number | null;
+  float_shares: number | null;
 }
 
 export const Analytics = () => {
@@ -546,9 +551,10 @@ export const Analytics = () => {
           <tr>
             <th>Time</th>
             <th>Ticker</th>
-            <th>Price</th>
-            <th>% Change</th>
-            <th>Source</th>
+            <th style={{ textAlign: 'right' }}>Gap%</th>
+            <th style={{ textAlign: 'right' }}>Cumul. Volume</th>
+            <th style={{ textAlign: 'right' }}>Volume</th>
+            <th style={{ textAlign: 'right' }}>Float</th>
           </tr>
         </thead>
         <tbody>
@@ -556,9 +562,18 @@ export const Analytics = () => {
             <tr key={d.id}>
               <td>{new Date(d.timestamp).toLocaleTimeString()}</td>
               <td className="ticker-cell">{d.ticker}</td>
-              <td>${d.price.toFixed(2)}</td>
-              <td className="positive">+{d.percent_change.toFixed(1)}%</td>
-              <td>{d.source}</td>
+              <td style={{ textAlign: 'right' }}>
+                {d.gap_pct != null ? <span className="positive">+{d.gap_pct.toFixed(1)}%</span> : '—'}
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                {d.cumulative_volume != null ? d.cumulative_volume.toLocaleString() : '—'}
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                {d.volume != null ? d.volume.toLocaleString() : '—'}
+              </td>
+              <td style={{ textAlign: 'right' }}>
+                {d.float_shares != null ? `${(d.float_shares / 1e6).toFixed(1)}M` : '—'}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -718,6 +733,7 @@ export const Analytics = () => {
                     <th style={{ textAlign: 'right' }}>Fill</th>
                     <th style={{ textAlign: 'right' }}>Slip BP</th>
                     <th style={{ textAlign: 'right' }}>Qty</th>
+                    <th style={{ textAlign: 'right' }}>Particip.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -741,6 +757,9 @@ export const Analytics = () => {
                         {fmtBp(r.slip_bp)}
                       </td>
                       <td style={{ textAlign: 'right' }}>{r.filled_qty}</td>
+                      <td style={{ textAlign: 'right', color: 'var(--text-secondary)' }}>
+                        {r.participation_rate != null ? `${(r.participation_rate * 100).toFixed(3)}%` : '—'}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

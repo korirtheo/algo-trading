@@ -240,7 +240,8 @@ async def get_slippage_by_date(date: str):
             cursor.execute(
                 """
                 SELECT id, timestamp, order_id, ticker, strategy, side, event_type,
-                       signal_price, fill_price, filled_qty, slip_bp, status
+                       signal_price, fill_price, filled_qty, slip_bp, status,
+                       cum_dollar_vol
                 FROM order_events
                 WHERE DATE(timestamp) = ? AND event_type IN ('fill', 'partial_fill')
                       AND slip_bp IS NOT NULL
@@ -253,6 +254,15 @@ async def get_slippage_by_date(date: str):
         # Build result rows
         result_rows = []
         for row in rows:
+            fill_price = row[8]
+            filled_qty = row[9]
+            dollar_amount = (fill_price or 0) * (filled_qty or 0)
+            # Participation rate: our fill size / 2-min cumulative dollar volume
+            participation_rate = None
+            # cum_dollar_vol is column index 12 in the query
+            cum_dollar_vol = row[12] if len(row) > 12 else None
+            if dollar_amount > 0 and cum_dollar_vol and cum_dollar_vol > 0:
+                participation_rate = dollar_amount / cum_dollar_vol
             result_rows.append(
                 {
                     "id": row[0],
@@ -263,11 +273,12 @@ async def get_slippage_by_date(date: str):
                     "side": row[5],
                     "event_type": row[6],
                     "signal_price": row[7],
-                    "fill_price": row[8],
-                    "filled_qty": row[9],
+                    "fill_price": fill_price,
+                    "filled_qty": filled_qty,
                     "slip_bp": row[10],
                     "status": row[11],
-                    "dollar_amount": (row[8] or 0) * (row[9] or 0),
+                    "dollar_amount": dollar_amount,
+                    "participation_rate": participation_rate,
                 }
             )
 

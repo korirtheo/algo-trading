@@ -480,6 +480,14 @@ class EngineBridge:
         cleaned = []
         for ev in order_events:
             if ev.get("event_type") in ("fill", "partial_fill") and ev.get("slip_bp") is not None:
+                fill_price = ev.get("fill_price")
+                filled_qty = ev.get("filled_qty")
+                cum_dollar_vol = ev.get("cum_dollar_vol")
+                dollar_amount = (fill_price or 0) * (filled_qty or 0)
+                # Participation rate: our fill size / 2-min cumulative dollar volume
+                participation_rate = None
+                if dollar_amount > 0 and cum_dollar_vol and cum_dollar_vol > 0:
+                    participation_rate = dollar_amount / cum_dollar_vol
                 cleaned.append({
                     "timestamp": ev.get("timestamp", ""),
                     "order_id": ev.get("order_id", ""),
@@ -487,11 +495,12 @@ class EngineBridge:
                     "side": ev.get("side", ""),
                     "strategy": ev.get("strategy", "?"),
                     "signal_price": ev.get("signal_price"),
-                    "fill_price": ev.get("fill_price"),
+                    "fill_price": fill_price,
                     "slip_bp": ev.get("slip_bp"),
-                    "filled_qty": ev.get("filled_qty"),
-                    "dollar_amount": ev.get("fill_price", 0) * ev.get("filled_qty", 0) if ev.get("fill_price") and ev.get("filled_qty") else 0,
-                    "cum_dollar_vol": ev.get("cum_dollar_vol"),
+                    "filled_qty": filled_qty,
+                    "dollar_amount": dollar_amount,
+                    "cum_dollar_vol": cum_dollar_vol,
+                    "participation_rate": participation_rate,
                     "status": ev.get("status", ""),
                 })
 

@@ -290,12 +290,54 @@ class TradingDatabase:
                     price REAL NOT NULL,
                     percent_change REAL NOT NULL,
                     source TEXT NOT NULL,
+                    gap_pct REAL,
+                    cumulative_volume REAL,
+                    volume REAL,
+                    float_shares REAL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(date, ticker)
                 )
             """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_intraday_discoveries_date ON intraday_discoveries(date)"
+            )
+
+            # Migration: add new columns to existing intraday_discoveries table
+            for col, typ in [
+                ("gap_pct", "REAL"),
+                ("cumulative_volume", "REAL"),
+                ("volume", "REAL"),
+                ("float_shares", "REAL"),
+            ]:
+                try:
+                    conn.execute(f"ALTER TABLE intraday_discoveries ADD COLUMN {col} {typ}")
+                except Exception:
+                    pass  # column already exists
+
+            # Ticker stream data table — stores raw Tradier stream values
+            # for later strategy development (not shown on analytics page)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS ticker_stream_data (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    ticker TEXT NOT NULL,
+                    price REAL,
+                    volume REAL,
+                    float_shares REAL,
+                    gap_pct REAL,
+                    prev_close REAL,
+                    day_high REAL,
+                    day_low REAL,
+                    avg_volume REAL,
+                    source TEXT,
+                    raw_json TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(date, ticker)
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticker_stream_date ON ticker_stream_data(date)"
             )
 
     # ===== TRADES =====
@@ -1221,7 +1263,9 @@ class TradingDatabase:
             )
         return result
 
-    def log_intraday_discovery(self, ticker, price, percent_change, timestamp, source):
+    def log_intraday_discovery(self, ticker, price, percent_change, timestamp, source,
+                                gap_pct=None, cumulative_volume=None, volume=None,
+                                float_shares=None):
         """Log an intraday discovery."""
         today = datetime.now(ET).date().isoformat()
         if isinstance(timestamp, str):
@@ -1234,11 +1278,13 @@ class TradingDatabase:
         with self._conn() as conn:
             conn.execute(
                 """
-                INSERT INTO intraday_discoveries (date, timestamp, ticker, price, percent_change, source)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO intraday_discoveries (date, timestamp, ticker, price, percent_change, source,
+                                                  gap_pct, cumulative_volume, volume, float_shares)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(date, ticker) DO NOTHING
             """,
-                (today, timestamp.isoformat(), ticker, price, percent_change, source),
+                (today, timestamp.isoformat(), ticker, price, percent_change, source,
+                 gap_pct, cumulative_volume, volume, float_shares),
             )
 
     def get_intraday_discoveries_by_date(self, date):
@@ -1249,3 +1295,32 @@ class TradingDatabase:
                 (date,),
             )
             return [dict(row) for row in cursor.fetchall()]
+
+    def log_ticker_stream_data(self, ticker, price=None, volume=None, float_shares=None,
+                                gap_pct=None, prev_close=None, day_high=None, day_low=None,
+                                avg_volume=None, source=None, raw_json=None):
+        """Store Tradier ticker stream values for later strategy development.
+
+        This captures the full snapshot of a ticker's data at discovery time,
+        including values not shown on the analytics page.
+        """
+        today = datetime.now(ET).date().isoformat()
+        timestamp = datetime.now(ET).isoformat()
+
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO ticker_stream_data
+                    (date, timestamp, ticker, price, volume, float_shares,
+                     gap_pct, prev_close, day_high, day_low, avg_volume, source, raw_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, ticker) DO UPDATE SET
+                    price=excluded.price, volume=excluded.volume,
+                    float_shares=excluded.float_shares, gap_pct=excluded.gap_pct,
+                    prev_close=excluded.prev_close, day_high=excluded.day_high,
+                    day_low=excluded.day_low, avg_volume=excluded.avg_volume,
+                    raw_json=excluded.raw_json, timestamp=excluded.timestamp
+            """,
+                (today, timestamp, ticker, price, volume, float_shares,
+                 gap_pct, prev_close, day_high, day_low, avg_volume, source, raw_json),
+            )

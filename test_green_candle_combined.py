@@ -77,7 +77,7 @@ if hasattr(_sys.stdout, "buffer"):
 #                   At 100% (you ARE):     K=3 -> 3.0%   impact
 #   regime_mult = 1.0 + REGIME_AMP * max(0, (regime_factor - 20) / 20)
 #                   default REGIME_AMP=0 disables it; opt-in by passing a VIX-like value
-USE_DYNAMIC_SLIPPAGE = False
+USE_DYNAMIC_SLIPPAGE = True
 SLIP_BASE_SPREAD = 0.05
 SLIP_PRICE_COEFF = 0.5
 SLIP_IMPACT_K = 3.0
@@ -108,7 +108,7 @@ MAX_2MIN_PARTICIPATION = (
 #   - 5% of cumulative dollar volume                  (sanity ceiling, rarely binds)
 #   - MAX_REGIME_PARTICIPATION * v_10min              (regime cap)
 #   - MAX_2MIN_PARTICIPATION   * v_eff_adj            (execution cap, usually binds)
-USE_MULTIWINDOW_SLIPPAGE = False
+USE_MULTIWINDOW_SLIPPAGE = True
 WINDOW_BARS_LOCAL = 3  # 3 bars = ~6 minutes (mid-range window)
 WINDOW_BARS_REGIME = 5  # 5 bars = ~10 minutes (regime window)
 MULTIWIN_LOCAL_WEIGHT = 0.5  # weight of 6-min window
@@ -2664,6 +2664,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             _close_position(st, stop_price, "STOP", ts)
                             continue
 
+                    # Time stop
                     if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
                         _close_position(st, c_close, "TIME_STOP", ts)
                         continue
@@ -2685,11 +2686,6 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         ):
                             _close_position(st, st["hgaf_trail_stop"], "TRAIL", ts)
                             continue
-
-                    # Time stop
-                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
-                        _close_position(st, c_close, "TIME_STOP", ts)
-                        continue
 
                     # Partial sell at target1 (G_TARGET_PCT)
                     if G_PARTIAL_SELL_PCT > 0 and not st["g_partial_taken"]:
@@ -2731,11 +2727,6 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if c_high >= tgt2_price:
                             _close_position(st, tgt2_price, "TARGET", ts)
                             continue
-
-                    # Time stop
-                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
-                        _close_position(st, c_close, "TIME_STOP", ts)
-                        continue
 
                     continue
 

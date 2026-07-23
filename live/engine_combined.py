@@ -352,14 +352,83 @@ class CombinedEngine:
                 event["price"],
                 event["percent_change"],
             )
-            # Log to DB
+
+            # Fetch Tradier quote for extended data (gap%, float, volume)
+            gap_pct = None
+            float_shares = FLOAT_DATA.get(ticker)
+            volume = None
+            prev_close = None
+            day_high = None
+            day_low = None
+            avg_volume = None
+            raw_json = None
+            try:
+                from config.settings import TRADIER_API_KEY
+                import requests as _req
+                resp = _req.get(
+                    "https://api.tradier.com/v1/markets/quotes",
+                    params={"symbols": ticker, "greeks": "false"},
+                    headers={"Authorization": f"Bearer {TRADIER_API_KEY}",
+                             "Accept": "application/json"},
+                    timeout=5,
+                )
+                if resp.status_code == 200:
+                    quotes = resp.json().get("quotes", {}).get("quote", [])
+                    if isinstance(quotes, dict):
+                        quotes = [quotes]
+                    if quotes:
+                        q = quotes[0]
+                        prev_close = q.get("prev_close")
+                        volume = q.get("volume")
+                        avg_volume = q.get("avg_volume")
+                        day_high = q.get("high")
+                        day_low = q.get("low")
+                        # Float from Tradier (more current than static file)
+                        tradier_float = q.get("shares_outstanding")
+                        if tradier_float and tradier_float > 0:
+                            float_shares = tradier_float
+                        # Compute gap% from prev_close
+                        if prev_close and prev_close > 0:
+                            gap_pct = ((event["price"] / prev_close) - 1) * 100
+                        raw_json = json.dumps(q)
+            except Exception as e:
+                log.debug(f"Tradier quote fetch failed for {ticker}: {e}")
+
+            # Cumulative volume from engine bar data (sum of all 2-min bars so far)
+            bars = self.bar_data.get(ticker, [])
+            cumulative_volume = sum(b.get("Volume", 0) for b in bars) if bars else None
+
+            # Log to DB with extended data
             self.db.log_intraday_discovery(
                 ticker,
                 event["price"],
                 event["percent_change"],
                 event["timestamp"],
                 source,
+                gap_pct=gap_pct,
+                cumulative_volume=cumulative_volume,
+                volume=volume,
+                float_shares=float_shares,
             )
+
+            # Store full Tradier stream data for later strategy development
+            try:
+                self.db.log_ticker_stream_data(
+                    ticker,
+                    price=event["price"],
+                    volume=volume,
+                    float_shares=float_shares,
+                    gap_pct=gap_pct,
+                    prev_close=prev_close,
+                    day_high=day_high,
+                    day_low=day_low,
+                    avg_volume=avg_volume,
+                    source=source,
+                    raw_json=raw_json,
+                )
+            except Exception as e:
+                log.debug(f"Failed to log ticker stream data for {ticker}: {e}")
+
             return True
         return False
 
