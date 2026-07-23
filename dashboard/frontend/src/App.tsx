@@ -8,6 +8,7 @@ import { StrategyPanel } from './components/StrategyPanel';
 import { Diagnostics } from './components/Diagnostics';
 import { HaltMonitor } from './components/HaltMonitor';
 import { Slippage } from './components/Slippage';
+import { SystemHealth } from './components/SystemHealth';
 import { Analytics } from './components/Analytics';
 import { useWebSocket } from './hooks/useWebSocket';
 
@@ -58,6 +59,7 @@ function App() {
       <main className="dashboard-main">
         {page === 'dashboard' ? (
           <>
+            <SystemHealth />
             <PortfolioHeader />
 
             <div className="row-chart-watch">

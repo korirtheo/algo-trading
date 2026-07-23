@@ -65,6 +65,7 @@ class EngineBridge:
         self.scanner_candidates = scanner_candidates or []
         self.halt_monitor = None     # set by live/main.py once monitor starts
         self.halt_events = []        # list of dicts pushed from main.py on each fire
+        self.system_health = []      # list of {component, status, message} from health checks
 
     def get_account(self):
         """Get account info from Alpaca.

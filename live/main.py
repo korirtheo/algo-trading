@@ -628,6 +628,18 @@ def _run_one_day(executor, args, log):
 
     log.info("Streaming... waiting for signals (primary feed: %s)", engine.active_feed)
 
+    # ── Pre-market health check ──────────────────────────────────────────
+    from live.health_check import run_health_check, check_streaming_health
+
+    healthy, health_results = run_health_check(engine, executor, tradier_streamer, fill_stream)
+    if not args.no_dash:
+        from dashboard.backend.app import bridge as _bridge
+        _bridge.system_health = health_results
+    if not healthy:
+        log.error("PRE-MARKET HEALTH CHECK FAILED — see system events for details")
+    else:
+        log.info("Pre-market health check: ALL PASSED")
+
     # Phase 5b: Halt-resume monitor (intraday discovery channel)
     halt_monitor = None
     try:
@@ -867,6 +879,19 @@ def _run_one_day(executor, args, log):
                         pass
 
             intraday_scanner.poll()
+
+            # ── Periodic streaming health check (every ~5 min = 10 × 30s) ──
+            _loop_count += 1
+            if _loop_count % 10 == 0:
+                try:
+                    s_healthy, s_results = check_streaming_health(engine, tradier_streamer)
+                    if not args.no_dash:
+                        from dashboard.backend.app import bridge as _bridge2
+                        _bridge2.system_health = s_results
+                    if not s_healthy:
+                        log.error("STREAMING HEALTH CHECK FAILED — see system events")
+                except Exception:
+                    pass
 
             time.sleep(30)
 

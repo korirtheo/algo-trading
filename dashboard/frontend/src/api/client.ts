@@ -166,7 +166,14 @@ export const api = {
   diagnostics: () => fetchJSON<DiagnosticsItem[]>('/api/diagnostics'),
   halts: () => fetchJSON<HaltEvent[]>('/api/halts/today'),
   slippage: () => fetchJSON<SlippageData>('/api/slippage/recent'),
+  health: () => fetchJSON<{healthy: boolean | null, checks: HealthCheck[]}>('/api/health'),
 };
+
+export interface HealthCheck {
+  component: string;
+  status: 'ok' | 'warning' | 'error';
+  message: string;
+}
 
 export interface SlippageRow {
   ts_signal: string;
