@@ -1967,7 +1967,10 @@ class CombinedEngine:
     def eod_close(self):
         """Force close all positions."""
         for ticker in list(self.active_positions):
-            self.executor.sell(ticker, reason="EOD_CLOSE")
+            try:
+                self.executor.sell(ticker, reason="EOD_CLOSE")
+            except Exception as e:
+                log.error(f"EOD close failed for {ticker}: {e}")
         self.active_positions.clear()
         # Mark any unfinished halt-resume states as done so they don't fire
         # entries on the next session if the process keeps running.

@@ -452,8 +452,18 @@ class OrderExecutor:
                     log.warning(f"Could not cancel bracket leg {o.id} ({ticker}): {e}")
             if cancelled > 0:
                 log.info(f"Cancelled {cancelled} bracket leg(s) for {ticker} before sell")
-                # Brief sleep to let Alpaca register cancellations before sell
-                time.sleep(0.4)
+                # Wait for Alpaca to fully process cancellations before selling.
+                # Poll every 0.5s up to 5s for the open orders to clear.
+                for attempt in range(10):
+                    time.sleep(0.5)
+                    remaining = self.client.get_orders(
+                        GetOrdersRequest(status=QueryOrderStatus.OPEN, symbols=[ticker])
+                    )
+                    if not remaining:
+                        log.info(f"Bracket legs fully cleared for {ticker} after {(attempt+1)*0.5}s")
+                        break
+                else:
+                    log.warning(f"Bracket legs still pending after 5s for {ticker}, proceeding with sell")
             return cancelled
         except Exception as e:
             log.warning(f"_cancel_bracket_legs_for_ticker {ticker} failed: {e}")
@@ -493,8 +503,24 @@ class OrderExecutor:
             if shares is None:
                 # Close entire position. With bracket legs already canceled,
                 # close_position is now reliable.
-                order = self.client.close_position(ticker)
-                log.info(f"SELL ALL {ticker} ({reason}) | order_id={order.id}")
+                # Retry up to 3 times if Alpaca still reports insufficient qty
+                # (bracket legs may not have fully cleared yet).
+                last_err = None
+                for attempt in range(3):
+                    try:
+                        order = self.client.close_position(ticker)
+                        log.info(f"SELL ALL {ticker} ({reason}) | order_id={order.id}")
+                        break
+                    except Exception as sell_err:
+                        err_str = str(sell_err).lower()
+                        if "insufficient qty" in err_str and attempt < 2:
+                            log.warning(f"SELL {ticker} attempt {attempt+1} failed (insufficient qty), retrying in 1s...")
+                            time.sleep(1)
+                            last_err = sell_err
+                            continue
+                        raise
+                else:
+                    raise last_err
             else:
                 # Mirror the BUY-side: whole shares only (most small-caps
                 # are non-fractionable on Alpaca).
