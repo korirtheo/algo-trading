@@ -15,6 +15,7 @@ from alpaca.data.historical.screener import ScreenerClient
 from alpaca.data.requests import MarketMoversRequest
 
 from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
+from live.event_logger import log_event
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -98,3 +99,4 @@ class IntradayScanner:
                     )
         except Exception as e:
             log.error(f"Failed to get intraday market movers: {e}")
+            log_event("intraday_scan_error", "error", f"Failed to get intraday market movers: {e}")

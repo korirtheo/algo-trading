@@ -23,6 +23,7 @@ from config.settings import (
     ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED,
     MIN_GAP_PCT, TOP_N, MAX_PRICE, FLOAT_DATA,
 )
+from live.event_logger import log_event
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -96,6 +97,7 @@ def _fetch_finviz_floats(tickers):
         log.info(f"Finviz float data: got {len(result)}/{len(tickers)} tickers")
     except Exception as e:
         log.warning(f"Finviz float fetch failed: {e}")
+        log_event("finviz_error", "warning", f"Finviz float fetch failed: {e}")
     return result
 
 
@@ -182,6 +184,7 @@ class PreMarketScanner:
             return movers
         except Exception as e:
             log.warning(f"Webull pre-market fetch failed: {e}")
+            log_event("webull_error", "error", f"Webull pre-market fetch failed: {e}")
             return []
 
     def _webull_batch_float(self, ticker_ids):
@@ -213,6 +216,7 @@ class PreMarketScanner:
             return result
         except Exception as e:
             log.warning(f"Webull batch float fetch failed: {e}")
+            log_event("webull_error", "warning", f"Webull batch float fetch failed: {e}")
             return {}
 
     def get_movers(self):
@@ -228,6 +232,7 @@ class PreMarketScanner:
             return gainers
         except Exception as e:
             log.warning(f"Alpaca movers failed: {e}")
+            log_event("alpaca_api_error", "error", f"Alpaca movers failed: {e}")
             return []
 
     def get_finviz_premarket(self):
@@ -292,6 +297,7 @@ class PreMarketScanner:
 
         except Exception as e:
             log.warning(f"Finviz scrape failed: {e}")
+            log_event("finviz_error", "error", f"Finviz scrape failed: {e}")
             return []
 
     def scan_premarket(self, movers):
@@ -368,6 +374,7 @@ class PreMarketScanner:
                     }
         except Exception as e:
             log.warning(f"Error fetching PM bars: {e}")
+            log_event("alpaca_api_error", "warning", f"Error fetching PM bars: {e}")
             bars_by_ticker = {}
 
         for ticker, info in ticker_map.items():
@@ -464,6 +471,7 @@ class PreMarketScanner:
             return tickers[:20]
         except Exception as e:
             log.warning(f"Finviz fetch failed: {e}")
+            log_event("finviz_error", "error", f"Finviz fetch failed: {e}")
             return []
 
     def get_gap_from_bars(self, tickers):
@@ -528,6 +536,7 @@ class PreMarketScanner:
             log.info(f"Bar-based gaps: {len(movers)} tickers with gap >= {self.min_gap_pct}%")
         except Exception as e:
             log.warning(f"Gap-from-bars calculation failed: {e}")
+            log_event("data_error", "warning", f"Gap-from-bars calculation failed: {e}")
 
         return movers
 

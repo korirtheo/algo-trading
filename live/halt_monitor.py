@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from datetime import datetime, date, time as dt_time
 from typing import Callable, Optional
 from zoneinfo import ZoneInfo
+from live.event_logger import log_event
 
 # 2026-06-24: persist every newly-seen halt to data/halts.csv so we accumulate
 # history going forward. The .txt source went dead; rebuilding via daily scrape.
@@ -66,6 +67,7 @@ def _persist_halt_event(ev: "HaltEvent") -> None:
                 ])
     except Exception as e:
         log.warning("Failed to persist halt event %s: %s", ev.ticker, e)
+        log_event("db_error", "warning", f"Failed to persist halt event {ev.ticker}: {e}")
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -256,6 +258,7 @@ class HaltMonitor:
             except Exception as e:
                 self.last_error = str(e)
                 log.warning("HaltMonitor poll error: %s", e)
+                log_event("halt_monitor_error", "warning", f"HaltMonitor poll error: {e}")
             # Sleep in short chunks so stop() reacts quickly
             for _ in range(self.poll_interval_secs):
                 if not self._running:
@@ -311,6 +314,7 @@ class HaltMonitor:
                 self.on_resume(ev)
             except Exception as e:
                 log.exception("on_resume callback raised for %s: %s", ev.ticker, e)
+                log_event("halt_monitor_error", "error", f"on_resume callback raised for {ev.ticker}: {e}")
 
     # ----- helpers exposed for dashboard / introspection -----
 

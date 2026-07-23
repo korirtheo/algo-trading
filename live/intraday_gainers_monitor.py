@@ -33,6 +33,7 @@ from alpaca.data.historical.screener import ScreenerClient
 from alpaca.data.requests import MarketMoversRequest
 
 from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
+from live.event_logger import log_event
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -121,6 +122,7 @@ def _load_news_cache():
         return by_ticker
     except Exception as e:
         log.warning("news cache load failed: %s", e)
+        log_event("data_error", "warning", f"News cache load failed: {e}")
         return {}
 
 
@@ -248,6 +250,7 @@ def run():
                          len(discovered))
         except Exception as e:
             log.warning("Poll %d failed: %s", poll_count, e)
+            log_event("intraday_scan_error", "warning", f"Intraday gainers poll {poll_count} failed: {e}")
 
         poll_count += 1
         time.sleep(POLL_SECONDS)

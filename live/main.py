@@ -46,6 +46,7 @@ from live.engine_combined import CombinedEngine
 from live.executor import OrderExecutor
 from live.halt_monitor import HaltMonitor
 from live.intraday_scanner import IntradayScanner
+from live.event_logger import log_event, set_db
 
 ET = ZoneInfo("America/New_York")
 
@@ -62,6 +63,7 @@ def recover_open_positions(engine, executor, candidates, log):
         open_positions = executor.get_positions()
     except Exception as e:
         log.warning(f"Recovery: could not fetch positions: {e}")
+        log_event("recovery_error", "error", f"Recovery: could not fetch positions: {e}")
         return candidates
 
     if not open_positions:
@@ -136,6 +138,7 @@ def recover_open_positions(engine, executor, candidates, log):
             df = bars_resp.df.reset_index() if not bars_resp.df.empty else None
         except Exception as e:
             log.warning(f"RECOVERY: Could not fetch bars for {ticker}: {e}")
+            log_event("recovery_error", "warning", f"RECOVERY: Could not fetch bars for {ticker}: {e}")
             df = None
 
         # Inject bars into engine
@@ -211,6 +214,7 @@ def recover_open_positions(engine, executor, candidates, log):
             )
       except Exception as e:
         log.error(f"RECOVERY: Failed to recover {ticker}: {e}", exc_info=True)
+        log_event("recovery_failed", "error", f"RECOVERY: Failed to recover {ticker}: {e}")
         try:
             if ticker in executor.get_positions():
                 log.warning(f"RECOVERY: Selling {ticker} due to recovery failure")
@@ -218,6 +222,7 @@ def recover_open_positions(engine, executor, candidates, log):
                 engine.position_state.remove_position(ticker)
         except Exception as sell_err:
             log.error(f"RECOVERY: Emergency sell failed for {ticker}: {sell_err}")
+            log_event("emergency_sell_failed", "critical", f"RECOVERY: Emergency sell failed for {ticker}: {sell_err}")
         continue
 
     # Save account snapshot after recovery
@@ -239,6 +244,7 @@ def recover_open_positions(engine, executor, candidates, log):
         )
     except Exception as e:
         log.warning(f"Failed to save recovery snapshot: {e}")
+        log_event("snapshot_error", "warning", f"Failed to save recovery snapshot: {e}")
 
     return candidates
 
@@ -344,6 +350,7 @@ def _next_trading_day_prep_time(executor, log):
         log.warning(
             f"Alpaca clock fetch failed ({e}); falling back to next weekday 7:00 ET"
         )
+        log_event("api_error", "warning", f"Alpaca clock fetch failed: {e}")
         now = datetime.now(ET)
         nxt = now.date() + timedelta(days=1)
         while nxt.weekday() >= 5:  # 5=Sat, 6=Sun
@@ -385,6 +392,7 @@ def start_dashboard(engine, executor, candidates, port=8000):
             server.run()
         except Exception as e:
             log.error(f"Dashboard server crashed: {e}", exc_info=True)
+            log_event("dashboard_error", "error", f"Dashboard server crashed: {e}")
 
     thread = threading.Thread(target=_run, daemon=True)
     thread.start()
@@ -407,6 +415,7 @@ def _run_one_day(executor, args, log):
             c = scanner.get_final_watchlist()
         except Exception as e:
             log.error(f"Scanner error during {label}: {e}", exc_info=True)
+            log_event("scanner_error", "error", f"Scanner error during {label}: {e}")
             return []
         if c:
             for x in c:
@@ -494,9 +503,11 @@ def _run_one_day(executor, args, log):
             f"FillStream init failed, falling back to legacy 30s polling: {e}",
             exc_info=True,
         )
+        log_event("stream_init_error", "error", f"FillStream init failed: {e}")
         fill_stream = None
 
     engine = CombinedEngine(executor, fill_stream=fill_stream)
+    set_db(engine.db)
     engine.initialize_watchlist(candidates)
 
     # Save watchlist to database
@@ -585,6 +596,7 @@ def _run_one_day(executor, args, log):
         log.error(
             f"TradierStreamer failed to start, falling back to Alpaca IEX as primary: {e}"
         )
+        log_event("tradier_init_error", "error", f"TradierStreamer failed to start: {e}")
         tradier_streamer = None
 
     # Secondary feed: Alpaca IEX — comparison logging only when Tradier is up,
@@ -677,6 +689,7 @@ def _run_one_day(executor, args, log):
                             pass
             except Exception as e:
                 log.exception("halt-monitor on_resume(%s) failed: %s", ticker, e)
+                log_event("halt_monitor_error", "error", f"Halt-monitor on_resume({ticker}) failed: {e}")
 
         halt_monitor = HaltMonitor(
             on_resume=_on_resume,
@@ -801,12 +814,14 @@ def _run_one_day(executor, args, log):
                     )
                 except Exception as e:
                     log.warning(f"Failed to save EOD snapshot: {e}")
+                    log_event("snapshot_error", "warning", f"Failed to save EOD snapshot: {e}")
 
                 # Save bar summaries
                 try:
                     engine.save_bar_summaries()
                 except Exception as e:
                     log.warning(f"Failed to save bar summaries: {e}")
+                    log_event("db_error", "warning", f"Failed to save bar summaries: {e}")
 
                 # Log shutdown event
                 engine.db.log_system_event(
@@ -911,6 +926,7 @@ def run(args):
             return
         except Exception as e:
             log.error(f"Trading session crashed: {e}", exc_info=True)
+            log_event("session_crash", "critical", f"Trading session crashed: {e}")
 
         if args.scan_only:
             return
@@ -950,6 +966,7 @@ def main():
     except Exception as e:
         log = logging.getLogger("live.main")
         log.error(f"Fatal error: {e}", exc_info=True)
+        log_event("fatal_error", "critical", f"Fatal error: {e}")
         # Keep dashboard alive even after a crash
         if not args.no_dash:
             log.info("Dashboard still running despite error...")

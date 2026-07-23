@@ -16,6 +16,7 @@ from collections import defaultdict
 
 from alpaca.data.enums import DataFeed
 from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED, ALPACA_FEED_DELAYED
+from live.event_logger import log_event
 
 _FEED_ENUM = DataFeed.IEX if ALPACA_FEED == "iex" else DataFeed.SIP
 
@@ -112,6 +113,7 @@ class BarStreamer:
             return True
         except Exception as e:
             log.error(f"add_symbol: subscribe_bars({symbol}) failed: {e}")
+            log_event("stream_subscribe_error", "error", f"subscribe_bars({symbol}) failed: {e}")
             with self._lock:
                 if symbol in self._symbols:
                     self._symbols.remove(symbol)
@@ -130,6 +132,7 @@ class BarStreamer:
             return True
         except Exception as e:
             log.warning(f"remove_symbol: unsubscribe_bars({symbol}) failed: {e}")
+            log_event("stream_subscribe_error", "warning", f"unsubscribe_bars({symbol}) failed: {e}")
             return False
 
     def symbols(self):
@@ -161,6 +164,7 @@ class BarStreamer:
                 ])
         except Exception as e:
             log.warning(f"Failed to log 1-min bar for {symbol}: {e}")
+            log_event("data_error", "warning", f"Failed to log 1-min bar for {symbol}: {e}")
 
     def _handle_bar(self, bar):
         """Process incoming 1-min bar, aggregate to 2-min."""

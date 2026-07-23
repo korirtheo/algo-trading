@@ -29,6 +29,7 @@ from test_full import SLIPPAGE_PCT, VOL_CAP_PCT, ET_TZ
 from strategies import halt_resume as hr
 from config.settings import FLOAT_DATA
 from live.position_state import PositionStateManager
+from live.event_logger import log_event
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -141,6 +142,7 @@ def _load_today_trades():
             return trades
         except Exception as e:
             log.warning("Could not load trade log: %s", e)
+            log_event("data_error", "warning", f"Could not load trade log: {e}")
     return []
 
 
@@ -290,8 +292,10 @@ class CombinedEngine:
                     self.executor.client.close_position(p.symbol)
                 except Exception as e:
                     log.error("ORPHAN close failed for %s: %s", p.symbol, e)
+                    log_event("position_error", "error", f"ORPHAN close failed for {p.symbol}: {e}")
         except Exception as e:
             log.warning("Orphan-position check failed: %s", e)
+            log_event("position_error", "warning", f"Orphan-position check failed: {e}")
 
     def on_intraday_addition(self, ticker, event, source="halt_resume"):
         """Register a ticker discovered mid-day (e.g. via halt-resume or intraday gainer scanner).
@@ -393,6 +397,7 @@ class CombinedEngine:
                         raw_json = json.dumps(q)
             except Exception as e:
                 log.debug(f"Tradier quote fetch failed for {ticker}: {e}")
+                log_event("tradier_api_error", "warning", f"Tradier quote fetch failed for {ticker}: {e}")
 
             # Cumulative volume from engine bar data (sum of all 2-min bars so far)
             bars = self.bar_data.get(ticker, [])
@@ -428,6 +433,7 @@ class CombinedEngine:
                 )
             except Exception as e:
                 log.debug(f"Failed to log ticker stream data for {ticker}: {e}")
+                log_event("db_error", "warning", f"Failed to log ticker stream data for {ticker}: {e}")
 
             return True
         return False
@@ -465,6 +471,7 @@ class CombinedEngine:
                 )
         except Exception as e:
             log.warning("Failed to log bar for %s: %s", symbol, e)
+            log_event("data_error", "warning", f"Failed to log bar for {symbol}: {e}")
 
     def _save_trade(self, trade):
         """Save trade to database and in-memory list."""
@@ -494,6 +501,7 @@ class CombinedEngine:
             _append_trade(trade)
         except Exception as e:
             log.error(f"Failed to save trade to database: {e}")
+            log_event("trade_save_error", "error", f"Failed to save trade to database: {e}")
             # Still save to JSON as fallback
             _append_trade(trade)
 
@@ -1666,6 +1674,7 @@ class CombinedEngine:
                     )
                 except Exception as e:
                     log.error(f"Failed to save position state for {ticker}: {e}")
+                    log_event("db_error", "warning", f"Failed to save position state for {ticker}: {e}")
         elif event_type in ("canceled", "rejected", "expired", "done_for_day"):
             # No fill — clear from active_positions so engine can react to next signal
             log.warning(
@@ -1773,6 +1782,7 @@ class CombinedEngine:
                         }
                 except Exception as e:
                     log.warning(f"Could not fetch position details for {ticker}: {e}")
+                    log_event("api_error", "warning", f"Could not fetch position details for {ticker}: {e}")
 
                 trade = {
                     "ticker": ticker,
@@ -1867,6 +1877,7 @@ class CombinedEngine:
                         self.pending_orders.pop(str(order_id), None)
             except Exception as e:
                 log.error(f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
+                log_event("safety_poll_error", "error", f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
 
         threading.Thread(
             target=_poll, daemon=True, name=f"sell-safety-{str(order_id)[:8]}"
@@ -1915,6 +1926,7 @@ class CombinedEngine:
                         self.active_positions.discard(ticker)
             except Exception as e:
                 log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
+                log_event("safety_poll_error", "error", f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
 
         threading.Thread(
             target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}"
@@ -2030,6 +2042,7 @@ class CombinedEngine:
             log.warning(
                 f"_cum_dollar_vol({ticker}) REST failed: {e}; falling back to local"
             )
+            log_event("api_error", "warning", f"_cum_dollar_vol({ticker}) REST failed: {e}")
             bars = self.bar_data.get(ticker, [])
             return float(sum(float(b["Close"]) * float(b["Volume"]) for b in bars))
 
@@ -2040,6 +2053,7 @@ class CombinedEngine:
                 self.executor.sell(ticker, reason="EOD_CLOSE")
             except Exception as e:
                 log.error(f"EOD close failed for {ticker}: {e}")
+                log_event("eod_close_failed", "error", f"EOD close failed for {ticker}: {e}")
         self.active_positions.clear()
         # Mark any unfinished halt-resume states as done so they don't fire
         # entries on the next session if the process keeps running.
@@ -2145,6 +2159,7 @@ class CombinedEngine:
                 saved_count += 1
             except Exception as e:
                 log.warning(f"Failed to save bar summary for {ticker}: {e}")
+                log_event("db_error", "warning", f"Failed to save bar summary for {ticker}: {e}")
 
         log.info(f"Bar summaries saved: {saved_count} tickers")
 

@@ -13,6 +13,7 @@ import logging
 import threading
 
 from alpaca.trading.stream import TradingStream
+from live.event_logger import log_event
 
 log = logging.getLogger(__name__)
 
@@ -70,8 +71,10 @@ class FillStream:
                     cb(event_str, order)
                 except Exception as e:
                     log.error(f"FillStream callback failed for {order_id}: {e}", exc_info=True)
+                    log_event("fillstream_error", "error", f"FillStream callback failed for {order_id}: {e}")
         except Exception as e:
             log.error(f"FillStream._on_update fatal: {e}", exc_info=True)
+            log_event("fillstream_error", "critical", f"FillStream._on_update fatal: {e}")
 
     def start_async(self):
         """Start the stream in a background daemon thread."""
@@ -86,6 +89,7 @@ class FillStream:
                 self.stream.run()
             except Exception as e:
                 log.error(f"FillStream.run died: {e}", exc_info=True)
+                log_event("fillstream_died", "critical", f"FillStream.run died: {e}")
 
         self._thread = threading.Thread(target=_run, daemon=True, name="alpaca-trading-stream")
         self._thread.start()

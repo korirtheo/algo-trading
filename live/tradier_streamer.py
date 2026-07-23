@@ -18,6 +18,7 @@ import threading
 import time
 from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
+from live.event_logger import log_event
 
 import requests
 
@@ -135,6 +136,7 @@ class TradierStreamer:
                 self.on_2min_bar(symbol, bar.to_dict())
             except Exception as e:
                 log.warning(f"TradierStreamer flush error for {symbol}: {e}")
+                log_event("tradier_stream_error", "warning", f"TradierStreamer flush error for {symbol}: {e}")
 
     def start_async(self) -> threading.Thread:
         self._running = True
@@ -163,6 +165,7 @@ class TradierStreamer:
             return session_id
         except Exception as e:
             log.error(f"TradierStreamer: failed to get session: {e}")
+            log_event("tradier_session_error", "error", f"TradierStreamer: failed to get session: {e}")
             return None
 
     def _stream_loop(self):
@@ -215,9 +218,11 @@ class TradierStreamer:
 
             except requests.exceptions.ReadTimeout:
                 log.warning("TradierStreamer: SSE read timeout, reconnecting")
+                log_event("tradier_stream_error", "warning", "TradierStreamer: SSE read timeout, reconnecting")
             except Exception as e:
                 if self._running:
                     log.error(f"TradierStreamer: SSE error: {e}, reconnecting in {backoff}s")
+                    log_event("tradier_stream_error", "warning", f"TradierStreamer: SSE error: {e}, reconnecting in {backoff}s")
                     time.sleep(backoff)
                     backoff = min(backoff * 2, 60)
 
@@ -273,3 +278,4 @@ class TradierStreamer:
             self.on_2min_bar(symbol, completed.to_dict())
         except Exception as e:
             log.warning(f"TradierStreamer on_2min_bar error for {symbol}: {e}")
+            log_event("tradier_stream_error", "warning", f"TradierStreamer on_2min_bar error for {symbol}: {e}")

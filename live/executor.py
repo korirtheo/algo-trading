@@ -17,6 +17,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from alpaca.trading.client import TradingClient
+from live.event_logger import log_event
 from alpaca.trading.requests import (
     MarketOrderRequest,
     StopOrderRequest,
@@ -129,6 +130,7 @@ class OrderExecutor:
                     status = status or "timeout"
             except Exception as e:
                 log.warning(f"reconcile {ticker} {order_id}: {e}")
+                log_event("reconcile_error", "warning", f"reconcile {ticker} {order_id}: {e}")
                 status = "poll_error"
 
             ts_fill = datetime.now(ET).isoformat()
@@ -187,6 +189,7 @@ class OrderExecutor:
                 )
             except Exception as e:
                 log.error(f"Failed to log order event to DB: {e}")
+                log_event("db_error", "warning", f"Failed to log order event to DB for {ticker}: {e}")
 
             # Stash the real fill on the executor's position record so future
             # consumers (dashboard, EOD report) can pick it up.
@@ -300,6 +303,7 @@ class OrderExecutor:
                     dollar_amount = equity_cap
             except Exception as e:
                 log.error(f"Equity cap fetch failed for {ticker}: {e}")
+                log_event("api_error", "warning", f"Equity cap fetch failed for {ticker}: {e}")
                 # If we can't read account equity, refuse to trade — better safe than sorry
                 return None
 
@@ -414,6 +418,7 @@ class OrderExecutor:
                 )
             except Exception as e:
                 log.error(f"Failed to log order placed event: {e}")
+                log_event("db_error", "warning", f"Failed to log buy order placed event for {ticker}: {e}")
 
             # Stage-1 calibration: background poll for the fill, append row
             # to logs/fills_calibration.csv. Doesn't change live behavior.
@@ -426,6 +431,7 @@ class OrderExecutor:
             return order
         except Exception as e:
             log.error(f"BUY {ticker} FAILED: {e}")
+            log_event("buy_failed", "error", f"BUY {ticker} FAILED: {e}")
             return None
 
     def _cancel_bracket_legs_for_ticker(self, ticker):
@@ -450,6 +456,7 @@ class OrderExecutor:
                     cancelled += 1
                 except Exception as e:
                     log.warning(f"Could not cancel bracket leg {o.id} ({ticker}): {e}")
+                    log_event("order_cancel_error", "warning", f"Could not cancel bracket leg {o.id} ({ticker}): {e}")
             if cancelled > 0:
                 log.info(f"Cancelled {cancelled} bracket leg(s) for {ticker} before sell")
                 # Wait for Alpaca to fully process cancellations before selling.
@@ -467,6 +474,7 @@ class OrderExecutor:
             return cancelled
         except Exception as e:
             log.warning(f"_cancel_bracket_legs_for_ticker {ticker} failed: {e}")
+            log_event("order_cancel_error", "warning", f"_cancel_bracket_legs_for_ticker {ticker} failed: {e}")
             return 0
 
     def sell(self, ticker, shares=None, reason="MANUAL",
@@ -565,6 +573,7 @@ class OrderExecutor:
                 )
             except Exception as ex:
                 log.error(f"Failed to log sell order placed event: {ex}")
+                log_event("db_error", "warning", f"Failed to log sell order placed event for {ticker}: {ex}")
 
             # Stage-1 calibration row for the sell leg.
             if signal_price is not None:
@@ -594,6 +603,7 @@ class OrderExecutor:
                     del self.positions[ticker]
                 return None
             log.error(f"SELL {ticker} FAILED: {e}")
+            log_event("sell_failed", "error", f"SELL {ticker} FAILED ({reason}): {e}")
             return None
 
     def close_all_positions(self, reason="EOD_CLOSE"):
