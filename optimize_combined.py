@@ -767,26 +767,42 @@ def suggest_all_params(trial):
     params["x_min_entry_room_pct"]    = trial.suggest_float("x_min_entry_room_pct", 2.0, 15.0, step=1.0)
     params["x_min_first_leg_gain_pct"] = trial.suggest_float("x_min_first_leg_gain_pct", 3.0, 20.0, step=1.0)
 
-    # === Strategy Enable/Disable (21 params, including X) ===
-    # USER OVERRIDE 2026-06-20: FORCE_ENABLE_STRATS env var locks the enable
-    # bits to a fixed set (e.g., "g,l"). Used by W10+ specialist studies after
-    # ablation revealed G is the dominant alpha source.
+    # === Strategy Enable/Disable ===
+    # ALLOWED_STRATS env var defines the search space. Optuna samples
+    # enable/disable for each strategy IN the set. Strategies NOT in the
+    # set are locked OFF permanently. When empty/unset, all 21 are in the
+    # search space (legacy behavior).
+    # Falls back to FORCE_ENABLE_STRATS for backward compat.
     import os as _os
-    _force_strats_env = _os.environ.get("FORCE_ENABLE_STRATS", "").strip()
-    if _force_strats_env:
-        _force_allowed = {s.strip().lower() for s in _force_strats_env.split(",") if s.strip()}
-        for s in ALL_STRATS:
-            params[f"enable_{s}"] = (s in _force_allowed)
+    _allowed_env = _os.environ.get("ALLOWED_STRATS",
+                    _os.environ.get("FORCE_ENABLE_STRATS", "")).strip()
+    if _allowed_env:
+        _allowed = {s.strip().lower() for s in _allowed_env.split(",") if s.strip()}
     else:
-        for s in ALL_STRATS:
+        _allowed = set(ALL_STRATS)
+
+    for s in ALL_STRATS:
+        if s in _allowed:
             params[f"enable_{s}"] = trial.suggest_categorical(f"enable_{s}", [True, False])
+        else:
+            params[f"enable_{s}"] = False
+
+    # Persist ALL enable bits via set_user_attr (correct booleans in PG)
+    for s in ALL_STRATS:
+        trial.set_user_attr(f"enable_{s}", params[f"enable_{s}"])
+    trial.set_user_attr("allowed_strats", ",".join(sorted(_allowed)))
+
     enabled = [params[f"enable_{s}"] for s in ALL_STRATS]
     if not any(enabled):
         raise optuna.TrialPruned()
 
-    # === Strategy Priority (21 params, including X) ===
+    # === Strategy Priority ===
+    # Only sample priority for allowed strategies (locked-OFF get priority 0)
     for s in ALL_STRATS:
-        params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 20)
+        if s in _allowed:
+            params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 20)
+        else:
+            params[f"priority_{s}"] = 0
 
     # === PHASE 1A adaptive controls (added 2026-06-17, revised 2026-06-18) ===
     # Gated via PHASE_1A_ENABLED env var so legacy studies can run unchanged.
@@ -1565,9 +1581,34 @@ def objective(trial, daily_picks, all_dates):
 # ---------------------------------------------------------------------------
 BEST_PARAMS_FILE = "results/params/optuna_best_params_v8.json"
 
+
+def merge_enable_from_user_attrs(trial):
+    """Merge enable_* bits from user_attrs into trial.params.
+
+    Always prefers user_attrs values over trial.params for enable_* bits,
+    because set_user_attr stores correct JSON booleans while
+    suggest_categorical encodes them as 0.0/1.0 floats in PostgreSQL.
+
+    Handles both new "allowed_strats" key (Optuna explores within set) and
+    legacy "enabled_strats" key (all listed strategies forced ON).
+    """
+    params = dict(trial.params)
+    ua = trial.user_attrs
+    # Override enable_* from user_attrs (always correct booleans)
+    for key, val in ua.items():
+        if key.startswith("enable_"):
+            params[key] = val
+    # Legacy compat: handle old "enabled_strats" key (forced ON)
+    if "enabled_strats" in ua and "allowed_strats" not in ua:
+        forced_set = set(ua["enabled_strats"].split(","))
+        for s in ALL_STRATS:
+            params[f"enable_{s}"] = s in forced_set
+    return params
+
+
 def dump_best_params(trial, elapsed_min=None):
     """Save best trial's full params + summary to JSON file."""
-    bp = dict(trial.params)
+    bp = merge_enable_from_user_attrs(trial)
     ua = trial.user_attrs
 
     data = {
@@ -1974,7 +2015,7 @@ def dump_best_gl_trail(study, args):
             "pf": ua.get("pf"),
             "wr": ua.get("wr"),
             "n": ua.get("n"),
-            "params": dict(best.params),
+            "params": merge_enable_from_user_attrs(best),
         }
         with open(args.params_out, "w") as f:
             json.dump(out, f, indent=2)

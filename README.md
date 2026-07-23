@@ -20,6 +20,7 @@ real-time React dashboard.
 4. [Slippage models](#slippage-models)
 5. [Backtest](#backtest)
 6. [Optimization](#optimization)
+   - [Switching strategies for a new study](#switching-strategies-for-a-new-study)
 7. [Walk-forward validation](#walk-forward-validation)
 8. [Strategies](#strategies)
 9. [Notable trial configs](#notable-trial-configs)
@@ -373,6 +374,57 @@ python optimize_combined.py --dump-best --db results/studies/run.db --study my_r
 ```
 
 Throughput: ~16–24 trials/hour on a typical laptop with `n_jobs=cpu_count()//2`.
+
+### Switching strategies for a new study
+
+Which strategies Optuna explores is controlled by a single line in the launcher
+([run_optuna_oglhmafp.py](run_optuna_oglhmafp.py)):
+
+```python
+STRATS = "o,g,l,h,m,a,p,f"   # ← change this to any subset of a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,r,s,v,w,x
+```
+
+The launcher passes `STRATS` as the `ALLOWED_STRATS` env var to
+`optimize_combined.py`. When set, Optuna **explores enable/disable within this
+set** — each trial independently decides which of the named strategies to turn
+on. Strategies NOT in the list are locked OFF permanently.
+
+This means if you give it 8 strategies, Optuna might discover that only 4 or 5
+of them are actually profitable together. The best trial could have any subset
+enabled.
+
+When `ALLOWED_STRATS` is empty/unset, all 21 strategies are in the search space
+(legacy behavior).
+
+**Examples:**
+
+```python
+# Explore only G+L (Optuna decides which combo works best)
+STRATS = "g,l"
+STUDY = "gl_v1"
+
+# Full 20-strategy search (Optuna samples all enable bits freely)
+STRATS = ""
+STUDY = "all_v1"
+
+# The 8 profitable strategies (Optuna picks the best subset)
+STRATS = "o,g,l,h,m,a,p,f"
+STUDY = "oglhmafp_v5"
+```
+
+**Versioning convention:** version studies, never delete. Bump the suffix
+(`oglhmafp_v5` → `oglhmafp_v6`) and update `STUDY` + `PARAMS_OUT` in the
+launcher. Old study data stays in PostgreSQL for reference.
+
+After changing `STRATS`, launch with:
+
+```powershell
+python run_optuna_oglhmafp.py --workers 8 --trials 3000 --startup 1000
+```
+
+The `--trials` and `--startup` are study-level totals — the launcher divides
+by worker count automatically. Defaults: 1000 startup (~10x dims for 256
+strategy combos), 3000 total (~30x dims for TPE convergence).
 
 ---
 

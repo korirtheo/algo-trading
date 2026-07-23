@@ -85,12 +85,20 @@ def _restrict_to_years(daily_picks, all_dates, years):
     return out_dates, out_picks
 
 
-def _merged_params(best_params):
-    """Merge trial params into the baseline (matches the OOS scripts)."""
+def _merged_params(best_trial_or_params):
+    """Merge trial params into the baseline (matches the OOS scripts).
+
+    Accepts either a Trial object (merges enable_* from user_attrs) or a dict.
+    """
+    from optimize_combined import merge_enable_from_user_attrs
+    if hasattr(best_trial_or_params, "user_attrs"):
+        params = merge_enable_from_user_attrs(best_trial_or_params)
+    else:
+        params = dict(best_trial_or_params)
     with open(BASELINE) as f:
         b = json.load(f)
     m = dict(b)
-    m.update(best_params)
+    m.update(params)
     return m
 
 

@@ -2,13 +2,21 @@
 Optuna Optimizer Launcher: O, G, L, H, M, A, P, F
 ===================================================
 Spawns 8 parallel worker processes running optimize_combined.py with
-FORCE_ENABLE_STRATS=o,g,l,h,m,a,p,f to lock the 8 profitable strategies ON.
-Each worker runs 1500 trials with 300 startup trials.
+ALLOWED_STRATS=o,g,l,h,m,a,p,f. Optuna explores enable/disable within
+this set — each trial independently decides which of the 8 to turn on.
+Strategies NOT in the list are locked OFF permanently.
 
 Usage:
-  python run_optuna_oglhmafp.py              # 8 workers, 1500 trials each
+  python run_optuna_oglhmafp.py              # 8 workers, 3000 total trials
   python run_optuna_oglhmafp.py --workers 4  # 4 workers
   python run_optuna_oglhmafp.py --trials 500 --startup 100  # quick test
+
+Version history:
+  v1 (oglhmafp_combined) — BUG: enable_* not stored, all 20 strats ran
+  v2 (oglhmafp_v2) — BUG: trial.params direct assign doesn't persist
+  v3 (oglhmafp_v3) — FIX: suggest_categorical single-value persists enable_*
+  v4 (oglhmafp_v4) — FIX: set_user_attr, but FORCE locked all listed ON
+  v5 (oglhmafp_v5) — ALLOWED_STRATS: Optuna explores enable/disable within set
 """
 
 import os
@@ -18,9 +26,9 @@ import argparse
 import time
 
 STRATS = "o,g,l,h,m,a,p,f"
-STUDY = "oglhmafp_combined"
+STUDY = "oglhmafp_v5"
 DB = "postgresql://postgres@127.0.0.1:5432/optuna_oglhmafp"
-PARAMS_OUT = "config/trial_oglhmafp_best.json"
+PARAMS_OUT = "config/trial_oglhmafp_v5_best.json"
 
 
 def main():
@@ -28,24 +36,27 @@ def main():
     parser.add_argument("--workers", type=int, default=8,
                         help="Number of parallel worker processes (default: 8)")
     parser.add_argument("--trials", type=int, default=3000,
-                        help="Total trials per worker (default: 3000)")
+                        help="Total trials for the STUDY, split across workers (default: 3000)")
     parser.add_argument("--startup", type=int, default=1000,
-                        help="TPE startup trials (default: 1000)")
+                        help="Total startup trials for the STUDY, split across workers (default: 1000)")
     parser.add_argument("--date-start", default="2024-01-01",
                         help="Training window start (default: 2024-01-01)")
     parser.add_argument("--date-end", default="2026-02-28",
                         help="Training window end (default: 2026-02-28)")
     args = parser.parse_args()
 
+    per_worker_trials = max(1, args.trials // args.workers)
+    per_worker_startup = max(1, args.startup // args.workers)
+
     print("=" * 70)
     print("Optuna Launcher: O, G, L, H, M, A, P, F")
-    print(f"  Strategies:  {STRATS.upper()}")
-    print(f"  Workers:     {args.workers}")
-    print(f"  Trials:      {args.trials} per worker")
-    print(f"  Startup:     {args.startup}")
-    print(f"  Study:       {STUDY}")
-    print(f"  DB:          {DB}")
-    print(f"  Params out:  {PARAMS_OUT}")
+    print(f"  Strategies:    {STRATS.upper()}")
+    print(f"  Workers:       {args.workers}")
+    print(f"  Study trials:  {args.trials} total ({per_worker_trials}/worker)")
+    print(f"  Study startup: {args.startup} total ({per_worker_startup}/worker)")
+    print(f"  Study:         {STUDY}")
+    print(f"  DB:            {DB}")
+    print(f"  Params out:    {PARAMS_OUT}")
     print("=" * 70)
 
     # Pre-set tgc slippage flags before launching workers — the objective
@@ -55,13 +66,16 @@ def main():
     _tgc.USE_MULTIWINDOW_SLIPPAGE = True
 
     # Build the command for each worker
+    # Trials and startup are STUDY-LEVEL totals — divide by workers
+    per_worker_trials = max(1, args.trials // args.workers)
+    per_worker_startup = max(1, args.startup // args.workers)
     base_cmd = [
         sys.executable, "optimize_combined.py",
         "--study-type", "combined",
         "--study", STUDY,
         "--db", DB,
-        "--trials", str(args.trials),
-        "--startup-trials", str(args.startup),
+        "--trials", str(per_worker_trials),
+        "--startup-trials", str(per_worker_startup),
         "--n-jobs", "1",        # single-threaded per process
         "--dynamic-slip",       # liquidity-aware slippage
         "--params-out", PARAMS_OUT,
@@ -69,9 +83,9 @@ def main():
         "--date-end", args.date_end,
     ]
 
-    # Set env for each worker — FORCE_ENABLE_STRATS locks the 8 strategies ON
+    # Set env for each worker — ALLOWED_STRATS defines the search space
     worker_env = os.environ.copy()
-    worker_env["FORCE_ENABLE_STRATS"] = STRATS
+    worker_env["ALLOWED_STRATS"] = STRATS
 
     # Step 1: Initialize DB schema with a single trial (avoids race condition)
     print(f"\nInitializing PostgreSQL schema...")
@@ -85,8 +99,8 @@ def main():
 
     # Step 2: Launch all workers
     print(f"\nLaunching {args.workers} workers...")
-    print(f"  Command: {' '.join(base_cmd)}")
-    print(f"  FORCE_ENABLE_STRATS={STRATS}\n")
+    print(f"  Per worker: {per_worker_trials} trials, {per_worker_startup} startup")
+    print(f"  ALLOWED_STRATS={STRATS}\n")
 
     start_time = time.time()
     procs = []
