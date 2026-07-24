@@ -6,6 +6,7 @@ type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | '
 interface Signal {
   id: number;
   date: string;
+  timestamp: string;
   ticker: string;
   strategy: string;
   signal_price: number;
