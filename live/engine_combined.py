@@ -1960,6 +1960,7 @@ class CombinedEngine:
         """Background safety net: if TradingStream misses an event (stream disconnect,
         callback bug, etc.), poll Alpaca after 60s to force-resolve the pending order.
         """
+        order_id = str(order_id)  # Alpaca returns UUID objects, not strings
 
         def _poll():
             time.sleep(60.0)
@@ -2000,7 +2001,7 @@ class CombinedEngine:
                 log_event("safety_poll_error", "error", f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
 
         threading.Thread(
-            target=_poll, daemon=True, name=f"safety-poll-{order_id[:8]}"
+            target=_poll, daemon=True, name=f"safety-poll-{str(order_id)[:8]}"
         ).start()
 
     def _poll_buy_fill_inline(self, order, ticker, strategy, entry_price, ts):

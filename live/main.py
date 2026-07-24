@@ -237,11 +237,15 @@ def recover_open_positions(engine, executor, candidates, log):
             positions_count=len(recovered),
         )
         # Log recovery event
-        engine.db.log_system_event(
-            "recovery",
-            "warning" if recovered else "info",
-            f"Recovery completed: {len(recovered)} positions restored",
-        )
+        if recovered:
+            details = ", ".join(
+                f"{t} ({s.get('strategy', '?')})" for t, s in recovered.items()
+            )
+            engine.db.log_system_event(
+                "recovery",
+                "info",
+                f"Recovery completed: {len(recovered)} positions restored and being tracked: {details}",
+            )
     except Exception as e:
         log.warning(f"Failed to save recovery snapshot: {e}")
         log_event("snapshot_error", "warning", f"Failed to save recovery snapshot: {e}")
