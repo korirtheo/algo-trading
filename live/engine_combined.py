@@ -835,10 +835,20 @@ class CombinedEngine:
                             order, ticker, strategy, entry_price, ts
                         )
                 else:
+                    _err = getattr(self.executor, "last_buy_error", "unknown error")
                     log.warning(
-                        "BUY REJECTED %s: order returned None (vol_cap or executor error)",
+                        "BUY REJECTED %s: %s",
                         ticker,
+                        _err,
                     )
+                    log_event(
+                        "buy_rejected",
+                        "error",
+                        f"BUY {ticker} ({strategy}) rejected: {_err}",
+                    )
+                    # Prevent re-triggering on every bar — store state so entry
+                    # detection sees prev.entry_price is not None next bar.
+                    self.last_states[state_key] = st
 
             # Exit detected
             if st.get("exit_price") is not None and (

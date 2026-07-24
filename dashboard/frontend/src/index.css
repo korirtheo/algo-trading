@@ -668,6 +668,10 @@ body {
   background: var(--red);
   color: #fff;
 }
+.badge-warning {
+  background: var(--yellow);
+  color: #000;
+}
 
 /* ─── System Health Banner ─── */
 .health-banner {

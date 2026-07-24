@@ -98,6 +98,7 @@ class OrderExecutor:
         self.client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
         self.positions = {}  # ticker -> position info
         self.pending_orders = {}  # ticker -> order info
+        self.non_tradable = set()  # tickers that Alpaca rejected as non-tradable
         self.db = TradingDatabase()
         _ensure_fill_log_header()
 
@@ -430,8 +431,10 @@ class OrderExecutor:
             )
             return order
         except Exception as e:
-            log.error(f"BUY {ticker} FAILED: {e}")
-            log_event("buy_failed", "error", f"BUY {ticker} FAILED: {e}")
+            error_msg = str(e)
+            log.error(f"BUY {ticker} FAILED: {error_msg}")
+            log_event("buy_failed", "error", f"BUY {ticker} FAILED: {error_msg}")
+            self.last_buy_error = error_msg  # surface to engine/dashboard
             return None
 
     def _cancel_bracket_legs_for_ticker(self, ticker):

@@ -456,20 +456,25 @@ export const Analytics = () => {
           </tr>
         </thead>
         <tbody>
-          {events.map((e) => (
-            <tr key={e.id}>
+          {[...events].sort((a, b) => {
+            // Errors first, then warnings, then info
+            const order: Record<string, number> = { critical: 0, error: 1, warning: 2, info: 3 };
+            return (order[a.severity] ?? 4) - (order[b.severity] ?? 4);
+          }).map((e) => (
+            <tr key={e.id} style={e.severity === 'error' || e.severity === 'critical' ? { background: 'var(--red-bg)' } : undefined}>
               <td>{new Date(e.timestamp).toLocaleTimeString()}</td>
               <td>{e.event_type}</td>
               <td>
                 <span className={`badge ${
                   e.severity === 'critical' ? 'badge-error' :
+                  e.severity === 'error' ? 'badge-error' :
                   e.severity === 'warning' ? 'badge-warning' :
                   'badge-info'
                 }`}>
                   {e.severity.toUpperCase()}
                 </span>
               </td>
-              <td>{e.message}</td>
+              <td style={(e.severity === 'error' || e.severity === 'critical') ? { fontWeight: 600 } : undefined}>{e.message}</td>
               <td className="details-cell">{e.details || '-'}</td>
             </tr>
           ))}
