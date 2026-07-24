@@ -1700,6 +1700,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "x_trailing_active": False,
                 # State — H/G/A/F trail tracking
                 "hgaf_trail_stop": 0.0,
+                # Partial sell tracking (set True when simulator actually executes a partial sell)
+                "partial_sell_executed": False,
                 # State — G partial exit tracking
                 "g_partial_taken": False,
                 "g_partial_proceeds": 0.0,
@@ -2102,6 +2104,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             partial_proceeds = partial_shares * sell_price
                             st["p_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
+                            st["partial_sell_executed"] = True
                             st["p_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
@@ -2169,6 +2172,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             partial_proceeds = partial_shares * sell_price
                             st["d_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
+                            st["partial_sell_executed"] = True
                             st["d_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
@@ -2235,6 +2239,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             partial_proceeds = partial_shares * sell_price
                             st["m_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
+                            st["partial_sell_executed"] = True
                             st["m_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
@@ -2292,6 +2297,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             partial_proceeds = partial_shares * sell_price
                             st["v_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
+                            st["partial_sell_executed"] = True
                             st["v_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
@@ -2356,6 +2362,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             partial_proceeds = partial_shares * sell_price
                             st["l_partial_proceeds"] += partial_proceeds
                             st["shares"] -= partial_shares
+                            st["partial_sell_executed"] = True
                             st["l_partial_taken"] = True
                             _receive_proceeds(partial_proceeds)
                             if st["shares"] <= 0.001:
@@ -2702,6 +2709,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["shares"] -= sell_shares
                                 st["g_partial_proceeds"] += proceeds
                                 _receive_proceeds(proceeds)
+                            st["partial_sell_executed"] = True
                             st["g_partial_taken"] = True
                             if st["shares"] <= 0.001:
                                 st["pnl"] = (

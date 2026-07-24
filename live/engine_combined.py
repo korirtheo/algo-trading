@@ -864,13 +864,16 @@ class CombinedEngine:
                             )
 
             # Partial sell detected
-            # FIX 2026-06-22: previously used the simulator's `st.shares` diff
-            # directly, which was based on the phantom cash/entry_price size.
-            # Now compute a FRACTION sold from the simulator state and apply
-            # that fraction to the ACTUAL Alpaca position size.
+            # FIX 2026-07-24: use simulator's explicit partial_sell_executed flag
+            # instead of comparing shares. Previous approach (shares diff) was a
+            # false positive: simulator re-runs the day with current cash, so after
+            # buy fill, cash drops -> simulator allocates fewer shares -> engine
+            # misinterprets as partial sell. The flag is only set when the simulator
+            # actually executes a partial sell on a bar.
             if (
                 prev is not None
-                and st.get("shares", 0) < prev.get("shares", 0)
+                and not prev.get("partial_sell_executed", False)
+                and st.get("partial_sell_executed", False)
                 and st.get("entry_price") is not None
                 and prev.get("entry_price") is not None
                 and ticker in self.active_positions
@@ -898,37 +901,39 @@ class CombinedEngine:
                                 signal_price=st.get("partial_price") or st.get("close"),
                                 strategy=pinfo.get("strategy", "?"),
                             )
-                            # FIX 2026-06-22: also poll the sell for terminal status.
-                            # Critical — if the sell only partially fills, our
-                            # position_entry update would over-decrement and
-                            # subsequent PARTIAL SELLs would target a non-existent
-                            # block of shares. Wait briefly for terminal state.
-                            actual_sold = sell_qty  # fallback assumption
+                            # FIX 2026-07-24: register with fill stream instead of
+                            # inline poll with unsafe fallback. The fill callback
+                            # (_on_sell_fill) with is_partial=True updates
+                            # position_entry.shares on fill/partial_fill and does
+                            # NOT record trade (position stays open).
                             if sell_order is not None:
-                                import time as _time
-
-                                term = {"filled", "canceled", "rejected", "expired"}
-                                deadline = _time.time() + 10.0
-                                while _time.time() < deadline:
-                                    try:
-                                        o = self.executor.client.get_order_by_id(
-                                            sell_order.id
-                                        )
-                                        sst = (
-                                            o.status.value
-                                            if hasattr(o.status, "value")
-                                            else str(o.status)
-                                        )
-                                        if o.filled_qty:
-                                            actual_sold = float(o.filled_qty)
-                                        if sst in term:
-                                            break
-                                    except Exception:
-                                        pass
-                                    _time.sleep(0.3)
-                            self.position_entry[ticker]["shares"] = (
-                                actual_shares - actual_sold
-                            )
+                                with self._pending_lock:
+                                    self.pending_orders[str(sell_order.id)] = {
+                                        "ticker": ticker,
+                                        "strategy": pinfo.get("strategy", "?"),
+                                        "signal_price": st.get("partial_price") or st.get("close"),
+                                        "signal_time": ts,
+                                        "side": "sell",
+                                        "exit_reason": "PARTIAL",
+                                        "is_partial": True,
+                                    }
+                                if self.fill_stream is not None:
+                                    self.fill_stream.register(
+                                        sell_order.id, self._on_sell_fill
+                                    )
+                                    self._schedule_sell_safety_poll(
+                                        sell_order.id, ticker
+                                    )
+                                    log.info(
+                                        "PARTIAL SELL %s: order %s placed, awaiting stream fill",
+                                        ticker,
+                                        sell_order.id,
+                                    )
+                                else:
+                                    # Legacy: assume fill, update shares directly
+                                    self.position_entry[ticker]["shares"] = (
+                                        actual_shares - sell_qty
+                                    )
 
             self.last_states[ticker] = dict(st)
 
