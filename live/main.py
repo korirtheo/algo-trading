@@ -927,7 +927,7 @@ def run(args):
     """
     log = setup_logging()
     log.info("=" * 60)
-    log.info("Combined Strategy Live Paper Trading (Trial 432)")
+    log.info("Combined Strategy Live Paper Trading (Trial 1215 (G+L modified))")
     log.info("=" * 60)
 
     # Check account
