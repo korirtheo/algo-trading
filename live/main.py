@@ -884,7 +884,7 @@ def _run_one_day(executor, args, log):
             _loop_count += 1
             if _loop_count % 10 == 0:
                 try:
-                    s_healthy, s_results = check_streaming_health(engine, tradier_streamer)
+                    s_healthy, s_results = check_streaming_health(engine, tradier_streamer, halt_monitor)
                     if not args.no_dash:
                         from dashboard.backend.app import bridge as _bridge2
                         _bridge2.system_health = s_results

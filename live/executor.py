@@ -355,6 +355,14 @@ class OrderExecutor:
         # Optional overrides (e.g. v3 overlay) bypass strategy resolution.
         bracket_stop_pct = bracket_stop_pct if bracket_stop_pct is not None else _resolve_bracket_stop_pct(strategy)
         bracket_stop = round(current_price * (1 - bracket_stop_pct / 100), 2)
+        # Alpaca enforces stop_price <= base_price - 0.01. For low-priced stocks
+        # or tight stop%, the calculated stop can violate this. Floor it at
+        # current_price - $0.01 (absolute minimum distance).
+        min_stop = round(current_price - 0.01, 2)
+        if bracket_stop > min_stop:
+            log.info(f"BRACKET STOP FLOOR {ticker}: ${bracket_stop:.2f} -> ${min_stop:.2f} "
+                     f"(current_price=${current_price:.2f}, stop_pct={bracket_stop_pct:.1f}%)")
+            bracket_stop = min_stop
         bracket_target_pct = bracket_target_pct if bracket_target_pct is not None else LIVE_BRACKET_TARGET_PCT
         bracket_target = round(current_price * (1 + bracket_target_pct / 100), 2)
 
@@ -381,15 +389,39 @@ class OrderExecutor:
         ts_signal = datetime.now(ET).isoformat()
         try:
             if LIVE_BRACKET_ORDERS:
-                order = self.client.submit_order(_build_buy_req(with_bracket=True))
-                order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"
-                log.info(
-                    f"BUY {ticker} [BRACKET/{order_kind}] strategy={strategy}: {shares} shares "
-                    f"@ ~${current_price:.2f} (${dollar_amount:,.0f}) | "
-                    f"stop=${bracket_stop:.2f} (-{bracket_stop_pct:.1f}%) "
-                    f"target=${bracket_target:.2f} (+{LIVE_BRACKET_TARGET_PCT}%) | "
-                    f"order_id={order.id}"
-                )
+                try:
+                    order = self.client.submit_order(_build_buy_req(with_bracket=True))
+                    order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"
+                    log.info(
+                        f"BUY {ticker} [BRACKET/{order_kind}] strategy={strategy}: {shares} shares "
+                        f"@ ~${current_price:.2f} (${dollar_amount:,.0f}) | "
+                        f"stop=${bracket_stop:.2f} (-{bracket_stop_pct:.1f}%) "
+                        f"target=${bracket_target:.2f} (+{LIVE_BRACKET_TARGET_PCT}%) | "
+                        f"order_id={order.id}"
+                    )
+                except Exception as bracket_err:
+                    bracket_msg = str(bracket_err)
+                    # Only retry without bracket for the specific Alpaca validation
+                    # error where stop is too close to base price. Other bracket
+                    # errors (auth, network, etc.) should propagate as failures.
+                    if "stop_loss.stop_price" in bracket_msg and "base_price" in bracket_msg:
+                        log.warning(
+                            f"BUY {ticker} BRACKET STOP TOO TIGHT: {bracket_msg} — retrying without bracket"
+                        )
+                        log_event(
+                            "bracket_stop_floor", "warning",
+                            f"Alpaca rejected bracket for {ticker}: {bracket_msg}. "
+                            f"Detected stop_price <= base_price violation. "
+                            f"Retrying buy without bracket (engine stops will manage exit).",
+                        )
+                        order = self.client.submit_order(_build_buy_req(with_bracket=False))
+                        order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"
+                        log.info(
+                            f"BUY {ticker} [NO-BRACKET/{order_kind}] strategy={strategy}: {shares} shares "
+                            f"@ ~${current_price:.2f} (${dollar_amount:,.0f}) | order_id={order.id}"
+                        )
+                    else:
+                        raise  # re-raise non-stop-related bracket errors
             else:
                 order = self.client.submit_order(_build_buy_req(with_bracket=False))
                 order_kind = f"LIMIT@${limit_price}" if use_limit else "MARKET"

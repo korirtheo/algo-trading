@@ -114,15 +114,25 @@ def check_tradier_streaming_alive(tradier_streamer):
     return _check("tradier_streaming", "ok", f"Tradier streaming active (session {tradier_streamer._session_id[:8]}...)")
 
 
-def check_bars_arriving(engine, max_stale_seconds=360):
+def check_bars_arriving(engine, max_stale_seconds=360, halt_monitor=None):
     """Check if bars are arriving within expected timeframe (post-open check).
 
     Args:
         max_stale_seconds: Max seconds since last bar before flagging as stale (default 6 min)
+        halt_monitor: HaltMonitor instance — if provided, halted tickers are excluded from stale warnings
     """
     now = datetime.now(ET)
+
+    # Build set of currently-halted tickers (halted but not yet resumed)
+    halted_tickers = set()
+    if halt_monitor is not None:
+        for ev in halt_monitor.recent_events:
+            if not ev.resumed:
+                halted_tickers.add(ev.ticker)
+
     # Check each symbol's last bar time
     stale_symbols = []
+    halted_stale = []
     for symbol, bars in engine.bar_data.items():
         if bars:
             last_bar = bars[-1]
@@ -132,13 +142,31 @@ def check_bars_arriving(engine, max_stale_seconds=360):
                     last_ts = last_ts.astimezone(ET)
                 age = (now - last_ts).total_seconds()
                 if age > max_stale_seconds:
-                    stale_symbols.append(f"{symbol} ({int(age)}s ago)")
+                    if symbol in halted_tickers:
+                        halted_stale.append(symbol)
+                    else:
+                        stale_symbols.append(f"{symbol} ({int(age)}s ago)")
 
-    if not stale_symbols:
+    # Log halted tickers to system events for record-keeping
+    for symbol in halted_stale:
+        log_event(
+            "ticker_halted",
+            "info",
+            f"{symbol} is halted (no bars — expected behavior)",
+        )
+
+    if not stale_symbols and not halted_stale:
         return _check("bar_feed", "ok", "All feeds delivering bars")
-    if len(stale_symbols) <= len(engine.bar_data) // 2:
-        return _check("bar_feed", "warning", f"Stale bars: {', '.join(stale_symbols[:5])}")
-    return _check("bar_feed", "error", f"Most feeds stale: {', '.join(stale_symbols[:5])}")
+
+    parts = []
+    if stale_symbols:
+        parts.append(f"Stale bars: {', '.join(stale_symbols[:5])}")
+    if halted_stale:
+        parts.append(f"Halted (no bars expected): {', '.join(halted_stale[:5])}")
+    msg = " | ".join(parts)
+
+    severity = "warning" if len(stale_symbols) <= len(engine.bar_data) // 2 else "error"
+    return _check("bar_feed", severity, msg)
 
 
 def run_health_check(engine, executor, tradier_streamer=None, fill_stream=None):
@@ -171,7 +199,7 @@ def run_health_check(engine, executor, tradier_streamer=None, fill_stream=None):
     return healthy, results
 
 
-def check_streaming_health(engine, tradier_streamer=None):
+def check_streaming_health(engine, tradier_streamer=None, halt_monitor=None):
     """Run post-open streaming health checks (called periodically during trading).
 
     Returns:
@@ -179,7 +207,7 @@ def check_streaming_health(engine, tradier_streamer=None):
     """
     results = [
         check_tradier_streaming_alive(tradier_streamer),
-        check_bars_arriving(engine),
+        check_bars_arriving(engine, halt_monitor=halt_monitor),
     ]
 
     for r in results:

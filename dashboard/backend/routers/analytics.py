@@ -371,3 +371,35 @@ async def get_trade_details(date: str):
 async def get_intraday_discoveries(date: str):
     """Get intraday top gainers for a specific date, sorted by % change."""
     return db.get_intraday_discoveries_by_date(date)
+
+
+@router.get("/analytics/halts/{date}")
+async def get_halt_status(date: str):
+    """Get halt status for tickers on a specific date.
+
+    Returns a dict mapping ticker -> {halted: bool, reason: str, resumed: bool}.
+    """
+    import csv
+    import os
+
+    halts_csv = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data", "halts.csv",
+    )
+    result = {}
+    if not os.path.exists(halts_csv):
+        return result
+    try:
+        with open(halts_csv, "r", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                if row.get("halt_date") == date:
+                    ticker = row.get("ticker", "")
+                    if ticker:
+                        result[ticker] = {
+                            "halted": not bool(row.get("resume_time")),
+                            "reason": row.get("reason", ""),
+                            "resumed": bool(row.get("resume_time")),
+                        }
+    except Exception:
+        pass
+    return result

@@ -16,6 +16,7 @@ import json
 import logging
 import threading
 import time
+import traceback
 from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 from live.event_logger import log_event
@@ -277,5 +278,5 @@ class TradierStreamer:
         try:
             self.on_2min_bar(symbol, completed.to_dict())
         except Exception as e:
-            log.warning(f"TradierStreamer on_2min_bar error for {symbol}: {e}")
+            log.warning(f"TradierStreamer on_2min_bar error for {symbol}: {e}\n{traceback.format_exc()}")
             log_event("tradier_stream_error", "warning", f"TradierStreamer on_2min_bar error for {symbol}: {e}")
