@@ -14,7 +14,7 @@ from alpaca.data.enums import MarketType
 from alpaca.data.historical.screener import ScreenerClient
 from alpaca.data.requests import MarketMoversRequest
 
-from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
+from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET, MIN_WATCHLIST_VOLUME
 from live.event_logger import log_event
 
 log = logging.getLogger(__name__)

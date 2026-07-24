@@ -23,10 +23,10 @@ async def get_signals(date: str):
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT id, date, ticker, strategy, signal_price, action, reason, order_id, gap_pct
+            SELECT id, date, timestamp, ticker, strategy, signal_price, action, reason, order_id, gap_pct
             FROM signals
             WHERE date = ?
-            ORDER BY date DESC
+            ORDER BY timestamp DESC
         """,
             (date,),
         )
@@ -38,13 +38,14 @@ async def get_signals(date: str):
             {
                 "id": row[0],
                 "date": row[1],
-                "ticker": row[2],
-                "strategy": row[3],
-                "signal_price": row[4],
-                "action": row[5],
-                "reason": row[6],
-                "order_id": row[7],
-                "gap_pct": row[8],
+                "timestamp": row[2],
+                "ticker": row[3],
+                "strategy": row[4],
+                "signal_price": row[5],
+                "action": row[6],
+                "reason": row[7],
+                "order_id": row[8],
+                "gap_pct": row[9],
             }
         )
 

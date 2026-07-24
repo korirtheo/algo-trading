@@ -1702,6 +1702,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "hgaf_trail_stop": 0.0,
                 # Partial sell tracking (set True when simulator actually executes a partial sell)
                 "partial_sell_executed": False,
+                # Per-trade params snapshot (for split-param G1/G2/L1/L2 studies)
+                "entry_params": None,       # params dict snapshot at entry time
+                "entry_trade_seq": 0,       # 0 = 1st trade of day for this strategy
                 # State — G partial exit tracking
                 "g_partial_taken": False,
                 "g_partial_proceeds": 0.0,
@@ -1993,6 +1996,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             e_only_states.append(e_st)
             st["e_eligible"] = False
     states.extend(e_only_states)
+
+    # Track how many times each strategy has entered today (for G1/G2/L1/L2 split)
+    day_trade_counts = {}  # strategy -> count of entries today
 
     for ts in all_timestamps:
         entry_candidates = []
@@ -2327,20 +2333,28 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                 # ===== STRATEGY L: Low Float Squeeze (trailing + partial + tiered targets) =====
                 if st["strategy"] == "L":
+                    # Read per-trade params (split-param L1/L2 support)
+                    _ep = st.get("entry_params") or params
+                    _l_stop = float(_ep.get("l_stop_pct", L_STOP_PCT))
+                    _l_trail = float(_ep.get("l_trail_pct", L_TRAIL_PCT))
+                    _l_trail_act = float(_ep.get("l_trail_activate_pct", L_TRAIL_ACTIVATE_PCT))
+                    _l_time = int(_ep.get("l_time_limit_min", L_TIME_LIMIT_MINUTES))
+                    _l_partial = float(_ep.get("l_partial_sell_pct", L_PARTIAL_SELL_PCT))
+
                     if c_high > st["l_highest_since_entry"]:
                         st["l_highest_since_entry"] = c_high
 
                     # 1. Trailing stop (if active)
                     if st["l_trailing_active"]:
                         trail_stop = st["l_highest_since_entry"] * (
-                            1 - L_TRAIL_PCT / 100
+                            1 - _l_trail / 100
                         )
                         if c_low <= trail_stop:
                             _close_position(st, trail_stop, "TRAIL", ts)
                             continue
                     else:
                         # 2. Hard stop (before trail activates)
-                        stop_price = st["entry_price"] * (1 - L_STOP_PCT / 100)
+                        stop_price = st["entry_price"] * (1 - _l_stop / 100)
                         if c_low <= stop_price:
                             _close_position(st, stop_price, "STOP", ts)
                             continue
@@ -2348,14 +2362,14 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     # 3. Activate trailing stop
                     if not st["l_trailing_active"]:
                         unrealized_pct = (c_high / st["entry_price"] - 1) * 100
-                        if unrealized_pct >= L_TRAIL_ACTIVATE_PCT:
+                        if unrealized_pct >= _l_trail_act:
                             st["l_trailing_active"] = True
 
                     # 4. Partial sell at target1 (float-tiered)
-                    if not st["l_partial_taken"] and L_PARTIAL_SELL_PCT > 0:
+                    if not st["l_partial_taken"] and _l_partial > 0:
                         tgt1 = st["entry_price"] * (1 + st["l_target1_pct"] / 100)
                         if c_high >= tgt1:
-                            partial_shares = st["shares"] * (L_PARTIAL_SELL_PCT / 100)
+                            partial_shares = st["shares"] * (_l_partial / 100)
                             sell_price = tgt1 * (
                                 1 - _exit_slip_pct(tgt1, partial_shares, st, ts) / 100
                             )
@@ -2384,7 +2398,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         continue
 
                     # 6. Time stop
-                    if minutes_in_trade >= L_TIME_LIMIT_MINUTES:
+                    if minutes_in_trade >= _l_time:
                         _close_position(st, c_close, "TIME_STOP", ts)
                         continue
 
@@ -2661,29 +2675,39 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                 # ===== STRATEGY G: Big Gap Runner (partial exit + trail/target2 + stop) =====
                 if st["strategy"] == "G":
+                    # Read per-trade params (split-param G1/G2 support)
+                    _ep = st.get("entry_params") or params
+                    _g_stop = float(_ep.get("g_stop_pct", G_STOP_PCT))
+                    _g_time = int(_ep.get("g_time_limit_min", G_TIME_LIMIT_MINUTES))
+                    _g_trail = float(_ep.get("g_trail_pct", G_TRAIL_PCT))
+                    _g_trail_act = float(_ep.get("g_trail_activate_pct", G_TRAIL_ACTIVATE_PCT))
+                    _g_target = float(_ep.get("g_target_pct", G_TARGET_PCT))
+                    _g_partial = float(_ep.get("g_partial_sell_pct", G_PARTIAL_SELL_PCT))
+                    _g_target2 = float(_ep.get("g_target2_pct", G_TARGET2_PCT))
+
                     if c_high > st["g_highest_since_entry"]:
                         st["g_highest_since_entry"] = c_high
 
                     # Hard stop (always active, even before partial)
-                    if G_STOP_PCT > 0:
-                        stop_price = st["entry_price"] * (1 - G_STOP_PCT / 100)
+                    if _g_stop > 0:
+                        stop_price = st["entry_price"] * (1 - _g_stop / 100)
                         if c_low <= stop_price:
                             _close_position(st, stop_price, "STOP", ts)
                             continue
 
                     # Time stop
-                    if minutes_in_trade >= G_TIME_LIMIT_MINUTES:
+                    if minutes_in_trade >= _g_time:
                         _close_position(st, c_close, "TIME_STOP", ts)
                         continue
 
                     # Trailing stop (active once trail_activate threshold reached)
-                    if G_TRAIL_PCT > 0:
+                    if _g_trail > 0:
                         unrealized_pct = (
                             st["g_highest_since_entry"] / st["entry_price"] - 1
                         ) * 100
-                        if unrealized_pct >= G_TRAIL_ACTIVATE_PCT:
+                        if unrealized_pct >= _g_trail_act:
                             trail_stop = st["g_highest_since_entry"] * (
-                                1 - G_TRAIL_PCT / 100
+                                1 - _g_trail / 100
                             )
                             if trail_stop > st.get("hgaf_trail_stop", 0):
                                 st["hgaf_trail_stop"] = trail_stop
@@ -2695,10 +2719,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             continue
 
                     # Partial sell at target1 (G_TARGET_PCT)
-                    if G_PARTIAL_SELL_PCT > 0 and not st["g_partial_taken"]:
-                        tgt1_price = st["entry_price"] * (1 + G_TARGET_PCT / 100)
+                    if _g_partial > 0 and not st["g_partial_taken"]:
+                        tgt1_price = st["entry_price"] * (1 + _g_target / 100)
                         if c_high >= tgt1_price:
-                            sell_shares = int(st["shares"] * G_PARTIAL_SELL_PCT / 100)
+                            sell_shares = int(st["shares"] * _g_partial / 100)
                             if sell_shares > 0:
                                 sell_price = tgt1_price * (
                                     1
@@ -2722,16 +2746,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["shares"] = 0
                                 st["done"] = True
                                 continue
-                    elif G_PARTIAL_SELL_PCT == 0:
+                    elif _g_partial == 0:
                         # No partial: sell all at target1 (legacy behavior)
-                        target_price = st["entry_price"] * (1 + G_TARGET_PCT / 100)
+                        target_price = st["entry_price"] * (1 + _g_target / 100)
                         if c_high >= target_price:
                             _close_position(st, target_price, "TARGET", ts)
                             continue
 
                     # Runner: exit at target2 (only after partial was taken)
-                    if st["g_partial_taken"] and G_TARGET2_PCT > 0:
-                        tgt2_price = st["entry_price"] * (1 + G_TARGET2_PCT / 100)
+                    if st["g_partial_taken"] and _g_target2 > 0:
+                        tgt2_price = st["entry_price"] * (1 + _g_target2 / 100)
                         if c_high >= tgt2_price:
                             _close_position(st, tgt2_price, "TARGET", ts)
                             continue
@@ -3755,6 +3779,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             vwap_ok_l = c_close >= st["vwap"][candle_idx]
 
                         if vol_ok_l and accel_ok and vwap_ok_l:
+                            # Override tier targets per trade sequence (L1/L2 split)
+                            _l_seq = day_trade_counts.get("L", 0)
+                            _pfx = "l1" if _l_seq == 0 else "l2"
+                            if params is not None:
+                                st["l_target1_pct"] = params.get(f"{_pfx}_tier1_target1_pct", st["l_target1_pct"])
+                                st["l_target2_pct"] = params.get(f"{_pfx}_tier1_target2_pct", st["l_target2_pct"])
                             st["strategy"] = "L"
                             st["signal"] = True
                             st["signal_price"] = c_close
@@ -4019,6 +4049,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             st["shares"] = trade_size / entry_price
             cash_box[0] -= trade_size
             filled_this_ts.append(st["strategy"])
+
+            # Track trade sequence and snapshot per-trade params (G1/G2/L1/L2 split)
+            _strat = st["strategy"]
+            st["entry_trade_seq"] = day_trade_counts.get(_strat, 0)
+            day_trade_counts[_strat] = st["entry_trade_seq"] + 1
+            # Snapshot exit-relevant params at entry time for per-trade exit logic
+            if params is not None:
+                _prefixes = ("g_", "g1_", "g2_", "l_", "l1_", "l2_")
+                st["entry_params"] = {k: v for k, v in params.items()
+                                       if k.startswith(_prefixes)}
 
             # Initialize strategy-specific exit tracking
             if st["strategy"] == "D":

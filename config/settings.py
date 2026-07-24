@@ -90,6 +90,7 @@ PDT_DAYTRADES_MAX = 3          # unused while floor=0; dead code in executor
 MIN_GAP_PCT = 8.0             # Lowest min_gap across all strategies (V=8%, O=8%)
 TOP_N = 20                    # Max candidates per day
 MIN_PM_VOLUME = 250_000       # Minimum premarket volume
+MIN_WATCHLIST_VOLUME = 100_000  # Minimum cumulative volume to stay on watchlist (filters noisy low-vol tickers)
 
 # --- Halt-Resume Scanner (intraday discovery channel) ---
 HALT_MONITOR_ENABLED = os.environ.get("HALT_MONITOR_ENABLED", "true").lower() == "true"

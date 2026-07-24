@@ -342,7 +342,7 @@ export const Analytics = () => {
         <tbody>
           {signals.map((s) => (
             <tr key={s.id}>
-              <td>{new Date(s.date).toLocaleTimeString()}</td>
+              <td>{s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '—'}</td>
               <td className="ticker-cell">{s.ticker}</td>
               <td>{s.strategy}</td>
               <td>${s.signal_price.toFixed(2)}</td>

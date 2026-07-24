@@ -22,6 +22,7 @@ from alpaca.trading.client import TradingClient
 from config.settings import (
     ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_FEED,
     MIN_GAP_PCT, TOP_N, MAX_PRICE, FLOAT_DATA,
+    MIN_WATCHLIST_VOLUME,
 )
 from live.event_logger import log_event
 
@@ -402,6 +403,13 @@ class PreMarketScanner:
                 "float_shares": float_shares,
                 "current_price": info["current_price"],
             })
+
+        # Filter out low-volume tickers (noise producers with wide spreads)
+        before_vol_filter = len(results)
+        results = [r for r in results if r.get("pm_volume", 0) >= MIN_WATCHLIST_VOLUME]
+        if len(results) < before_vol_filter:
+            log.info(f"Volume filter: removed {before_vol_filter - len(results)} tickers "
+                     f"with PM volume < ${MIN_WATCHLIST_VOLUME:,}")
 
         results.sort(key=lambda x: x["gap_pct"], reverse=True)
         results = results[:TOP_N]

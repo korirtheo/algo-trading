@@ -195,9 +195,10 @@ class CombinedEngine:
             log.debug("No v3 overlay in config: %s", e)
         self.bar_data = {}  # ticker -> list of (timestamp, OHLCV dict)
         self.picks = []  # list of pick dicts (scanner output)
-        self.last_states = {}  # ticker -> last known state from simulate (for entry/exit detection)
+        self.last_states = {}  # (ticker, strategy) -> last known state from simulate
         self.all_states = {}  # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
         self.active_positions = set()  # set of tickers currently in position
+        self._pending_entries = set()  # tickers with buy orders placed this bar (blocks dupes)
         self.position_entry = {}  # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
         # Load today's trades from database
@@ -245,6 +246,7 @@ class CombinedEngine:
         self.all_states.clear()
         self.active_positions.clear()
         self.position_entry.clear()
+        self._pending_entries.clear()
         self.daily_pnl = 0.0
         self.trades_today = []
         self.halt_states.clear()
@@ -313,6 +315,11 @@ class CombinedEngine:
             log.debug("on_intraday_addition: %s already tracked (skip)", ticker)
             return False
 
+        # Skip tickers already in the pre-market watchlist (no duplication)
+        if ticker in self.bar_data or any(p["ticker"] == ticker for p in self.picks):
+            log.debug("on_intraday_addition: %s already in watchlist (skip)", ticker)
+            return False
+
         if source == "halt_resume":
             float_shares = FLOAT_DATA.get(ticker)  # None if unknown — permissive
             if not hr.is_eligible(event, float_shares=float_shares):
@@ -324,6 +331,33 @@ class CombinedEngine:
                     float_shares,
                 )
                 return False
+
+            # Volume filter for halt-resume tickers
+            from config.settings import MIN_WATCHLIST_VOLUME
+            try:
+                from config.settings import TRADIER_API_KEY
+                import requests as _req
+                _qresp = _req.get(
+                    "https://api.tradier.com/v1/markets/quotes",
+                    params={"symbols": ticker, "greeks": "false"},
+                    headers={"Authorization": f"Bearer {TRADIER_API_KEY}",
+                             "Accept": "application/json"},
+                    timeout=5,
+                )
+                if _qresp.status_code == 200:
+                    _quotes = _qresp.json().get("quotes", {}).get("quote", [])
+                    if isinstance(_quotes, dict):
+                        _quotes = [_quotes]
+                    if _quotes:
+                        _vol = _quotes[0].get("volume", 0)
+                        if _vol is not None and _vol < MIN_WATCHLIST_VOLUME:
+                            log.info(
+                                "HALT-RESUME %s SKIPPED: volume=%s < MIN_WATCHLIST_VOLUME=%s",
+                                ticker, f"{_vol:,}", f"{MIN_WATCHLIST_VOLUME:,}",
+                            )
+                            return False
+            except Exception as e:
+                log.debug(f"Halt-resume volume check failed for {ticker}: {e}")
 
             self.bar_data.setdefault(ticker, [])
             self.halt_states[ticker] = hr.create_state(
@@ -339,6 +373,10 @@ class CombinedEngine:
             )
             return True
         elif source == "intraday_gainer":
+            # LOGGING ONLY — do not add to bar_data or subscribe to streams.
+            # Intraday discoveries are logged to DB for analysis but do NOT
+            # affect live trading. Pre-market watchlist tickers are the only
+            # ones that get traded.
             self.intraday_discoveries.append(
                 {
                     "ticker": ticker,
@@ -348,7 +386,6 @@ class CombinedEngine:
                     "source": source,
                 }
             )
-            self.bar_data.setdefault(ticker, [])
             log.info(
                 "INTRADAY-ADD %s (source=%s): price=$%.3f change=%.2f%%",
                 ticker,
@@ -398,6 +435,15 @@ class CombinedEngine:
             except Exception as e:
                 log.debug(f"Tradier quote fetch failed for {ticker}: {e}")
                 log_event("tradier_api_error", "warning", f"Tradier quote fetch failed for {ticker}: {e}")
+
+            # Volume filter: skip low-volume tickers (noise producers)
+            from config.settings import MIN_WATCHLIST_VOLUME
+            if volume is not None and volume < MIN_WATCHLIST_VOLUME:
+                log.info(
+                    "INTRADAY-ADD %s SKIPPED: volume=%s < MIN_WATCHLIST_VOLUME=%s",
+                    ticker, f"{volume:,}", f"{MIN_WATCHLIST_VOLUME:,}",
+                )
+                return False
 
             # Cumulative volume from engine bar data (sum of all 2-min bars so far)
             bars = self.bar_data.get(ticker, [])
@@ -612,7 +658,12 @@ class CombinedEngine:
         # Detect state changes
         for st in states:
             ticker = st["ticker"]
-            prev = self.last_states.get(ticker)
+            strategy = st.get("strategy", "?")
+            # Key by (ticker, strategy) so different strategies for the same
+            # ticker don't share previous state. Without this, G and L states
+            # for BNRG would both see prev=None and both fire entry detection.
+            state_key = (ticker, strategy)
+            prev = self.last_states.get(state_key)
 
             # FIX 2026-06-22: when a ticker is already active, only respond
             # to state changes from the SAME strategy that owns the position.
@@ -637,8 +688,9 @@ class CombinedEngine:
                 strategy = st.get("strategy", "?")
                 gap_pct = st.get("gap_pct", 0)
 
-                if ticker in self.active_positions:
-                    log.debug("SIGNAL %s skipped — already in this ticker", ticker)
+                if ticker in self.active_positions or ticker in self._pending_entries:
+                    log.debug("SIGNAL %s skipped — already in this ticker (active=%s pending=%s)",
+                              ticker, ticker in self.active_positions, ticker in self._pending_entries)
                     # Only log the first time we see this signal (prev had no entry_price).
                     # Without this guard the same rejection is written every bar while
                     # in position because last_states[ticker] is never updated on continue.
@@ -651,7 +703,7 @@ class CombinedEngine:
                             "already_in_position",
                             gap_pct=gap_pct,
                         )
-                    self.last_states[ticker] = st  # prevent re-triggering next bar
+                    self.last_states[state_key] = st  # prevent re-triggering next bar
                     continue
 
                 # Check if this strategy is already done for the day (timed out before crash/restart)
@@ -671,7 +723,7 @@ class CombinedEngine:
                             "done",
                             gap_pct=gap_pct,
                         )
-                    self.last_states[ticker] = st  # prevent re-triggering next bar
+                    self.last_states[state_key] = st  # prevent re-triggering next bar
                     continue
 
                 # Record first signal time for time limit enforcement
@@ -699,7 +751,7 @@ class CombinedEngine:
                             "reentry_floor",
                             gap_pct=gap_pct,
                         )
-                    self.last_states[ticker] = st
+                    self.last_states[state_key] = st
                     continue
                 trade_size = st.get("position_cost", cash)
                 cum_dollar = self._cum_dollar_vol(ticker)
@@ -740,6 +792,7 @@ class CombinedEngine:
                     # Stream callback resolves position_entry with actual filled qty/avg
                     # when the fill arrives — could be 2s or 30s, no longer matters.
                     self.active_positions.add(ticker)
+                    self._pending_entries.add(ticker)  # block duplicate entries while fill is pending
                     # 2026-06-24 FIX: bootstrap position_entry IMMEDIATELY (using
                     # signal_price as entry estimate, shares=0 placeholder). The
                     # CCXI 2026-06-24 incident showed that the TradingStream fill
@@ -935,7 +988,7 @@ class CombinedEngine:
                                         actual_shares - sell_qty
                                     )
 
-            self.last_states[ticker] = dict(st)
+            self.last_states[state_key] = dict(st)
 
         # --- v3 overlay entry check ---
         if self.v3_params.get("enabled", False) and picks_with_data:
@@ -1584,8 +1637,8 @@ class CombinedEngine:
                 )
                 # Don't clear active_positions yet on partial_fill — may complete later
                 if event_type != "partial_fill":
-                    if ticker in self.active_positions:
-                        self.active_positions.discard(ticker)
+                    self.active_positions.discard(ticker)
+                    self._pending_entries.discard(ticker)
                 return
 
             # Update position_entry with cumulative totals (not delta)
@@ -1680,6 +1733,8 @@ class CombinedEngine:
                 except Exception as e:
                     log.error(f"Failed to save position state for {ticker}: {e}")
                     log_event("db_error", "warning", f"Failed to save position state for {ticker}: {e}")
+            # Fill confirmed — no longer "pending", actively tracked in active_positions
+            self._pending_entries.discard(ticker)
         elif event_type in ("canceled", "rejected", "expired", "done_for_day"):
             # No fill — clear from active_positions so engine can react to next signal
             log.warning(
@@ -1689,6 +1744,7 @@ class CombinedEngine:
             )
             if ticker in self.active_positions and ticker not in self.position_entry:
                 self.active_positions.discard(ticker)
+            self._pending_entries.discard(ticker)
         else:
             log.debug(f"BUY {ticker} STREAM event={event_type} order={oid}")
 
