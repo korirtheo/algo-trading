@@ -50,6 +50,8 @@ DATA_DIRS = [
     "stored_data_oos",            # 2025-08 -> 2025-12        (105 days)
     "stored_data",                # 2026-01 -> 2026-02         (38 days)
     "stored_data_mar_may_2026",   # 2026-03 -> 2026-05         (43 days)
+    "stored_data_jun_2026",       # 2026-05-21 -> 2026-06-16   (17 days)
+    "stored_data_jul_2026",       # 2026-06-17 -> 2026-07-10   (16 days)
 ]
 DATE_RANGE = ("2021-01-01", "2026-05-31")
 
@@ -391,10 +393,10 @@ def set_strategy_params(params):
     }
     for s in ALL_STRATS:
         if s == "r":
-            if not params.get("enable_r", True):
+            if not params.get("enable_r", False):
                 tgc.R_DAY1_MIN_GAP = 9999.0
         else:
-            if not params.get(f"enable_{s}", True):
+            if not params.get(f"enable_{s}", False):
                 setattr(tgc, _gap_keys[s], 9999.0)
 
     # --- Strategy priority ---
@@ -1192,6 +1194,24 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not params.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
+
     def _safe(x, default=-9.9e12):
         import math
         try: x = float(x)
@@ -1272,6 +1292,24 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not params.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
+
     def _safe(x, default=-9.9e12):
         import math
         try: x = float(x)
@@ -1351,6 +1389,24 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not params.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
+
     def _safe(x, default=-9.9e12):
         import math
         try: x = float(x)
@@ -1417,6 +1473,24 @@ def objective(trial, daily_picks, all_dates):
             tgc.USE_DYNAMIC_SLIPPAGE = True
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
+
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not params.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
 
     # ----------------------------------------------------------------------
     # CV PATH — per-year-reset cross-validation.
@@ -1881,6 +1955,24 @@ def objective_gl_trail(trial, data):
         set_strategy_params(p)
         configure_gl_trail_for_optimization()
         snapshot = _build_param_snapshot()
+
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not p.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
 
     result = run_gl_trail_backtest(dates, picks_by_date, snapshot)
 
@@ -2398,7 +2490,7 @@ def main():
             for k in pkeys:
                 print(f"    {k}: {bp[k]}")
 
-    enabled_list = [s.upper() for s in ALL_STRATS if bp.get(f"enable_{s}", True)]
+    enabled_list = [s.upper() for s in ALL_STRATS if bp.get(f"enable_{s}", False)]
     print(f"\n  Enabled strategies: {', '.join(enabled_list)} ({len(enabled_list)} of 20)")
 
     # Final dump of best params to JSON

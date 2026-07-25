@@ -37,13 +37,14 @@ from test_full import load_all_picks, STARTING_CASH, MARGIN_THRESHOLD
 # Reuse infrastructure from optimize_combined
 from optimize_combined import (
     DATA_DIRS, ALL_STRATS, STRAT_KEYS, _param_lock,
-    set_strategy_params, run_combined_backtest, make_callback,
+    set_strategy_params, run_combined_backtest,
+    make_callback,
     dump_best_params as _dump_best_params_combined,
     merge_enable_from_user_attrs,
 )
 
 # ── Defaults ────────────────────────────────────────────────────────────
-DEFAULT_DB = "postgresql://postgres@127.0.0.1:5432/optuna_oglhmafp"
+DEFAULT_DB = "postgresql://postgres@127.0.0.1:5432/optuna_gl_split"
 DEFAULT_STUDY = "gl_split_v1"
 DEFAULT_PARAMS_OUT = "config/trial_gl_split_v1_best.json"
 
@@ -121,9 +122,14 @@ def suggest_gl_split_params(trial):
     params["l2_trail_activate_pct"] = trial.suggest_float("l2_trail_activate_pct", 1.0, 8.0, step=1.0)
     params["l2_time_limit_min"] = trial.suggest_int("l2_time_limit_min", 30, 120, step=10)
 
-    # ── Strategy enable/disable (always ON for this study) ──
-    params["enable_g"] = True
-    params["enable_l"] = True
+    # ── Strategy enable/disable ──
+    # Only G and L are active. All others must be explicitly disabled
+    # because set_strategy_params defaults enable to True when key is missing.
+    for s in ALL_STRATS:
+        if s in ("g", "l"):
+            params[f"enable_{s}"] = True
+        else:
+            params[f"enable_{s}"] = False
     params["priority_g"] = 1
     params["priority_l"] = 7
 
@@ -170,9 +176,33 @@ def _map_split_to_standard(params):
 #  Build param snapshot with split keys
 # ═══════════════════════════════════════════════════════════════════════
 def _build_split_snapshot(std_params):
-    """Build param snapshot: standard globals from tgc + split keys for simulator."""
-    from optimize_combined import _build_param_snapshot
+    """Build param snapshot: standard globals from tgc + split keys for simulator.
+
+    Defense-in-depth: reads enable_<s> flags from std_params and forces gap=9999
+    for ANY disabled strategy. This is independent of set_strategy_params — even if
+    that function resets gaps to defaults, the snapshot enforces the correct state.
+    """
+    from optimize_combined import _build_param_snapshot, ALL_STRATS
     snapshot = _build_param_snapshot()
+
+    # ── Gap override map (strategy letter → snapshot key) ──
+    _gap_keys = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT",
+    }
+
+    # Force gap=9999 for every disabled strategy (reads enable_<s> from params)
+    for s in ALL_STRATS:
+        enabled = std_params.get(f"enable_{s}", False)
+        if not enabled:
+            if s == "r":
+                snapshot["R_DAY1_MIN_GAP"] = 9999.0
+            elif s in _gap_keys:
+                snapshot[_gap_keys[s]] = 9999.0
 
     # Add all g1_*/g2_*/l1_*/l2_* keys to the snapshot
     # The simulator's entry_params will pick these up at trade entry
@@ -186,11 +216,11 @@ def _build_split_snapshot(std_params):
 # ═══════════════════════════════════════════════════════════════════════
 #  Objective function
 # ═══════════════════════════════════════════════════════════════════════
-def objective_val_multi_sortino_split(trial, daily_picks, train_dates, val_windows_list):
-    """Sortino multi-window objective for split-param G+L study.
+def objective_split(trial, daily_picks, all_dates):
+    """Single full-backtest objective for split-param G+L study.
 
-    Same structure as objective_val_multi_sortino in optimize_combined.py
-    but uses suggest_gl_split_params + split-aware snapshot building.
+    Same structure as objective() in optimize_combined.py (non-CV path).
+    Score: total_pnl × min(pf, 3.0)
     """
     assert tgc.USE_DYNAMIC_SLIPPAGE and tgc.USE_MULTIWINDOW_SLIPPAGE, \
         "Slippage parity violation: both USE_DYNAMIC_SLIPPAGE and USE_MULTIWINDOW_SLIPPAGE must be True"
@@ -204,6 +234,24 @@ def objective_val_multi_sortino_split(trial, daily_picks, train_dates, val_windo
         tgc.USE_MULTIWINDOW_SLIPPAGE = True
         snapshot = _build_split_snapshot(std_params)
 
+    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    _gap_keys_check = {
+        "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
+        "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
+        "m": "M_MIN_GAP_PCT", "o": "O_MIN_GAP_PCT", "b": "B_MIN_GAP_PCT",
+        "k": "K_MIN_GAP_PCT", "c": "C_MIN_GAP_PCT", "s": "S_MIN_GAP_PCT",
+        "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
+        "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
+    }
+    for s in ALL_STRATS:
+        if not std_params.get(f"enable_{s}", False):
+            gap_key = _gap_keys_check.get(s)
+            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+                raise RuntimeError(
+                    f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
+                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                )
+
     def _safe(x, default=-9.9e12):
         import math
         try: x = float(x)
@@ -211,61 +259,38 @@ def objective_val_multi_sortino_split(trial, daily_picks, train_dates, val_windo
         if math.isnan(x) or math.isinf(x): return default
         return max(-9.9e12, min(9.9e12, x))
 
-    train_result = run_combined_backtest(daily_picks, train_dates, params_snapshot=snapshot)
-    if train_result["n"] < 100:
+    result = run_combined_backtest(daily_picks, all_dates, params_snapshot=snapshot)
+
+    n = result["n"]
+    if n < 100:
         return -9999
-    if train_result["pf"] < 0.5:
+
+    pf = result["pf"]
+    if pf < 0.5:
         return -9999
 
-    per_win_scores = []
-    for label, win_dates in val_windows_list:
-        r = run_combined_backtest(daily_picks, win_dates, params_snapshot=snapshot)
-        if r["n"] < 5:
-            return -9999
-        pnl_safe = _safe(r["total_pnl"], -1e12)
-        sortino_safe = _safe(r.get("sortino_pct", 0), 0)
-        win_score = pnl_safe * min(max(sortino_safe, 0.0), 4.0)
-        per_win_scores.append(win_score)
-
-        trial.set_user_attr(f"{label}_n", r["n"])
-        trial.set_user_attr(f"{label}_pnl", round(pnl_safe, 2))
-        trial.set_user_attr(f"{label}_pf", round(_safe(r["pf"]), 3))
-        trial.set_user_attr(f"{label}_wr", round(_safe(r["wr"]), 1))
-        trial.set_user_attr(f"{label}_sortino", round(sortino_safe, 3))
-        trial.set_user_attr(f"{label}_sharpe", round(_safe(r.get("sharpe_pct", 0)), 3))
-        trial.set_user_attr(f"{label}_equity", round(_safe(r["equity"]), 2))
-        trial.set_user_attr(f"{label}_score", round(_safe(win_score), 2))
-
-    # Training diagnostics
-    trial.set_user_attr("train_n", train_result["n"])
-    trial.set_user_attr("train_pnl", round(_safe(train_result["total_pnl"]), 2))
-    trial.set_user_attr("train_pf", round(_safe(train_result["pf"]), 3))
-    trial.set_user_attr("train_wr", round(_safe(train_result["wr"]), 1))
-    trial.set_user_attr("train_sortino", round(_safe(train_result.get("sortino_pct", 0)), 3))
-    trial.set_user_attr("train_equity", round(_safe(train_result["equity"]), 2))
-
-    # G/L only — always enabled
-    trial.set_user_attr("priority", "G>L")
-    trial.set_user_attr("enabled", "G,L")
-    trial.set_user_attr("n_strategies", 2)
+    total_pnl = result["total_pnl"]
+    score = _safe(total_pnl * min(pf, 3.0), -9999)
 
     # Per-strategy breakdown
-    for s, v in train_result.get("strats", {}).items():
+    for s, v in result.get("strats", {}).items():
         sn = v.get("n", 0)
         trial.set_user_attr(f"{s}_n", sn)
         trial.set_user_attr(f"{s}_pnl", round(_safe(v.get("pnl", 0)), 2))
         wr_s = v.get("wins", 0) / sn * 100 if sn > 0 else 0
         trial.set_user_attr(f"{s}_wr", round(_safe(wr_s), 1))
 
-    min_score = min(per_win_scores)
-    trial.set_user_attr("min_val_score", round(_safe(min_score), 2))
-    trial.set_user_attr("total_pnl", round(_safe(min_score), 2))
-    trial.set_user_attr("pf", round(_safe(train_result["pf"]), 3))
-    trial.set_user_attr("wr", round(_safe(train_result["wr"]), 1))
-    trial.set_user_attr("n", train_result["n"])
-    trial.set_user_attr("equity", 0)
+    # G/L only — always enabled
+    trial.set_user_attr("priority", "G>L")
+    trial.set_user_attr("enabled", "G,L")
+    trial.set_user_attr("n_strategies", 2)
+    trial.set_user_attr("total_pnl", round(_safe(total_pnl), 2))
+    trial.set_user_attr("pf", round(_safe(pf), 3))
+    trial.set_user_attr("wr", round(_safe(result["wr"]), 1))
+    trial.set_user_attr("n", n)
+    trial.set_user_attr("equity", round(_safe(result["equity"]), 2))
 
-    return _safe(min_score, -9999)
+    return score
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -330,8 +355,6 @@ def main():
     parser.add_argument("--dynamic-slip", action="store_true")
     parser.add_argument("--date-start", default="2024-01-01")
     parser.add_argument("--date-end", default="2026-02-28")
-    parser.add_argument("--val-windows", default=None,
-                        help="Multi-window walk-forward val. Comma-separated 'start:end,start:end,...'")
     args = parser.parse_args()
 
     BEST_PARAMS_FILE = args.params_out
@@ -397,30 +420,6 @@ def main():
     all_dates = [d for d in all_dates if args.date_start <= d <= args.date_end]
     print(f"  Date range: {args.date_start} to {args.date_end} ({len(all_dates)} days)")
 
-    # ── Validation windows ──
-    if args.val_windows:
-        win_specs = [w.strip() for w in args.val_windows.split(",") if w.strip()]
-        val_windows_list = []
-        all_val_days = set()
-        for i, spec in enumerate(win_specs):
-            s, e = spec.split(":")
-            win_days = sorted([d for d in all_dates if s <= d <= e])
-            label = f"val{i+1}"
-            val_windows_list.append((label, win_days))
-            all_val_days.update(win_days)
-            print(f"  {label}: {s} to {e} ({len(win_days)} days)")
-        train_dates = sorted([d for d in all_dates if d not in all_val_days])
-        print(f"  Training: {len(train_dates)} days | Val windows: {len(val_windows_list)}")
-    else:
-        # Default: use last 2 months as validation
-        val_start = "2025-12-01"
-        val_end = args.date_end
-        val_dates = sorted([d for d in all_dates if val_start <= d <= val_end])
-        train_dates = sorted([d for d in all_dates if d < val_start])
-        val_windows_list = [("val1", val_dates)]
-        print(f"  Training: {train_dates[0]} to {train_dates[-1]} ({len(train_dates)} days)")
-        print(f"  Validation: {val_start} to {val_end} ({len(val_dates)} days)")
-
     # ── Create / resume study ──
     study = optuna.create_study(
         direction="maximize",
@@ -444,8 +443,8 @@ def main():
     start_time = time.time()
 
     # ── Run ──
-    objective_fn = lambda trial: objective_val_multi_sortino_split(
-        trial, daily_picks, train_dates, val_windows_list
+    objective_fn = lambda trial: objective_split(
+        trial, daily_picks, all_dates
     )
 
     study.optimize(
