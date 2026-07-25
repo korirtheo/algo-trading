@@ -21,9 +21,9 @@ import subprocess
 import argparse
 import time
 
-STUDY = "gl_split_v1"
-DB = "postgresql://postgres@127.0.0.1:5432/optuna_oglhmafp"
-PARAMS_OUT = "config/trial_gl_split_v1_best.json"
+STUDY = "gl_split_v2"
+DB = "postgresql://postgres@127.0.0.1:5432/optuna_gl_split"
+PARAMS_OUT = "config/trial_gl_split_v2_best.json"
 STRATS = "g,l"
 
 

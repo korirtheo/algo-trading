@@ -45,8 +45,8 @@ from optimize_combined import (
 
 # ── Defaults ────────────────────────────────────────────────────────────
 DEFAULT_DB = "postgresql://postgres@127.0.0.1:5432/optuna_gl_split"
-DEFAULT_STUDY = "gl_split_v1"
-DEFAULT_PARAMS_OUT = "config/trial_gl_split_v1_best.json"
+DEFAULT_STUDY = "gl_split_v2"
+DEFAULT_PARAMS_OUT = "config/trial_gl_split_v2_best.json"
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -296,7 +296,7 @@ def objective_split(trial, daily_picks, all_dates):
 # ═══════════════════════════════════════════════════════════════════════
 #  Dump best params (split-param aware)
 # ═══════════════════════════════════════════════════════════════════════
-BEST_PARAMS_FILE = "config/trial_gl_split_v1_best.json"
+BEST_PARAMS_FILE = "config/trial_gl_split_v2_best.json"
 
 
 def dump_best_split(trial, params_out=None):

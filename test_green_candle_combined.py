@@ -2334,12 +2334,15 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 # ===== STRATEGY L: Low Float Squeeze (trailing + partial + tiered targets) =====
                 if st["strategy"] == "L":
                     # Read per-trade params (split-param L1/L2 support)
+                    # L1 (seq=0) uses l_* params, L2 (seq>0) uses l2_* params
                     _ep = st.get("entry_params") or params
-                    _l_stop = float(_ep.get("l_stop_pct", L_STOP_PCT))
-                    _l_trail = float(_ep.get("l_trail_pct", L_TRAIL_PCT))
-                    _l_trail_act = float(_ep.get("l_trail_activate_pct", L_TRAIL_ACTIVATE_PCT))
-                    _l_time = int(_ep.get("l_time_limit_min", L_TIME_LIMIT_MINUTES))
-                    _l_partial = float(_ep.get("l_partial_sell_pct", L_PARTIAL_SELL_PCT))
+                    _l_seq = st.get("entry_trade_seq", 0)
+                    _lp = "l2" if _l_seq > 0 else "l"
+                    _l_stop = float(_ep.get(f"{_lp}_stop_pct", L_STOP_PCT))
+                    _l_trail = float(_ep.get(f"{_lp}_trail_pct", L_TRAIL_PCT))
+                    _l_trail_act = float(_ep.get(f"{_lp}_trail_activate_pct", L_TRAIL_ACTIVATE_PCT))
+                    _l_time = int(_ep.get(f"{_lp}_time_limit_min", L_TIME_LIMIT_MINUTES))
+                    _l_partial = float(_ep.get(f"{_lp}_partial_sell_pct", L_PARTIAL_SELL_PCT))
 
                     if c_high > st["l_highest_since_entry"]:
                         st["l_highest_since_entry"] = c_high
@@ -2676,14 +2679,17 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 # ===== STRATEGY G: Big Gap Runner (partial exit + trail/target2 + stop) =====
                 if st["strategy"] == "G":
                     # Read per-trade params (split-param G1/G2 support)
+                    # G1 (seq=0) uses g_* params, G2 (seq>0) uses g2_* params
                     _ep = st.get("entry_params") or params
-                    _g_stop = float(_ep.get("g_stop_pct", G_STOP_PCT))
-                    _g_time = int(_ep.get("g_time_limit_min", G_TIME_LIMIT_MINUTES))
-                    _g_trail = float(_ep.get("g_trail_pct", G_TRAIL_PCT))
-                    _g_trail_act = float(_ep.get("g_trail_activate_pct", G_TRAIL_ACTIVATE_PCT))
-                    _g_target = float(_ep.get("g_target_pct", G_TARGET_PCT))
-                    _g_partial = float(_ep.get("g_partial_sell_pct", G_PARTIAL_SELL_PCT))
-                    _g_target2 = float(_ep.get("g_target2_pct", G_TARGET2_PCT))
+                    _g_seq = st.get("entry_trade_seq", 0)
+                    _gp = "g2" if _g_seq > 0 else "g"
+                    _g_stop = float(_ep.get(f"{_gp}_stop_pct", G_STOP_PCT))
+                    _g_time = int(_ep.get(f"{_gp}_time_limit_min", G_TIME_LIMIT_MINUTES))
+                    _g_trail = float(_ep.get(f"{_gp}_trail_pct", G_TRAIL_PCT))
+                    _g_trail_act = float(_ep.get(f"{_gp}_trail_activate_pct", G_TRAIL_ACTIVATE_PCT))
+                    _g_target = float(_ep.get(f"{_gp}_target_pct", G_TARGET_PCT))
+                    _g_partial = float(_ep.get(f"{_gp}_partial_sell_pct", G_PARTIAL_SELL_PCT))
+                    _g_target2 = float(_ep.get(f"{_gp}_target2_pct", G_TARGET2_PCT))
 
                     if c_high > st["g_highest_since_entry"]:
                         st["g_highest_since_entry"] = c_high
