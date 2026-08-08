@@ -55,7 +55,7 @@ from test_full import (
 
 import io, sys as _sys
 
-if hasattr(_sys.stdout, "buffer"):
+if __name__ == "__main__" and hasattr(_sys.stdout, "buffer"):
     _sys.stdout = io.TextIOWrapper(
         _sys.stdout.buffer, encoding="utf-8", errors="replace", line_buffering=True
     )
@@ -457,346 +457,51 @@ if os.path.exists(_float_path):
         if isinstance(_v, dict) and _v.get("floatShares"):
             FLOAT_DATA[_tk] = _v["floatShares"]
 
-# --- STRATEGY H CONFIG: High Conviction (filtered G) ---
-H_MIN_GAP_PCT = 35.0
+
+# ---------------------------------------------------------------------------
+# STRATEGY PARAMETERS (Phase 1 refactor 2026-08)
+# ---------------------------------------------------------------------------
+# Single source of truth: strategies/config.py -> STRATEGIES registry.
+# Each strategy's tunable params are materialized here as module globals so
+# every reader (simulate_day_combined globals() snapshot, tgc.__dict__
+# snapshot, dir(tgc), and external scripts) keeps working unchanged.
+# set_strategy_params() in optimize_combined delegates to the same registry.
+from strategies.config import STRATEGIES as _STRATEGIES
+
+for _cfg in _STRATEGIES.values():
+    for _g, _k, _d, _kind in _cfg.params:
+        globals()[_g] = _d
+
+# Default priority map (Optuna can override; matches registry)
+STRAT_PRIORITY = {s.upper(): c.priority for s, c in _STRATEGIES.items()}
+
+# ---------------------------------------------------------------------------
+# NON-TUNABLE STRATEGY CONSTANTS (not optimizer params; fixed behavior)
+# ---------------------------------------------------------------------------
+# H (High Conviction)
 H_MIN_BODY_PCT = 4.0
 H_REQUIRE_VOL_CONFIRM = True
-H_TARGET_PCT = 16.0
-H_TIME_LIMIT_MINUTES = 15
-H_STOP_PCT = 0.0  # 0 = no hard stop (legacy behavior)
-H_TRAIL_PCT = 0.0  # 0 = no trailing stop
-H_TRAIL_ACTIVATE_PCT = 0.0
-
-# --- STRATEGY G CONFIG: Big Gap Runner ---
-G_MIN_GAP_PCT = 30.0
+# G (Big Gap Runner)
 G_MIN_BODY_PCT = 0.0
-G_REQUIRE_2ND_GREEN = True
-G_REQUIRE_2ND_NEW_HIGH = True
-G_TARGET_PCT = 11.0
-G_TARGET2_PCT = (
-    30.0  # Runner target after partial sell (used when G_PARTIAL_SELL_PCT > 0)
-)
-G_PARTIAL_SELL_PCT = (
-    0.0  # % of position to sell at G_TARGET_PCT (0 = sell all, legacy behavior)
-)
-G_TIME_LIMIT_MINUTES = 10
-G_STOP_PCT = 0.0
-G_TRAIL_PCT = 0.0
-G_TRAIL_ACTIVATE_PCT = 0.0
-
-# --- STRATEGY A CONFIG: Quick Scalp ---
-A_MIN_GAP_PCT = 15.0
+# A (Quick Scalp)
 A_MIN_BODY_PCT = 4.0
 A_MAX_BODY_PCT = 999
 A_REQUIRE_2ND_GREEN = True
 A_REQUIRE_2ND_NEW_HIGH = True
-A_TARGET_PCT = 6.0
-A_TIME_LIMIT_MINUTES = 12
-A_STOP_PCT = 0.0
-A_TRAIL_PCT = 0.0
-A_TRAIL_ACTIVATE_PCT = 0.0
-
-# --- STRATEGY F CONFIG: Catch-All ---
-F_MIN_GAP_PCT = 10.0
+# F (Catch-All)
 F_MIN_BODY_PCT = 0.0
 F_REQUIRE_2ND_GREEN = True
 F_REQUIRE_2ND_NEW_HIGH = False
-F_TARGET_PCT = 8.0
-F_TIME_LIMIT_MINUTES = 3
-F_STOP_PCT = 0.0
-F_TRAIL_PCT = 0.0
-F_TRAIL_ACTIVATE_PCT = 0.0
-
-# --- STRATEGY D CONFIG: Opening Dip Buy (Optuna v2 optimized) ---
-# Fallback: fires when H/G/A/F don't classify, alongside P but fires earlier
-D_MIN_GAP_PCT = 30.0  # Optuna v2: raised from 10%
-D_MIN_SPIKE_PCT = 10.0  # Optuna v2: raised from 6%
-D_SPIKE_WINDOW = 20  # Optuna v2: widened from 5
-D_DIP_PCT = 6.0  # Optuna v2: tightened from 8%
-D_ENTRY_MODE = "5candle"  # "5candle" or "vwap"
-D_MAX_ENTRY_CANDLE = 45  # Optuna v2: widened from 15
-D_TARGET1_PCT = 12.0  # Target (no partial sell)
-D_TARGET2_PCT = 12.0  # Same as target1 (partial_sell=0)
-D_STOP_PCT = 9.0  # Hard stop per entry
-D_TIME_LIMIT_MINUTES = 70  # Optuna v2: widened from 30
-D_PARTIAL_SELL_PCT = 0.0  # Optuna v2: no partial sell — trail only
-D_TRAIL_PCT = 2.0  # Fixed trailing stop %
-D_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing after +2% unrealized
-
-# --- STRATEGY M CONFIG: Midday Range Break ---
-# Morning spike → midday consolidation → afternoon breakout
-M_MIN_GAP_PCT = 10.0
-M_MORNING_SPIKE_PCT = 8.0  # Morning high >= 8% above open
-M_MORNING_CANDLES = 40  # Check spike in first 40 candles
-M_RANGE_START_CANDLE = 55  # Consolidation starts at candle 55
-M_CONSOLIDATION_LEN = 40  # Consolidation lasts 40 candles (ends c95)
-M_MAX_RANGE_PCT = 7.0  # Consolidation range <= 7%
-M_VOL_RATIO = 0.5  # Consolidation vol <= 0.5x morning vol
-M_MAX_ENTRY_CANDLE = 150  # Must enter by candle 150
-M_TARGET1_PCT = 6.0  # Partial target: sell 50% here
-M_STOP_PCT = 10.0  # Hard stop per entry
-M_TIME_LIMIT_MINUTES = 120  # 60 candles * 2 min
-M_PARTIAL_SELL_PCT = 50.0  # Sell 50% at target1
-M_TRAIL_PCT = 4.0  # Trailing stop %
-M_TRAIL_ACTIVATE_PCT = 5.0  # Start trailing after +5% unrealized
-
-# --- STRATEGY V CONFIG: VWAP Reclaim (Optuna v2 optimized) ---
-# Gap-up sells off below VWAP, then reclaims with volume -> buy the reclaim
-V_MIN_GAP_PCT = 14.0  # Optuna v2: lowered from 24%
-V_MIN_BELOW_CANDLES = 7  # Optuna v2: raised from 4
-V_MIN_BELOW_PCT = 1.0  # Must dip at least 1% below VWAP
-V_VOL_SPIKE_RATIO = 3.5  # Optuna v2: raised from 1.0
-V_MAX_ENTRY_CANDLE = 60  # Optuna v2: lowered from 80
-V_TARGET1_PCT = 3.0  # Optuna v2: lowered from 9%
-V_TARGET2_PCT = 19.0  # Optuna v2: raised from 17%
-V_STOP_PCT = 9.0  # Optuna v2: lowered from 10%
-V_TIME_LIMIT_MINUTES = 100  # 50 candles * 2 min
-V_PARTIAL_SELL_PCT = 25.0  # Sell 25% at target1
-V_TRAIL_PCT = 3.0  # Optuna v2: raised from 2%
-V_TRAIL_ACTIVATE_PCT = 5.0  # Optuna v2: raised from 2%
-
-# --- STRATEGY R CONFIG: Multi-Day Runner ---
-# Day 1: massive gap-up. Day 2: pullback then bounce continuation.
-R_DAY1_MIN_GAP = 40.0
-R_D2_PULLBACK_PCT = 10.0  # Optuna v2: raised from 3%
-R_PULLBACK_WINDOW = 30  # Pullback within first 30 candles
-R_BOUNCE_REF = "d2_open"  # Optuna v2: changed from d1_close
-R_MAX_ENTRY_CANDLE = 55  # Optuna v2: raised from 20
-R_TARGET1_PCT = 9.0  # Optuna v2: lowered from 19%
-R_STOP_PCT = 9.0  # Optuna v2: lowered from 10%
-R_TRAIL_PCT = 6.0  # Optuna v2: raised from 4%
-R_TRAIL_ACTIVATE_PCT = 6.0  # Optuna v2: lowered from 8%
-R_TIME_LIMIT_MINUTES = 100  # Optuna v2: reduced from 180
-
-# --- STRATEGY P CONFIG: PM High Breakout + Pullback + Bounce (Optuna v2 optimized) ---
-# Only fires when H/G/A/F did not classify the stock (fallback)
-# Advanced exits: trailing stop (no partial sell — full trail)
-P_MIN_GAP_PCT = 10.0  # Minimum gap
-P_CONFIRM_ABOVE = 3  # Optuna v2: 3 candles above PM high
-P_CONFIRM_WINDOW = 3  # Optuna v2: 3 candle window
-P_PULLBACK_PCT = 9.0  # Optuna v2: widened from 7%
-P_PULLBACK_TIMEOUT = 10  # Optuna v2: tightened from 30
-P_MAX_ENTRY_CANDLE = 105  # Optuna v2: raised from 75
-P_TARGET1_PCT = 15.0  # Optuna v2: raised from 9%
-P_TARGET2_PCT = 15.0  # Same as target1 (partial_sell=0)
-P_STOP_PCT = 12.0  # Hard stop
-P_TIME_LIMIT_MINUTES = 180  # Optuna v2: raised from 40
-P_PARTIAL_SELL_PCT = 0.0  # Optuna v2: no partial sell — trail only
-P_TRAIL_PCT = 2.0  # Fixed trailing stop %
-P_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing after +2% unrealized
-
-# --- STRATEGY W CONFIG: Power Hour Breakout ---
-# Gap-up + morning run + all-day consolidation + 3 PM+ volume breakout
-W_MIN_GAP_PCT = 10.0
-W_MIN_MORNING_RUN = 4.0  # Optuna v2: raised from 3%
-W_CONSOL_START = 35  # Optuna v2: earlier start
-W_MAX_RANGE_PCT = 10.0  # Optuna v2: tightened from 16%
-W_MAX_VWAP_DEV_PCT = 5.0  # Optuna v2: tightened from 11%
-W_EARLIEST_CANDLE = 165  # Optuna v2: later start
-W_LATEST_CANDLE = 190  # Optuna v2: later end
-W_VOL_SURGE_MULT = 2.0  # Optuna v2: lowered from 3x
-W_VOL_VS_MORNING_MULT = 0.1  # Breakout vol >= 0.1x morning spike vol
-W_MAX_HOD_BREAKS = 3  # Max HOD breaks before entry window
-W_REQUIRE_ABOVE_VWAP = True  # Must be above VWAP at breakout
-W_TARGET_PCT = 8.0  # Optuna v2: raised from 6%
-W_STOP_PCT = 3.0  # Optuna v2: tightened from 3.5%
-W_TRAIL_PCT = 2.5  # Optuna v2: raised from 1%
-W_TRAIL_ACTIVATE_PCT = 2.0  # Optuna v2: lowered from 3.5%
-
-# --- STRATEGY L CONFIG: Low Float Squeeze (optimized trial #486) ---
-L_MAX_FLOAT = 15_000_000  # Float shares threshold
-L_MIN_GAP_PCT = 30.0  # Minimum gap %
-L_EARLIEST_CANDLE = 8  # Don't enter too early
-L_LATEST_CANDLE = 115  # Latest possible entry candle
-L_HOD_BREAK_REQUIRED = True  # Must break to new HOD for entry
-L_VOL_SURGE_MULT = 1.5  # Current candle vol >= Nx avg of last 10
-L_MIN_PRICE_ACCEL_PCT = 1.0  # Min green candle body % for entry candle
-L_REQUIRE_ABOVE_VWAP = True  # Must be above VWAP at entry
-# Float-tiered targets
-L_TIER1_FLOAT = 1_000_000  # Ultra-low float boundary
-L_TIER2_FLOAT = 5_000_000  # Low float boundary
-L_TIER1_TARGET1_PCT = 30.0
-L_TIER1_TARGET2_PCT = 40.0
-L_TIER2_TARGET1_PCT = 15.0
-L_TIER2_TARGET2_PCT = 40.0
-L_TIER3_TARGET1_PCT = 9.0
-L_TIER3_TARGET2_PCT = 32.0
-L_STOP_PCT = 14.0  # Hard stop (wide for low float volatility)
-L_PARTIAL_SELL_PCT = 0.0  # No partial sell
-L_TRAIL_PCT = 1.0  # Tight trailing stop %
-L_TRAIL_ACTIVATE_PCT = 2.0  # Start trailing early at +2%
-L_TIME_LIMIT_MINUTES = 70  # Time limit in minutes
-
-# --- STRATEGY X CONFIG: Range Reversion (re-entry / second-leg pattern) ---
-# Targets the pullback-then-bounce pattern that follows ~65% of first-leg gap-ups.
-# Empirically (2024 scan, 3,572 ticker-days): 2,333 had >=10% pullback + >=5%
-# recovery, median 16% upside, median second-peak = 92% of first-leg peak.
-X_FIRST_LEG_WINDOW_BARS = 15  # bars 0..15 (first ~30 min) define "first leg"
-X_MIN_FIRST_LEG_GAIN_PCT = 5.0  # first-leg high must be >= this above open
-X_MIN_PULLBACK_PCT = 10.0  # then price must drop >= this from first-leg high
-X_MIN_RECOVERY_PCT = 3.0  # then bounce >= this from intraday low to trigger
-X_MIN_BARS_SINCE_PEAK = 5  # >=5 bars (~10 min) must have passed since peak
-X_ENTRY_REQUIRE_GREEN = True  # entry bar must be green (close > open)
-X_TARGET_PCT_OF_PEAK = 92.0  # exit at 92% of first-leg peak (empirical median)
-X_STOP_PCT_BELOW_TROUGH = 2.0  # stop = trough * (1 - X_STOP_PCT_BELOW_TROUGH/100)
-X_TRAIL_PCT = 5.0  # trail %
-X_TRAIL_ACTIVATE_PCT = 5.0  # activate trail at +5% above entry
-X_TIME_LIMIT_MINUTES = 60  # 60 min hold (mid-day fades slower than open)
-X_MIN_VOL_VS_AVG = 1.0  # entry bar volume >= 1.0x rolling avg
-X_VOL_AVG_BARS = 5  # rolling avg window for volume check
-X_MAX_ENTRY_HHMM = "14:30"  # don't enter past 14:30 ET (need 60 min before EOD)
-X_MIN_ENTRY_ROOM_PCT = 4.0  # require >= this % room between entry and target
-
-# --- STRATEGY O CONFIG: Opening Range Breakout ---
-O_MIN_GAP_PCT = 10.0
-O_RANGE_CANDLES = 5  # candles to form opening range (5 = 10 min)
-O_BREAKOUT_VOL_MULT = 1.5  # breakout candle vol vs avg range vol
-O_MAX_ENTRY_CANDLE = 30
-O_TARGET1_PCT = 8.0
-O_TARGET2_PCT = 15.0
-O_STOP_PCT = 0.0  # 0 = dynamic stop at range low
-O_PARTIAL_SELL_PCT = 50.0
-O_TRAIL_PCT = 2.0
-O_TRAIL_ACTIVATE_PCT = 3.0
-O_TIME_LIMIT_MINUTES = 60
-
-# --- STRATEGY B CONFIG: Red-to-Green (R2G) ---
-B_MIN_GAP_PCT = 15.0
-B_MAX_DIP_PCT = 5.0  # max dip below open before abandoning
-B_MIN_RECLAIM_VOL_MULT = 1.5  # volume surge on reclaim candle
-B_MAX_ENTRY_CANDLE = 20
-B_TARGET1_PCT = 6.0
-B_TARGET2_PCT = 12.0
-B_STOP_PCT = 4.0
-B_PARTIAL_SELL_PCT = 50.0
-B_TRAIL_PCT = 2.0
-B_TRAIL_ACTIVATE_PCT = 3.0
-B_TIME_LIMIT_MINUTES = 30
-
-# --- STRATEGY K CONFIG: First Pullback Buy ---
-K_MIN_GAP_PCT = 10.0
-K_MIN_RUN_PCT = 5.0  # min morning run-up before pullback
-K_RUN_WINDOW = 15  # candles to establish run
-K_PULLBACK_PCT = 3.0  # min pullback % from run high
-K_PULLBACK_VOL_RATIO = 0.5  # pullback vol <= ratio * run vol (orderly)
-K_BOUNCE_VOL_MULT = 1.5  # bounce vol >= mult * pullback avg vol
-K_MAX_ENTRY_CANDLE = 45
-K_TARGET1_PCT = 8.0
-K_TARGET2_PCT = 15.0
-K_STOP_PCT = 5.0
-K_PARTIAL_SELL_PCT = 50.0
-K_TRAIL_PCT = 2.0
-K_TRAIL_ACTIVATE_PCT = 3.0
-K_TIME_LIMIT_MINUTES = 60
-
-# --- STRATEGY C CONFIG: Micro Flag / Base Pattern ---
-C_MIN_GAP_PCT = 10.0
-C_MIN_SPIKE_PCT = 5.0  # initial spike before consolidation
-C_MIN_BASE_CANDLES = 3  # min candles in tight base
-C_MAX_BASE_CANDLES = 8  # max candles in base before abandon
-C_MAX_BASE_RANGE_PCT = 3.0  # max range of base (tight consolidation)
-C_BREAKOUT_VOL_MULT = 1.5  # vol surge on breakout
-C_MAX_ENTRY_CANDLE = 60
-C_TARGET1_PCT = 8.0
-C_TARGET2_PCT = 15.0
-C_STOP_PCT = 4.0
-C_PARTIAL_SELL_PCT = 50.0
-C_TRAIL_PCT = 2.0
-C_TRAIL_ACTIVATE_PCT = 3.0
-C_TIME_LIMIT_MINUTES = 60
-
-# --- STRATEGY S CONFIG: Stuff-and-Break ---
-S_MIN_GAP_PCT = 10.0
-S_MIN_HOD_TESTS = 2  # min times HOD tested and rejected
-S_HOD_TOLERANCE_PCT = 0.5  # within X% of HOD = "test"
-S_REJECTION_PCT = 1.0  # must pull back X% to count as rejection
-S_BREAKOUT_VOL_MULT = 1.5  # vol surge on final break
-S_MAX_ENTRY_CANDLE = 90
-S_TARGET1_PCT = 8.0
-S_TARGET2_PCT = 15.0
-S_STOP_PCT = 4.0
-S_PARTIAL_SELL_PCT = 50.0
-S_TRAIL_PCT = 2.0
-S_TRAIL_ACTIVATE_PCT = 3.0
-S_TIME_LIMIT_MINUTES = 90
-
-# --- STRATEGY E CONFIG: Gap-and-Go RelVol ---
-E_MIN_GAP_PCT = 15.0
-E_MIN_PM_VOL_MULT = 5.0  # premarket vol >= X * typical daily avg
-E_MAX_ENTRY_CANDLE = 5  # enter very early
-E_TARGET1_PCT = 6.0
-E_TARGET2_PCT = 12.0
-E_STOP_PCT = 4.0
-E_PARTIAL_SELL_PCT = 50.0
-E_TRAIL_PCT = 2.0
-E_TRAIL_ACTIVATE_PCT = 3.0
-E_TIME_LIMIT_MINUTES = 20
-
-# --- STRATEGY I CONFIG: P1 Immediate PM High Breakout ---
-I_MIN_GAP_PCT = 10.0
-I_MAX_ENTRY_CANDLE = 30  # must break PM high early
-I_BREAKOUT_VOL_MULT = 1.5
-I_TARGET1_PCT = 8.0
-I_TARGET2_PCT = 15.0
-I_STOP_PCT = 5.0
-I_PARTIAL_SELL_PCT = 50.0
-I_TRAIL_PCT = 2.0
-I_TRAIL_ACTIVATE_PCT = 3.0
-I_TIME_LIMIT_MINUTES = 60
-
-# --- STRATEGY J CONFIG: P3 VWAP + PM High Breakout ---
-J_MIN_GAP_PCT = 10.0
-J_MAX_ENTRY_CANDLE = 90
-J_VWAP_PROXIMITY_PCT = 2.0  # price within X% of VWAP at breakout
-J_TARGET1_PCT = 8.0
-J_TARGET2_PCT = 15.0
-J_STOP_PCT = 5.0
-J_PARTIAL_SELL_PCT = 50.0
-J_TRAIL_PCT = 2.0
-J_TRAIL_ACTIVATE_PCT = 3.0
-J_TIME_LIMIT_MINUTES = 90
-
-# --- STRATEGY N CONFIG: P4 HOD Reclaim ---
-N_MIN_GAP_PCT = 10.0
-N_MIN_HOD_AGE = 10  # HOD must be at least X candles old
-N_PULLBACK_FROM_HOD_PCT = 3.0  # must pull back X% from HOD
-N_MAX_ENTRY_CANDLE = 120
-N_TARGET1_PCT = 8.0
-N_TARGET2_PCT = 15.0
-N_STOP_PCT = 5.0
-N_PARTIAL_SELL_PCT = 50.0
-N_TRAIL_PCT = 2.0
-N_TRAIL_ACTIVATE_PCT = 3.0
-N_TIME_LIMIT_MINUTES = 90
+# L (Low Float Squeeze)
+L_HOD_BREAK_REQUIRED = True
+L_REQUIRE_ABOVE_VWAP = True
+# W (Power Hour Breakout)
+W_REQUIRE_ABOVE_VWAP = True
 
 # --- SHARED CONFIG ---
 EOD_EXIT_MINUTES = 15
 FULL_BALANCE_SIZING = True  # Use full balance for each trade
 
-# Strategy priority (lower = higher priority; Optuna can override)
-STRAT_PRIORITY = {
-    "H": 0,
-    "G": 1,
-    "A": 2,
-    "F": 3,
-    "D": 4,
-    "V": 5,
-    "P": 6,
-    "M": 7,
-    "R": 8,
-    "W": 9,
-    "O": 10,
-    "B": 11,
-    "K": 12,
-    "C": 13,
-    "S": 14,
-    "E": 15,
-    "I": 16,
-    "J": 17,
-    "N": 18,
-    "L": 19,
-    "X": 20,
-}
 STRAT_KEYS = [
     "H",
     "G",

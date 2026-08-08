@@ -1,0 +1,1486 @@
+{
+  "2026-07-27": [
+    {
+      "ticker": "EDBL",
+      "gap_pct": 153.18,
+      "pm_volume": 21461357,
+      "premarket_high": 9.51,
+      "prev_close": 3.14,
+      "float_shares": 120568.0
+    },
+    {
+      "ticker": "LGHL",
+      "gap_pct": 124.05999999999999,
+      "pm_volume": 39460453,
+      "premarket_high": 2.1,
+      "prev_close": 0.9105,
+      "float_shares": 917387.0
+    },
+    {
+      "ticker": "DFNS",
+      "gap_pct": 60.0,
+      "pm_volume": 20100138,
+      "premarket_high": 7.31,
+      "prev_close": 4.35,
+      "float_shares": 707989.0
+    },
+    {
+      "ticker": "MTNB",
+      "gap_pct": 53.31,
+      "pm_volume": 123507084,
+      "premarket_high": 0.395,
+      "prev_close": 0.2414,
+      "float_shares": 11223698.0
+    },
+    {
+      "ticker": "BIYA",
+      "gap_pct": 52.32,
+      "pm_volume": 16902590,
+      "premarket_high": 3.35,
+      "prev_close": 1.93,
+      "float_shares": 3229573.0
+    },
+    {
+      "ticker": "ENTX",
+      "gap_pct": 43.9,
+      "pm_volume": 21975960,
+      "premarket_high": 3.9,
+      "prev_close": 2.05,
+      "float_shares": 37483418.0
+    },
+    {
+      "ticker": "GOSS",
+      "gap_pct": 27.279999999999998,
+      "pm_volume": 90286148,
+      "premarket_high": 0.1717,
+      "prev_close": 0.136,
+      "float_shares": 481415002.0
+    },
+    {
+      "ticker": "JZXN",
+      "gap_pct": 24.37,
+      "pm_volume": 8243078,
+      "premarket_high": 1.68,
+      "prev_close": 1.19,
+      "float_shares": 511452.0
+    },
+    {
+      "ticker": "KIDZ",
+      "gap_pct": 21.95,
+      "pm_volume": 49812704,
+      "premarket_high": 0.5259,
+      "prev_close": 0.4191,
+      "float_shares": 5207603.0
+    },
+    {
+      "ticker": "TRAX",
+      "gap_pct": 21.23,
+      "pm_volume": 537158,
+      "premarket_high": 45.13,
+      "prev_close": 35.52,
+      "float_shares": 32621614.0
+    },
+    {
+      "ticker": "VEEE",
+      "gap_pct": 19.82,
+      "pm_volume": 817223,
+      "premarket_high": 16.815,
+      "prev_close": 12.97,
+      "float_shares": 443238.0
+    },
+    {
+      "ticker": "RACC",
+      "gap_pct": 17.419999999999998,
+      "pm_volume": 125526,
+      "premarket_high": 12.94,
+      "prev_close": 11.02,
+      "float_shares": 7500000.0
+    },
+    {
+      "ticker": "GMEX",
+      "gap_pct": 16.33,
+      "pm_volume": 14775283,
+      "premarket_high": 1.82,
+      "prev_close": 1.47,
+      "float_shares": 17968.0
+    },
+    {
+      "ticker": "LGCL",
+      "gap_pct": 12.5,
+      "pm_volume": 1562243,
+      "premarket_high": 1.56,
+      "prev_close": 1.36,
+      "float_shares": 1599686.0
+    },
+    {
+      "ticker": "QBTS",
+      "gap_pct": 10.8,
+      "pm_volume": 5842338,
+      "premarket_high": 18.78,
+      "prev_close": 16.21,
+      "float_shares": 358771032.0
+    },
+    {
+      "ticker": "FRNM",
+      "gap_pct": 10.32,
+      "pm_volume": 248561,
+      "premarket_high": 11.26,
+      "prev_close": 11.24,
+      "float_shares": 7870992.0
+    }
+  ],
+  "2026-07-28": [
+    {
+      "ticker": "CISS",
+      "gap_pct": 80.36999999999999,
+      "pm_volume": 242702235,
+      "premarket_high": 0.22,
+      "prev_close": 0.1024,
+      "float_shares": 1475821.0
+    },
+    {
+      "ticker": "FIRY",
+      "gap_pct": 67.45,
+      "pm_volume": 10264729,
+      "premarket_high": 14.32,
+      "prev_close": 8.36,
+      "float_shares": 5867853.0
+    },
+    {
+      "ticker": "DFNS",
+      "gap_pct": 56.269999999999996,
+      "pm_volume": 10314324,
+      "premarket_high": 23.15,
+      "prev_close": 13.1,
+      "float_shares": 707989.0
+    },
+    {
+      "ticker": "INLF",
+      "gap_pct": 44.51,
+      "pm_volume": 8259240,
+      "premarket_high": 4.73,
+      "prev_close": 3.28,
+      "float_shares": 978465.0
+    },
+    {
+      "ticker": "ONFO",
+      "gap_pct": 38.71,
+      "pm_volume": 53637414,
+      "premarket_high": 0.1467,
+      "prev_close": 0.1005,
+      "float_shares": 5427157.0
+    },
+    {
+      "ticker": "GOSS",
+      "gap_pct": 34.65,
+      "pm_volume": 104973766,
+      "premarket_high": 0.31,
+      "prev_close": 0.1994,
+      "float_shares": 481415002.0
+    },
+    {
+      "ticker": "BIYA",
+      "gap_pct": 31.89,
+      "pm_volume": 9649157,
+      "premarket_high": 6.62,
+      "prev_close": 4.17,
+      "float_shares": 3229573.0
+    },
+    {
+      "ticker": "CHAI",
+      "gap_pct": 25.53,
+      "pm_volume": 64697216,
+      "premarket_high": 0.534,
+      "prev_close": 0.3928,
+      "float_shares": 8964178.0
+    },
+    {
+      "ticker": "OMH",
+      "gap_pct": 21.6,
+      "pm_volume": 31885561,
+      "premarket_high": 0.1767,
+      "prev_close": 0.1454,
+      "float_shares": 22170294.0
+    },
+    {
+      "ticker": "PMN",
+      "gap_pct": 20.39,
+      "pm_volume": 396583,
+      "premarket_high": 14.11,
+      "prev_close": 11.72,
+      "float_shares": 7748507.0
+    },
+    {
+      "ticker": "PRLD",
+      "gap_pct": 16.97,
+      "pm_volume": 330292,
+      "premarket_high": 4.33,
+      "prev_close": 3.89,
+      "float_shares": 44152574.0
+    },
+    {
+      "ticker": "POLA",
+      "gap_pct": 16.33,
+      "pm_volume": 9561338,
+      "premarket_high": 1.85,
+      "prev_close": 1.47,
+      "float_shares": 2830088.0
+    },
+    {
+      "ticker": "SCNI",
+      "gap_pct": 13.29,
+      "pm_volume": 134433,
+      "premarket_high": 0.28,
+      "prev_close": 0.2468,
+      "float_shares": 4362297.0
+    },
+    {
+      "ticker": "EHGO",
+      "gap_pct": 11.85,
+      "pm_volume": 2550195,
+      "premarket_high": 2.36,
+      "prev_close": 2.11,
+      "float_shares": 2459827.0
+    },
+    {
+      "ticker": "OPK",
+      "gap_pct": 11.27,
+      "pm_volume": 3448215,
+      "premarket_high": 1.53,
+      "prev_close": 1.24,
+      "float_shares": 377930407.0
+    },
+    {
+      "ticker": "BZFD",
+      "gap_pct": 9.73,
+      "pm_volume": 944447,
+      "premarket_high": 1.24,
+      "prev_close": 1.13,
+      "float_shares": 30338029.0
+    }
+  ],
+  "2026-07-29": [
+    {
+      "ticker": "NCRA",
+      "gap_pct": 146.85,
+      "pm_volume": 55875462,
+      "premarket_high": 4.43,
+      "prev_close": 1.43,
+      "float_shares": 1302638.0
+    },
+    {
+      "ticker": "DFNS",
+      "gap_pct": 63.129999999999995,
+      "pm_volume": 4929525,
+      "premarket_high": 43.7,
+      "prev_close": 24.0,
+      "float_shares": 707989.0
+    },
+    {
+      "ticker": "AMIX",
+      "gap_pct": 57.089999999999996,
+      "pm_volume": 22873272,
+      "premarket_high": 5.96,
+      "prev_close": 2.75,
+      "float_shares": 948744.0
+    },
+    {
+      "ticker": "VIVK",
+      "gap_pct": 42.78,
+      "pm_volume": 32273289,
+      "premarket_high": 3.17,
+      "prev_close": 1.94,
+      "float_shares": 614243.0
+    },
+    {
+      "ticker": "GMM",
+      "gap_pct": 39.65,
+      "pm_volume": 8499964,
+      "premarket_high": 3.46,
+      "prev_close": 2.47,
+      "float_shares": 1081764.0
+    },
+    {
+      "ticker": "VRRM",
+      "gap_pct": 38.04,
+      "pm_volume": 6588003,
+      "premarket_high": 5.97,
+      "prev_close": 4.18,
+      "float_shares": 150303357.0
+    },
+    {
+      "ticker": "STFS",
+      "gap_pct": 34.71,
+      "pm_volume": 9136256,
+      "premarket_high": 5.57,
+      "prev_close": 3.63,
+      "float_shares": 988776.0
+    },
+    {
+      "ticker": "MWYN",
+      "gap_pct": 28.57,
+      "pm_volume": 331679,
+      "premarket_high": 0.63,
+      "prev_close": 0.4901,
+      "float_shares": 14201549.0
+    },
+    {
+      "ticker": "SKYQ",
+      "gap_pct": 23.43,
+      "pm_volume": 3956766,
+      "premarket_high": 4.43,
+      "prev_close": 3.67,
+      "float_shares": 4135812.0
+    },
+    {
+      "ticker": "BRAI",
+      "gap_pct": 21.310000000000002,
+      "pm_volume": 376462,
+      "premarket_high": 7.22,
+      "prev_close": 5.8,
+      "float_shares": 72183876.0
+    },
+    {
+      "ticker": "EGG",
+      "gap_pct": 20.22,
+      "pm_volume": 2871202,
+      "premarket_high": 4.46,
+      "prev_close": 3.81,
+      "float_shares": 24005200.0
+    },
+    {
+      "ticker": "SPRC",
+      "gap_pct": 18.01,
+      "pm_volume": 126913,
+      "premarket_high": 6.05,
+      "prev_close": 5.33,
+      "float_shares": 573243.0
+    },
+    {
+      "ticker": "NEO",
+      "gap_pct": 16.04,
+      "pm_volume": 508257,
+      "premarket_high": 16.09,
+      "prev_close": 13.4,
+      "float_shares": 127537327.0
+    },
+    {
+      "ticker": "OBAI",
+      "gap_pct": 15.260000000000002,
+      "pm_volume": 3166261,
+      "premarket_high": 0.6263,
+      "prev_close": 0.5014,
+      "float_shares": 14275040.0
+    },
+    {
+      "ticker": "ONMD",
+      "gap_pct": 13.62,
+      "pm_volume": 14352146,
+      "premarket_high": 0.8199,
+      "prev_close": 0.709,
+      "float_shares": 17028759.0
+    },
+    {
+      "ticker": "BATL",
+      "gap_pct": 13.370000000000001,
+      "pm_volume": 4586547,
+      "premarket_high": 1.56,
+      "prev_close": 1.28,
+      "float_shares": 20311966.0
+    },
+    {
+      "ticker": "PYPD",
+      "gap_pct": 11.469999999999999,
+      "pm_volume": 128003,
+      "premarket_high": 4.21,
+      "prev_close": 3.75,
+      "float_shares": 14090034.0
+    }
+  ],
+  "2026-07-30": [
+    {
+      "ticker": "NUWE",
+      "gap_pct": 174.07,
+      "pm_volume": 59814478,
+      "premarket_high": 6.13,
+      "prev_close": 1.89,
+      "float_shares": 509927.0
+    },
+    {
+      "ticker": "PN",
+      "gap_pct": 90.39,
+      "pm_volume": 3264899,
+      "premarket_high": 20.8,
+      "prev_close": 10.72,
+      "float_shares": 1168000.0
+    },
+    {
+      "ticker": "STKH",
+      "gap_pct": 58.660000000000004,
+      "pm_volume": 13281000,
+      "premarket_high": 4.875,
+      "prev_close": 2.71,
+      "float_shares": 495474.0
+    },
+    {
+      "ticker": "GCTK",
+      "gap_pct": 43.16,
+      "pm_volume": 43981851,
+      "premarket_high": 0.3965,
+      "prev_close": 0.285,
+      "float_shares": 6500870.0
+    },
+    {
+      "ticker": "CMCO",
+      "gap_pct": 36.59,
+      "pm_volume": 279704,
+      "premarket_high": 20.27,
+      "prev_close": 14.62,
+      "float_shares": 28246550.0
+    },
+    {
+      "ticker": "SXTC",
+      "gap_pct": 35.809999999999995,
+      "pm_volume": 316476835,
+      "premarket_high": 0.0708,
+      "prev_close": 0.0525,
+      "float_shares": 7444875.0
+    },
+    {
+      "ticker": "XRX",
+      "gap_pct": 29.56,
+      "pm_volume": 7198879,
+      "premarket_high": 3.74,
+      "prev_close": 2.64,
+      "float_shares": 109771317.0
+    },
+    {
+      "ticker": "BOOM",
+      "gap_pct": 28.78,
+      "pm_volume": 349324,
+      "premarket_high": 7.34,
+      "prev_close": 5.42,
+      "float_shares": 18975070.0
+    },
+    {
+      "ticker": "VSEE",
+      "gap_pct": 25.03,
+      "pm_volume": 73523253,
+      "premarket_high": 0.0933,
+      "prev_close": 0.0731,
+      "float_shares": 47402286.0
+    },
+    {
+      "ticker": "DCX",
+      "gap_pct": 24.05,
+      "pm_volume": 4180226,
+      "premarket_high": 1.36,
+      "prev_close": 1.08,
+      "float_shares": 333859395.0
+    },
+    {
+      "ticker": "PRCH",
+      "gap_pct": 23.79,
+      "pm_volume": 321266,
+      "premarket_high": 15.19,
+      "prev_close": 12.36,
+      "float_shares": 106179703.0
+    },
+    {
+      "ticker": "STAK",
+      "gap_pct": 23.05,
+      "pm_volume": 8988056,
+      "premarket_high": 3.08,
+      "prev_close": 2.43,
+      "float_shares": 10010349.0
+    },
+    {
+      "ticker": "ZONE",
+      "gap_pct": 21.59,
+      "pm_volume": 5405336,
+      "premarket_high": 0.4018,
+      "prev_close": 0.3219,
+      "float_shares": 211389290.0
+    },
+    {
+      "ticker": "GMEX",
+      "gap_pct": 19.53,
+      "pm_volume": 4080116,
+      "premarket_high": 1.53,
+      "prev_close": 1.28,
+      "float_shares": 17968.0
+    },
+    {
+      "ticker": "INIO",
+      "gap_pct": 17.130000000000003,
+      "pm_volume": 316043,
+      "premarket_high": 25.085,
+      "prev_close": 21.77,
+      "float_shares": 75000000.0
+    },
+    {
+      "ticker": "BAX",
+      "gap_pct": 16.55,
+      "pm_volume": 1794816,
+      "premarket_high": 30.0,
+      "prev_close": 24.77,
+      "float_shares": 512923637.0
+    }
+  ],
+  "2026-07-31": [
+    {
+      "ticker": "FCUV",
+      "gap_pct": 442.55000000000007,
+      "pm_volume": 28730535,
+      "premarket_high": 11.46,
+      "prev_close": 1.88,
+      "float_shares": 601411.0
+    },
+    {
+      "ticker": "WETO",
+      "gap_pct": 252.99999999999997,
+      "pm_volume": 824263462,
+      "premarket_high": 0.1031,
+      "prev_close": 0.03,
+      "float_shares": 6570040.0
+    },
+    {
+      "ticker": "MGRX",
+      "gap_pct": 119.99,
+      "pm_volume": 151094289,
+      "premarket_high": 0.86,
+      "prev_close": 0.2936,
+      "float_shares": 15444087.0
+    },
+    {
+      "ticker": "REPL",
+      "gap_pct": 109.43,
+      "pm_volume": 8151951,
+      "premarket_high": 12.64,
+      "prev_close": 5.41,
+      "float_shares": 81770188.0
+    },
+    {
+      "ticker": "ZBAO",
+      "gap_pct": 61.739999999999995,
+      "pm_volume": 140378572,
+      "premarket_high": 0.31,
+      "prev_close": 0.1725,
+      "float_shares": 8766787.0
+    },
+    {
+      "ticker": "LBGJ",
+      "gap_pct": 56.67,
+      "pm_volume": 744785715,
+      "premarket_high": 0.032,
+      "prev_close": 0.018,
+      "float_shares": 3049682.0
+    },
+    {
+      "ticker": "KUST",
+      "gap_pct": 49.15,
+      "pm_volume": 27726590,
+      "premarket_high": 1.95,
+      "prev_close": 1.18,
+      "float_shares": 626731.0
+    },
+    {
+      "ticker": "NWL",
+      "gap_pct": 28.79,
+      "pm_volume": 3946270,
+      "premarket_high": 7.11,
+      "prev_close": 5.14,
+      "float_shares": 418526182.0
+    },
+    {
+      "ticker": "SBEV",
+      "gap_pct": 28.749999999999996,
+      "pm_volume": 16200823,
+      "premarket_high": 0.4398,
+      "prev_close": 0.3451,
+      "float_shares": 6299531.0
+    },
+    {
+      "ticker": "PWP",
+      "gap_pct": 21.060000000000002,
+      "pm_volume": 141457,
+      "premarket_high": 18.35,
+      "prev_close": 14.91,
+      "float_shares": 68840615.0
+    },
+    {
+      "ticker": "TGHL",
+      "gap_pct": 18.240000000000002,
+      "pm_volume": 872323,
+      "premarket_high": 1.03,
+      "prev_close": 0.7358,
+      "float_shares": 12722710.0
+    },
+    {
+      "ticker": "KWM",
+      "gap_pct": 16.05,
+      "pm_volume": 219086143,
+      "premarket_high": 0.088,
+      "prev_close": 0.0754,
+      "float_shares": 53872485.0
+    },
+    {
+      "ticker": "ONFO",
+      "gap_pct": 15.909999999999998,
+      "pm_volume": 235070128,
+      "premarket_high": 0.1229,
+      "prev_close": 0.0842,
+      "float_shares": 5427157.0
+    },
+    {
+      "ticker": "DUOT",
+      "gap_pct": 15.72,
+      "pm_volume": 191224,
+      "premarket_high": 9.32,
+      "prev_close": 8.14,
+      "float_shares": 29316411.0
+    },
+    {
+      "ticker": "LFS",
+      "gap_pct": 15.14,
+      "pm_volume": 578408,
+      "premarket_high": 2.435,
+      "prev_close": 2.18,
+      "float_shares": 12472634.0
+    },
+    {
+      "ticker": "OPTT",
+      "gap_pct": 13.59,
+      "pm_volume": 1144798,
+      "premarket_high": 0.179,
+      "prev_close": 0.1611,
+      "float_shares": 249016063.0
+    },
+    {
+      "ticker": "JFB",
+      "gap_pct": 12.950000000000001,
+      "pm_volume": 143487,
+      "premarket_high": 4.39,
+      "prev_close": 3.63,
+      "float_shares": 11564049.0
+    }
+  ],
+  "2026-08-03": [
+    {
+      "ticker": "HYFM",
+      "gap_pct": 474.07000000000005,
+      "pm_volume": 74878827,
+      "premarket_high": 4.09,
+      "prev_close": 0.54,
+      "float_shares": 3510451.0
+    },
+    {
+      "ticker": "UPC",
+      "gap_pct": 121.52000000000001,
+      "pm_volume": 13638917,
+      "premarket_high": 7.54,
+      "prev_close": 3.16,
+      "float_shares": 491448.0
+    },
+    {
+      "ticker": "EZRA",
+      "gap_pct": 79.12,
+      "pm_volume": 52793687,
+      "premarket_high": 4.52,
+      "prev_close": 1.82,
+      "float_shares": 962131.0
+    },
+    {
+      "ticker": "YYAI",
+      "gap_pct": 67.33,
+      "pm_volume": 328462860,
+      "premarket_high": 0.33,
+      "prev_close": 0.12,
+      "float_shares": 906139.0
+    },
+    {
+      "ticker": "MGN",
+      "gap_pct": 65.08,
+      "pm_volume": 295100431,
+      "premarket_high": 0.1229,
+      "prev_close": 0.0736,
+      "float_shares": 26155000.0
+    },
+    {
+      "ticker": "DFNS",
+      "gap_pct": 53.76,
+      "pm_volume": 2230586,
+      "premarket_high": 51.99,
+      "prev_close": 27.68,
+      "float_shares": 708109.0
+    },
+    {
+      "ticker": "FCUV",
+      "gap_pct": 33.019999999999996,
+      "pm_volume": 6521031,
+      "premarket_high": 17.77,
+      "prev_close": 11.6,
+      "float_shares": 601411.0
+    },
+    {
+      "ticker": "EDBL",
+      "gap_pct": 17.169999999999998,
+      "pm_volume": 15472146,
+      "premarket_high": 3.88,
+      "prev_close": 2.33,
+      "float_shares": 1349415.0
+    },
+    {
+      "ticker": "ADGM",
+      "gap_pct": 16.31,
+      "pm_volume": 333866,
+      "premarket_high": 0.4798,
+      "prev_close": 0.3783,
+      "float_shares": 12074870.0
+    },
+    {
+      "ticker": "AUTL",
+      "gap_pct": 14.77,
+      "pm_volume": 969788,
+      "premarket_high": 1.725,
+      "prev_close": 1.49,
+      "float_shares": 193096657.0
+    },
+    {
+      "ticker": "SXTC",
+      "gap_pct": 13.5,
+      "pm_volume": 182758473,
+      "premarket_high": 0.0734,
+      "prev_close": 0.0618,
+      "float_shares": 7444875.0
+    },
+    {
+      "ticker": "TGHL",
+      "gap_pct": 13.270000000000001,
+      "pm_volume": 826120,
+      "premarket_high": 1.295,
+      "prev_close": 1.13,
+      "float_shares": 12722710.0
+    },
+    {
+      "ticker": "PRZO",
+      "gap_pct": 12.25,
+      "pm_volume": 10273109,
+      "premarket_high": 0.58,
+      "prev_close": 0.4629,
+      "float_shares": 25019750.0
+    },
+    {
+      "ticker": "RUBI",
+      "gap_pct": 11.66,
+      "pm_volume": 3725065,
+      "premarket_high": 2.58,
+      "prev_close": 2.23,
+      "float_shares": 605011.0
+    },
+    {
+      "ticker": "BOW",
+      "gap_pct": 11.23,
+      "pm_volume": 136347,
+      "premarket_high": 35.07,
+      "prev_close": 30.59,
+      "float_shares": 22570031.0
+    },
+    {
+      "ticker": "CNH",
+      "gap_pct": 11.219999999999999,
+      "pm_volume": 3696428,
+      "premarket_high": 11.96,
+      "prev_close": 10.25,
+      "float_shares": 868878244.0
+    }
+  ],
+  "2026-08-04": [
+    {
+      "ticker": "QNME",
+      "gap_pct": 253.54000000000002,
+      "pm_volume": 75181815,
+      "premarket_high": 1.16,
+      "prev_close": 1.11,
+      "float_shares": 25776959.0
+    },
+    {
+      "ticker": "TNMG",
+      "gap_pct": 117.93,
+      "pm_volume": 168527265,
+      "premarket_high": 0.89,
+      "prev_close": 0.3575,
+      "float_shares": 2275381.0
+    },
+    {
+      "ticker": "MOVE",
+      "gap_pct": 74.53999999999999,
+      "pm_volume": 4420925,
+      "premarket_high": 18.625,
+      "prev_close": 10.76,
+      "float_shares": 16239179.0
+    },
+    {
+      "ticker": "ENSC",
+      "gap_pct": 55.089999999999996,
+      "pm_volume": 93396243,
+      "premarket_high": 0.43,
+      "prev_close": 0.2801,
+      "float_shares": 15269895.0
+    },
+    {
+      "ticker": "AMIX",
+      "gap_pct": 47.12,
+      "pm_volume": 22196262,
+      "premarket_high": 7.395,
+      "prev_close": 3.65,
+      "float_shares": 948744.0
+    },
+    {
+      "ticker": "AMRC",
+      "gap_pct": 37.54,
+      "pm_volume": 434854,
+      "premarket_high": 30.93,
+      "prev_close": 22.73,
+      "float_shares": 31903059.0
+    },
+    {
+      "ticker": "ADGM",
+      "gap_pct": 32.59,
+      "pm_volume": 102951917,
+      "premarket_high": 0.9,
+      "prev_close": 0.46,
+      "float_shares": 12074870.0
+    },
+    {
+      "ticker": "NUWE",
+      "gap_pct": 32.300000000000004,
+      "pm_volume": 17928749,
+      "premarket_high": 2.39,
+      "prev_close": 1.61,
+      "float_shares": 509927.0
+    },
+    {
+      "ticker": "DXST",
+      "gap_pct": 30.53,
+      "pm_volume": 8275892,
+      "premarket_high": 3.2,
+      "prev_close": 2.26,
+      "float_shares": 1218008.0
+    },
+    {
+      "ticker": "BLZE",
+      "gap_pct": 29.509999999999998,
+      "pm_volume": 3086421,
+      "premarket_high": 23.98,
+      "prev_close": 15.59,
+      "float_shares": 57151930.0
+    },
+    {
+      "ticker": "MED",
+      "gap_pct": 25.7,
+      "pm_volume": 175221,
+      "premarket_high": 12.995,
+      "prev_close": 9.74,
+      "float_shares": 10632346.0
+    },
+    {
+      "ticker": "LIFE",
+      "gap_pct": 22.43,
+      "pm_volume": 756320,
+      "premarket_high": 28.79,
+      "prev_close": 22.83,
+      "float_shares": 27121061.0
+    },
+    {
+      "ticker": "BRCC",
+      "gap_pct": 21.9,
+      "pm_volume": 516929,
+      "premarket_high": 1.245,
+      "prev_close": 1.05,
+      "float_shares": 91589226.0
+    },
+    {
+      "ticker": "XGN",
+      "gap_pct": 20.3,
+      "pm_volume": 814149,
+      "premarket_high": 6.82,
+      "prev_close": 4.68,
+      "float_shares": 13860162.0
+    },
+    {
+      "ticker": "VOYG",
+      "gap_pct": 19.1,
+      "pm_volume": 606643,
+      "premarket_high": 35.79,
+      "prev_close": 28.01,
+      "float_shares": 50825186.0
+    },
+    {
+      "ticker": "MRAM",
+      "gap_pct": 18.709999999999997,
+      "pm_volume": 615869,
+      "premarket_high": 18.23,
+      "prev_close": 15.45,
+      "float_shares": 22090599.0
+    },
+    {
+      "ticker": "DDD",
+      "gap_pct": 18.37,
+      "pm_volume": 1328003,
+      "premarket_high": 3.33,
+      "prev_close": 2.83,
+      "float_shares": 161235537.0
+    },
+    {
+      "ticker": "VGAS",
+      "gap_pct": 18.099999999999998,
+      "pm_volume": 1774067,
+      "premarket_high": 1.245,
+      "prev_close": 1.05,
+      "float_shares": 4194422.0
+    },
+    {
+      "ticker": "LWLG",
+      "gap_pct": 16.72,
+      "pm_volume": 1122995,
+      "premarket_high": 8.08,
+      "prev_close": 6.82,
+      "float_shares": 152286100.0
+    },
+    {
+      "ticker": "JELD",
+      "gap_pct": 15.97,
+      "pm_volume": 1497858,
+      "premarket_high": 1.77,
+      "prev_close": 1.44,
+      "float_shares": 83228002.0
+    }
+  ],
+  "2026-08-05": [
+    {
+      "ticker": "YXT",
+      "gap_pct": 182.69,
+      "pm_volume": 34792965,
+      "premarket_high": 11.32,
+      "prev_close": 2.6,
+      "float_shares": 2411008.0
+    },
+    {
+      "ticker": "INLF",
+      "gap_pct": 145.59,
+      "pm_volume": 17230828,
+      "premarket_high": 7.95,
+      "prev_close": 3.18,
+      "float_shares": 977980.0
+    },
+    {
+      "ticker": "CISS",
+      "gap_pct": 47.449999999999996,
+      "pm_volume": 422925840,
+      "premarket_high": 0.1433,
+      "prev_close": 0.0881,
+      "float_shares": 13075177.0
+    },
+    {
+      "ticker": "BJDX",
+      "gap_pct": 47.0,
+      "pm_volume": 30508197,
+      "premarket_high": 1.55,
+      "prev_close": 1.0,
+      "float_shares": 971938.0
+    },
+    {
+      "ticker": "GTE",
+      "gap_pct": 46.410000000000004,
+      "pm_volume": 8845467,
+      "premarket_high": 10.84,
+      "prev_close": 6.83,
+      "float_shares": 33953481.0
+    },
+    {
+      "ticker": "BLMN",
+      "gap_pct": 36.32,
+      "pm_volume": 1132099,
+      "premarket_high": 12.59,
+      "prev_close": 8.92,
+      "float_shares": 84335647.0
+    },
+    {
+      "ticker": "DBGI",
+      "gap_pct": 33.1,
+      "pm_volume": 1567543,
+      "premarket_high": 43.68,
+      "prev_close": 21.63,
+      "float_shares": 557789.0
+    },
+    {
+      "ticker": "JLHL",
+      "gap_pct": 29.160000000000004,
+      "pm_volume": 3889323,
+      "premarket_high": 7.43,
+      "prev_close": 5.42,
+      "float_shares": 1448632.0
+    },
+    {
+      "ticker": "APPS",
+      "gap_pct": 25.869999999999997,
+      "pm_volume": 3798533,
+      "premarket_high": 13.62,
+      "prev_close": 9.51,
+      "float_shares": 108454504.0
+    },
+    {
+      "ticker": "SWIM",
+      "gap_pct": 22.46,
+      "pm_volume": 189293,
+      "premarket_high": 6.905,
+      "prev_close": 5.7,
+      "float_shares": 108495536.0
+    },
+    {
+      "ticker": "PRGO",
+      "gap_pct": 18.27,
+      "pm_volume": 800132,
+      "premarket_high": 13.5,
+      "prev_close": 10.78,
+      "float_shares": 137766568.0
+    },
+    {
+      "ticker": "TATT",
+      "gap_pct": 17.98,
+      "pm_volume": 122306,
+      "premarket_high": 52.99,
+      "prev_close": 41.65,
+      "float_shares": 11982821.0
+    },
+    {
+      "ticker": "FTK",
+      "gap_pct": 17.19,
+      "pm_volume": 117586,
+      "premarket_high": 35.49,
+      "prev_close": 28.21,
+      "float_shares": 14180208.0
+    },
+    {
+      "ticker": "KMT",
+      "gap_pct": 16.220000000000002,
+      "pm_volume": 321461,
+      "premarket_high": 40.04,
+      "prev_close": 36.06,
+      "float_shares": 75318810.0
+    },
+    {
+      "ticker": "PCLA",
+      "gap_pct": 16.220000000000002,
+      "pm_volume": 129989,
+      "premarket_high": 5.66,
+      "prev_close": 4.87,
+      "float_shares": 6364382.0
+    },
+    {
+      "ticker": "XOS",
+      "gap_pct": 15.409999999999998,
+      "pm_volume": 229498,
+      "premarket_high": 3.035,
+      "prev_close": 2.63,
+      "float_shares": 7290627.0
+    },
+    {
+      "ticker": "AMPX",
+      "gap_pct": 15.079999999999998,
+      "pm_volume": 1922464,
+      "premarket_high": 12.29,
+      "prev_close": 10.81,
+      "float_shares": 139122421.0
+    },
+    {
+      "ticker": "ZJYL",
+      "gap_pct": 14.95,
+      "pm_volume": 6805563,
+      "premarket_high": 2.25,
+      "prev_close": 1.94,
+      "float_shares": 891251.0
+    },
+    {
+      "ticker": "GSM",
+      "gap_pct": 14.91,
+      "pm_volume": 410048,
+      "premarket_high": 4.18,
+      "prev_close": 3.42,
+      "float_shares": 117839761.0
+    },
+    {
+      "ticker": "UPST",
+      "gap_pct": 14.41,
+      "pm_volume": 1989257,
+      "premarket_high": 33.56,
+      "prev_close": 30.32,
+      "float_shares": 83249261.0
+    },
+    {
+      "ticker": "RYAM",
+      "gap_pct": 14.249999999999998,
+      "pm_volume": 126822,
+      "premarket_high": 9.06,
+      "prev_close": 8.76,
+      "float_shares": 60547503.0
+    }
+  ],
+  "2026-08-06": [
+    {
+      "ticker": "CLRO",
+      "gap_pct": 217.66,
+      "pm_volume": 38970519,
+      "premarket_high": 12.49,
+      "prev_close": 3.68,
+      "float_shares": 867109.0
+    },
+    {
+      "ticker": "WYHG",
+      "gap_pct": 149.96,
+      "pm_volume": 29809726,
+      "premarket_high": 9.6,
+      "prev_close": 3.341,
+      "float_shares": 12582732.0
+    },
+    {
+      "ticker": "PAVS",
+      "gap_pct": 88.39,
+      "pm_volume": 23632330,
+      "premarket_high": 9.7,
+      "prev_close": 4.91,
+      "float_shares": 856531.0
+    },
+    {
+      "ticker": "SURG",
+      "gap_pct": 76.37,
+      "pm_volume": 175418757,
+      "premarket_high": 0.3921,
+      "prev_close": 0.2234,
+      "float_shares": 15815778.0
+    },
+    {
+      "ticker": "ENSC",
+      "gap_pct": 73.45,
+      "pm_volume": 192420815,
+      "premarket_high": 0.6826,
+      "prev_close": 0.362,
+      "float_shares": 15269895.0
+    },
+    {
+      "ticker": "CELZ",
+      "gap_pct": 71.95,
+      "pm_volume": 100488663,
+      "premarket_high": 1.37,
+      "prev_close": 0.6688,
+      "float_shares": 4705964.0
+    },
+    {
+      "ticker": "ASPN",
+      "gap_pct": 45.14,
+      "pm_volume": 2189032,
+      "premarket_high": 7.74,
+      "prev_close": 5.01,
+      "float_shares": 69417285.0
+    },
+    {
+      "ticker": "IOVA",
+      "gap_pct": 39.4,
+      "pm_volume": 13066125,
+      "premarket_high": 6.385,
+      "prev_close": 4.34,
+      "float_shares": 416023420.0
+    },
+    {
+      "ticker": "MGRX",
+      "gap_pct": 38.43,
+      "pm_volume": 34012230,
+      "premarket_high": 0.6178,
+      "prev_close": 0.4255,
+      "float_shares": 15444087.0
+    },
+    {
+      "ticker": "FVN",
+      "gap_pct": 34.75,
+      "pm_volume": 136672,
+      "premarket_high": 14.54,
+      "prev_close": 10.79,
+      "float_shares": 5612500.0
+    },
+    {
+      "ticker": "AEVA",
+      "gap_pct": 30.7,
+      "pm_volume": 936546,
+      "premarket_high": 25.8,
+      "prev_close": 19.61,
+      "float_shares": 55173887.0
+    },
+    {
+      "ticker": "EVH",
+      "gap_pct": 30.19,
+      "pm_volume": 1001706,
+      "premarket_high": 3.955,
+      "prev_close": 3.08,
+      "float_shares": 108830438.0
+    },
+    {
+      "ticker": "HNST",
+      "gap_pct": 28.57,
+      "pm_volume": 3208433,
+      "premarket_high": 5.68,
+      "prev_close": 3.85,
+      "float_shares": 93104232.0
+    },
+    {
+      "ticker": "WPP",
+      "gap_pct": 25.759999999999998,
+      "pm_volume": 445486,
+      "premarket_high": 26.08,
+      "prev_close": 20.61,
+      "float_shares": 215760472.0
+    },
+    {
+      "ticker": "SOUN",
+      "gap_pct": 24.88,
+      "pm_volume": 19676832,
+      "premarket_high": 8.28,
+      "prev_close": 6.43,
+      "float_shares": 395221930.0
+    },
+    {
+      "ticker": "AZI",
+      "gap_pct": 21.759999999999998,
+      "pm_volume": 5116719,
+      "premarket_high": 1.44,
+      "prev_close": 1.01,
+      "float_shares": 5384189.0
+    },
+    {
+      "ticker": "CLOV",
+      "gap_pct": 17.87,
+      "pm_volume": 1554664,
+      "premarket_high": 5.175,
+      "prev_close": 4.14,
+      "float_shares": 411630231.0
+    },
+    {
+      "ticker": "HTZ",
+      "gap_pct": 16.669999999999998,
+      "pm_volume": 15059178,
+      "premarket_high": 1.9,
+      "prev_close": 1.56,
+      "float_shares": 344741136.0
+    },
+    {
+      "ticker": "CAI",
+      "gap_pct": 15.870000000000001,
+      "pm_volume": 614059,
+      "premarket_high": 19.435,
+      "prev_close": 16.45,
+      "float_shares": 124492592.0
+    },
+    {
+      "ticker": "ARHS",
+      "gap_pct": 14.95,
+      "pm_volume": 167776,
+      "premarket_high": 8.73,
+      "prev_close": 8.23,
+      "float_shares": 51344779.0
+    },
+    {
+      "ticker": "RDW",
+      "gap_pct": 14.27,
+      "pm_volume": 1404514,
+      "premarket_high": 11.86,
+      "prev_close": 10.72,
+      "float_shares": 230309299.0
+    }
+  ],
+  "2026-08-07": [
+    {
+      "ticker": "MB",
+      "gap_pct": 283.2,
+      "pm_volume": 16980935,
+      "premarket_high": 15.03,
+      "prev_close": 3.75,
+      "float_shares": 4690000.0
+    },
+    {
+      "ticker": "NAMI",
+      "gap_pct": 214.42999999999998,
+      "pm_volume": 34104474,
+      "premarket_high": 9.97,
+      "prev_close": 2.91,
+      "float_shares": 2436642.0
+    },
+    {
+      "ticker": "DOCS",
+      "gap_pct": 89.2,
+      "pm_volume": 19702508,
+      "premarket_high": 39.81,
+      "prev_close": 20.66,
+      "float_shares": 125275142.0
+    },
+    {
+      "ticker": "DSY",
+      "gap_pct": 73.91,
+      "pm_volume": 17547034,
+      "premarket_high": 7.59,
+      "prev_close": 3.45,
+      "float_shares": 1251873.0
+    },
+    {
+      "ticker": "HCWC",
+      "gap_pct": 60.0,
+      "pm_volume": 209508107,
+      "premarket_high": 0.4064,
+      "prev_close": 0.2,
+      "float_shares": 23516582.0
+    },
+    {
+      "ticker": "SLGB",
+      "gap_pct": 49.41,
+      "pm_volume": 85294438,
+      "premarket_high": 0.7599,
+      "prev_close": 0.5124,
+      "float_shares": 5000000.0
+    },
+    {
+      "ticker": "VATE",
+      "gap_pct": 47.099999999999994,
+      "pm_volume": 6204384,
+      "premarket_high": 11.91,
+      "prev_close": 7.41,
+      "float_shares": 5414000.0
+    },
+    {
+      "ticker": "FIGS",
+      "gap_pct": 35.32,
+      "pm_volume": 1135755,
+      "premarket_high": 16.28,
+      "prev_close": 11.24,
+      "float_shares": 151445058.0
+    },
+    {
+      "ticker": "QNST",
+      "gap_pct": 32.72,
+      "pm_volume": 196680,
+      "premarket_high": 20.34,
+      "prev_close": 15.22,
+      "float_shares": 53997331.0
+    },
+    {
+      "ticker": "FNKO",
+      "gap_pct": 30.3,
+      "pm_volume": 443366,
+      "premarket_high": 7.005,
+      "prev_close": 5.28,
+      "float_shares": 41838159.0
+    },
+    {
+      "ticker": "CPOP",
+      "gap_pct": 28.99,
+      "pm_volume": 72740768,
+      "premarket_high": 0.4619,
+      "prev_close": 0.3581,
+      "float_shares": 6281074.0
+    },
+    {
+      "ticker": "CELZ",
+      "gap_pct": 28.689999999999998,
+      "pm_volume": 18583584,
+      "premarket_high": 1.825,
+      "prev_close": 1.15,
+      "float_shares": 4705964.0
+    },
+    {
+      "ticker": "STLN",
+      "gap_pct": 27.860000000000003,
+      "pm_volume": 966351,
+      "premarket_high": 6.52,
+      "prev_close": 4.99,
+      "float_shares": 83503844.0
+    },
+    {
+      "ticker": "PUBM",
+      "gap_pct": 27.0,
+      "pm_volume": 585998,
+      "premarket_high": 17.97,
+      "prev_close": 13.48,
+      "float_shares": 37710795.0
+    },
+    {
+      "ticker": "RCEL",
+      "gap_pct": 25.259999999999998,
+      "pm_volume": 322048,
+      "premarket_high": 6.65,
+      "prev_close": 4.75,
+      "float_shares": 30307484.0
+    },
+    {
+      "ticker": "PSIX",
+      "gap_pct": 22.650000000000002,
+      "pm_volume": 198478,
+      "premarket_high": 41.825,
+      "prev_close": 33.02,
+      "float_shares": 8408328.0
+    },
+    {
+      "ticker": "MITK",
+      "gap_pct": 21.42,
+      "pm_volume": 118001,
+      "premarket_high": 20.61,
+      "prev_close": 16.81,
+      "float_shares": 43859606.0
+    },
+    {
+      "ticker": "HTZ",
+      "gap_pct": 21.29,
+      "pm_volume": 48305164,
+      "premarket_high": 2.7,
+      "prev_close": 2.02,
+      "float_shares": 344741136.0
+    },
+    {
+      "ticker": "INDI",
+      "gap_pct": 20.41,
+      "pm_volume": 1226880,
+      "premarket_high": 4.105,
+      "prev_close": 3.43,
+      "float_shares": 207796088.0
+    },
+    {
+      "ticker": "UAVS",
+      "gap_pct": 19.72,
+      "pm_volume": 1855786,
+      "premarket_high": 0.8815,
+      "prev_close": 0.7184,
+      "float_shares": 51153374.0
+    },
+    {
+      "ticker": "AQB",
+      "gap_pct": 19.63,
+      "pm_volume": 3518066,
+      "premarket_high": 1.31,
+      "prev_close": 1.07,
+      "float_shares": 5120371.0
+    },
+    {
+      "ticker": "EMBC",
+      "gap_pct": 19.139999999999997,
+      "pm_volume": 117466,
+      "premarket_high": 4.08,
+      "prev_close": 3.5,
+      "float_shares": 58298414.0
+    },
+    {
+      "ticker": "SAGT",
+      "gap_pct": 17.98,
+      "pm_volume": 1156354,
+      "premarket_high": 0.851,
+      "prev_close": 0.721,
+      "float_shares": 3731750.0
+    }
+  ]
+}
