@@ -204,10 +204,12 @@ def _build_split_snapshot(std_params):
             elif s in _gap_keys:
                 snapshot[_gap_keys[s]] = 9999.0
 
-    # Add all g1_*/g2_*/l1_*/l2_* keys to the snapshot
-    # The simulator's entry_params will pick these up at trade entry
+    # Add all g_*/g1_*/g2_*/l_*/l1_*/l2_* keys to the snapshot.
+    # The simulator's entry_params captures ("g_", "g1_", "g2_", "l_", "l1_", "l2_")
+    # prefixed keys at trade entry. G1/L1 exit logic reads g_*/l_* (base), G2/L2 reads
+    # g2_*/l2_*. ALL of these must be in the snapshot.
     for k, v in std_params.items():
-        if k.startswith(("g1_", "g2_", "l1_", "l2_")):
+        if k.startswith(("g_", "g1_", "g2_", "l_", "l1_", "l2_")):
             snapshot[k] = v
 
     return snapshot

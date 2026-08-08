@@ -1,145 +1,70 @@
 {
-  "trial_number": 48,
-  "score": 2802.8589478039166,
-  "total_pnl": 2802.86,
-  "pf": 0.989,
-  "wr": 44.7,
-  "trades": 1511,
-  "equity": 0,
+  "trial_number": 2472,
+  "score": 69743940.59161192,
+  "total_pnl": 23247980.2,
+  "pf": 3.029,
+  "wr": 78.9,
+  "trades": 1694,
+  "equity": 23272980.2,
   "enabled": "G,L",
   "n_strategies": 2,
   "priority": "G>L",
-  "elapsed_minutes": 68.8,
+  "elapsed_minutes": 258.1,
   "per_strategy": {
-    "H": {
-      "trades": 109,
-      "wr": 60.6,
-      "pnl": 86739.63
-    },
     "G": {
-      "trades": 126,
-      "wr": 50.8,
-      "pnl": 74043.62
-    },
-    "A": {
-      "trades": 67,
-      "wr": 68.7,
-      "pnl": 12436.52
-    },
-    "F": {
-      "trades": 162,
-      "wr": 43.8,
-      "pnl": -2525.49
-    },
-    "D": {
-      "trades": 31,
-      "wr": 51.6,
-      "pnl": -8331.9
-    },
-    "V": {
-      "trades": 17,
-      "wr": 58.8,
-      "pnl": 2836.23
-    },
-    "P": {
-      "trades": 6,
-      "wr": 16.7,
-      "pnl": -5368.32
-    },
-    "O": {
-      "trades": 226,
-      "wr": 61.9,
-      "pnl": 8076.85
-    },
-    "B": {
-      "trades": 38,
-      "wr": 36.8,
-      "pnl": -15762.38
-    },
-    "K": {
-      "trades": 14,
-      "wr": 42.9,
-      "pnl": -3654.55
-    },
-    "S": {
-      "trades": 11,
-      "wr": 63.6,
-      "pnl": 2046.02
-    },
-    "E": {
-      "trades": 545,
-      "wr": 31.6,
-      "pnl": -134648.69
-    },
-    "I": {
-      "trades": 14,
-      "wr": 64.3,
-      "pnl": 5616.2
-    },
-    "J": {
-      "trades": 17,
-      "wr": 29.4,
-      "pnl": -5389.73
-    },
-    "N": {
-      "trades": 51,
-      "wr": 41.2,
-      "pnl": -3074.78
+      "trades": 1381,
+      "wr": 80.3,
+      "pnl": 16848538.25
     },
     "L": {
-      "trades": 27,
-      "wr": 55.6,
-      "pnl": 2596.94
-    },
-    "X": {
-      "trades": 50,
-      "wr": 26.0,
-      "pnl": -23834.72
+      "trades": 313,
+      "wr": 72.8,
+      "pnl": 6399441.95
     }
   },
   "params": {
-    "g_min_gap_pct": 30.0,
+    "g_min_gap_pct": 15.0,
     "g_require_2nd_green": true,
-    "g_require_2nd_new_high": true,
-    "g1_target_pct": 12.0,
-    "g1_time_limit_min": 24,
-    "g1_stop_pct": 4.0,
-    "g1_trail_pct": 0.0,
-    "g1_trail_activate_pct": 4.0,
-    "g2_target_pct": 10.0,
+    "g_require_2nd_new_high": false,
+    "g1_target_pct": 9.0,
+    "g1_time_limit_min": 3,
+    "g1_stop_pct": 0.0,
+    "g1_trail_pct": 1.0,
+    "g1_trail_activate_pct": 0.0,
+    "g2_target_pct": 18.0,
     "g2_time_limit_min": 12,
-    "g2_stop_pct": 4.0,
+    "g2_stop_pct": 0.0,
     "g2_trail_pct": 1.0,
     "g2_trail_activate_pct": 0.0,
-    "l_min_gap": 65,
-    "l_max_float": 10000000,
-    "l_earliest_candle": 6,
-    "l_latest_candle": 120,
+    "l_min_gap": 45,
+    "l_max_float": 20000000,
+    "l_earliest_candle": 9,
+    "l_latest_candle": 90,
     "l_vol_surge_mult": 1.5,
-    "l_min_price_accel_pct": 2.5,
+    "l_min_price_accel_pct": 0.5,
     "l_tier1_float": 1000000,
-    "l_tier2_float": 6000000,
+    "l_tier2_float": 5000000,
     "l1_tier1_target1_pct": 40.0,
-    "l1_tier1_target2_pct": 40.0,
-    "l1_tier2_target1_pct": 28.0,
-    "l1_tier2_target2_pct": 35.0,
-    "l1_tier3_target1_pct": 12.0,
-    "l1_tier3_target2_pct": 25.0,
+    "l1_tier1_target2_pct": 55.0,
+    "l1_tier2_target1_pct": 18.0,
+    "l1_tier2_target2_pct": 30.0,
+    "l1_tier3_target1_pct": 5.0,
+    "l1_tier3_target2_pct": 30.0,
     "l1_stop_pct": 16.0,
     "l1_partial_sell_pct": 50.0,
-    "l1_trail_pct": 5.0,
-    "l1_trail_activate_pct": 5.0,
-    "l1_time_limit_min": 100,
-    "l2_tier1_target1_pct": 15.0,
+    "l1_trail_pct": 1.0,
+    "l1_trail_activate_pct": 4.0,
+    "l1_time_limit_min": 120,
+    "l2_tier1_target1_pct": 25.0,
     "l2_tier1_target2_pct": 55.0,
-    "l2_tier2_target1_pct": 22.0,
-    "l2_tier2_target2_pct": 50.0,
-    "l2_tier3_target1_pct": 15.0,
-    "l2_tier3_target2_pct": 30.0,
-    "l2_stop_pct": 10.0,
-    "l2_partial_sell_pct": 50.0,
-    "l2_trail_pct": 6.0,
-    "l2_trail_activate_pct": 5.0,
-    "l2_time_limit_min": 120
+    "l2_tier2_target1_pct": 30.0,
+    "l2_tier2_target2_pct": 25.0,
+    "l2_tier3_target1_pct": 18.0,
+    "l2_tier3_target2_pct": 40.0,
+    "l2_stop_pct": 20.0,
+    "l2_partial_sell_pct": 0.0,
+    "l2_trail_pct": 1.0,
+    "l2_trail_activate_pct": 4.0,
+    "l2_time_limit_min": 80
   }
 }
