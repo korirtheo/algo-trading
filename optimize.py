@@ -117,6 +117,14 @@ def _process_one_day(args):
         if len(market_hours) == 0:
             continue
 
+        # 1-min data pipeline (stored_data_1min): deterministically aggregate
+        # to the 2-min bars the strategy layer expects, slot-aligned to 9:30 ET.
+        from strategies.bars import ensure_2min_bars
+
+        market_hours = ensure_2min_bars(market_hours, et_tz)
+        if len(market_hours) == 0:
+            continue
+
         market_open = float(market_hours.iloc[0]["Open"])
         premarket_high = float(premarket["High"].max()) if len(premarket) > 0 else market_open
         pm_volume = int(premarket["Volume"].sum()) if len(premarket) > 0 else 0

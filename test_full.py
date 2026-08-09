@@ -135,6 +135,72 @@ ET_TZ = ZoneInfo("America/New_York")
 DAYS_PER_PAGE = 5
 
 
+def _pick_for_ticker_day(ticker, test_date, et_index, idf, dpath, et_tz):
+    """Build a pick dict for (ticker, test_date) from an already-loaded
+    intraday frame + daily path. Returns None if the ticker/day doesn't
+    qualify. Shared by the legacy per-day worker and the fast per-ticker
+    worker so both paths produce identical picks."""
+    day_mask = et_index.strftime("%Y-%m-%d") == test_date
+    day_candles = idf[day_mask]
+    et_day = et_index[day_mask]
+    if len(day_candles) == 0:
+        return None
+
+    pm_mask = (et_day.hour < 9) | ((et_day.hour == 9) & (et_day.minute < 30))
+    mh_mask = ((et_day.hour == 9) & (et_day.minute >= 30)) | (
+        (et_day.hour >= 10) & (et_day.hour < 16)
+    )
+    premarket = day_candles[pm_mask]
+    market_hours = day_candles[mh_mask]
+    if len(market_hours) == 0:
+        return None
+
+    # 1-min data pipeline (stored_data_1min): deterministically aggregate
+    # to the 2-min bars the strategy layer expects, slot-aligned to 9:30 ET.
+    from strategies.bars import ensure_2min_bars
+
+    market_hours = ensure_2min_bars(market_hours, et_tz)
+    if len(market_hours) == 0:
+        return None
+
+    market_open = float(market_hours.iloc[0]["Open"])
+    premarket_high = (
+        float(premarket["High"].max()) if len(premarket) > 0 else market_open
+    )
+
+    pm_volume = int(premarket["Volume"].sum()) if len(premarket) > 0 else 0
+    if pm_volume < MIN_PM_VOLUME:
+        return None
+
+    prev_close = None
+    if os.path.exists(dpath):
+        try:
+            ddf = pd.read_csv(dpath, index_col=0, parse_dates=True)
+            date_naive = pd.Timestamp(test_date)
+            ddf_dates = ddf.index.tz_localize(None) if ddf.index.tz else ddf.index
+            prev_mask = ddf_dates < date_naive
+            if prev_mask.any():
+                prev_close = float(ddf.loc[ddf.index[prev_mask][-1], "Close"])
+        except Exception:
+            pass
+    if prev_close is None or prev_close <= 0:
+        return None
+
+    gap_pct = (market_open - prev_close) / prev_close * 100
+    if gap_pct < MIN_GAP_PCT:
+        return None
+
+    return {
+        "ticker": ticker,
+        "gap_pct": gap_pct,
+        "market_open": market_open,
+        "premarket_high": premarket_high,
+        "prev_close": prev_close,
+        "pm_volume": pm_volume,
+        "market_hour_candles": market_hours,
+    }
+
+
 def _process_one_day(args):
     """Worker: scan all tickers for one day (runs in separate process)."""
     test_date, ticker_list, idir, ddir = args
@@ -149,46 +215,98 @@ def _process_one_day(args):
             idf = pd.read_csv(ipath, index_col=0, parse_dates=True)
         except Exception:
             continue
+        if not isinstance(idf.index, pd.DatetimeIndex):
+            continue
         if idf.index.tz is not None:
             et_index = idf.index.tz_convert(et_tz)
         else:
             et_index = idf.index.tz_localize("UTC").tz_convert(et_tz)
 
-        day_mask = et_index.strftime("%Y-%m-%d") == test_date
-        day_candles = idf[day_mask]
-        et_day = et_index[day_mask]
-        if len(day_candles) == 0:
+        pick = _pick_for_ticker_day(ticker, test_date, et_index, idf, dpath, et_tz)
+        if pick is not None:
+            candidates.append(pick)
+
+    candidates.sort(key=lambda x: x["gap_pct"], reverse=True)
+    return test_date, candidates[:TOP_N]
+
+
+def _process_one_ticker_all_days(args):
+    """Worker: read ONE ticker's CSV once, build picks for all its days.
+
+    Optimized for multi-year 1-min files: loads the intraday + daily CSVs a
+    single time each, precomputes the per-day market-hours slices, and only
+    resamples/qualifies days that actually have data.
+    """
+    ticker, idir, ddir, dates, et_tz = args
+    if _is_warrant_or_unit(ticker):
+        return {}
+    ipath = os.path.join(idir, f"{ticker}.csv")
+    dpath = os.path.join(ddir, f"{ticker}.csv")
+    try:
+        idf = pd.read_csv(ipath, index_col=0, parse_dates=True)
+    except Exception:
+        return {}
+    if not isinstance(idf.index, pd.DatetimeIndex):
+        # e.g. empty file or non-datetime index — skip this ticker
+        return {}
+    if idf.index.tz is not None:
+        et_index = idf.index.tz_convert(et_tz)
+    else:
+        et_index = idf.index.tz_localize("UTC").tz_convert(et_tz)
+
+    # Load daily once for prev_close lookups.
+    daily_df = None
+    if os.path.exists(dpath):
+        try:
+            daily_df = pd.read_csv(dpath, index_col=0, parse_dates=True)
+            daily_df = daily_df.sort_index()
+            daily_df_dates = (
+                daily_df.index.tz_localize(None)
+                if daily_df.index.tz
+                else daily_df.index
+            )
+        except Exception:
+            daily_df = None
+            daily_df_dates = None
+
+    # Precompute per-day masks from the ET index once.
+    day_of = et_index.strftime("%Y-%m-%d")
+    hour_arr = np.array(et_index.hour)
+    min_arr = np.array(et_index.minute)
+    is_pm = (hour_arr < 9) | ((hour_arr == 9) & (min_arr < 30))
+    is_mh = ((hour_arr == 9) & (min_arr >= 30)) | ((hour_arr >= 10) & (hour_arr < 16))
+    date_set = set(dates)
+
+    out = {}
+    # One grouping pass over the frame's actual days (avoids O(n) mask per day).
+    for test_date, idx_in_day in pd.Series(np.arange(len(et_index))).groupby(day_of).groups.items():
+        if test_date not in date_set:
             continue
+        iarr = idx_in_day
+        mh_mask = is_mh[iarr]
+        pm_mask = is_pm[iarr]
 
-        pm_mask = (et_day.hour < 9) | ((et_day.hour == 9) & (et_day.minute < 30))
-        mh_mask = ((et_day.hour == 9) & (et_day.minute >= 30)) | (
-            (et_day.hour >= 10) & (et_day.hour < 16)
-        )
-        premarket = day_candles[pm_mask]
-        market_hours = day_candles[mh_mask]
-        if len(market_hours) == 0:
+        # Only days with market-hours data proceed.
+        if not mh_mask.any():
             continue
+        mh = idf.iloc[iarr].loc[mh_mask]
+        pm = idf.iloc[iarr].loc[pm_mask]
 
-        market_open = float(market_hours.iloc[0]["Open"])
-        premarket_high = (
-            float(premarket["High"].max()) if len(premarket) > 0 else market_open
-        )
-
-        pm_volume = int(premarket["Volume"].sum()) if len(premarket) > 0 else 0
+        # Cheap gates first (before the expensive 2-min resample):
+        market_open = float(mh.iloc[0]["Open"])
+        pm_volume = int(pm["Volume"].sum()) if len(pm) > 0 else 0
         if pm_volume < MIN_PM_VOLUME:
             continue
+        premarket_high = float(pm["High"].max()) if len(pm) > 0 else market_open
 
         prev_close = None
-        if os.path.exists(dpath):
-            try:
-                ddf = pd.read_csv(dpath, index_col=0, parse_dates=True)
-                date_naive = pd.Timestamp(test_date)
-                ddf_dates = ddf.index.tz_localize(None) if ddf.index.tz else ddf.index
-                prev_mask = ddf_dates < date_naive
-                if prev_mask.any():
-                    prev_close = float(ddf.loc[ddf.index[prev_mask][-1], "Close"])
-            except Exception:
-                pass
+        if daily_df is not None and len(daily_df) > 0:
+            date_naive = pd.Timestamp(test_date)
+            prev_mask = daily_df_dates < date_naive
+            if prev_mask.any():
+                prev_close = float(
+                    daily_df.loc[daily_df.index[prev_mask][-1], "Close"]
+                )
         if prev_close is None or prev_close <= 0:
             continue
 
@@ -196,7 +314,14 @@ def _process_one_day(args):
         if gap_pct < MIN_GAP_PCT:
             continue
 
-        candidates.append(
+        # 1-min -> 2-min deterministic aggregation (slot-aligned to 9:30 ET).
+        from strategies.bars import ensure_2min_bars
+
+        mh = ensure_2min_bars(mh, et_tz)
+        if len(mh) == 0:
+            continue
+
+        out.setdefault(test_date, []).append(
             {
                 "ticker": ticker,
                 "gap_pct": gap_pct,
@@ -204,12 +329,10 @@ def _process_one_day(args):
                 "premarket_high": premarket_high,
                 "prev_close": prev_close,
                 "pm_volume": pm_volume,
-                "market_hour_candles": market_hours,
+                "market_hour_candles": mh,
             }
         )
-
-    candidates.sort(key=lambda x: x["gap_pct"], reverse=True)
-    return test_date, candidates[:TOP_N]
+    return out
 
 
 def load_picks_for_dir(data_dir):
@@ -233,25 +356,36 @@ def load_picks_for_dir(data_dir):
     gdf = pd.read_csv(gainers_csv)
     all_dates = sorted(gdf["date"].unique().tolist())
 
+    # Fast path: parallelize per-TICKER (read each CSV once) instead of
+    # per-DAY (re-read every CSV per day). For 1-min multi-year files this is
+    # ~1e3x fewer file reads and makes the cache build tractable.
     n_workers = max(1, multiprocessing.cpu_count() - 1)
     print(
         f"  Scanning {len(all_tickers)} tickers x {len(all_dates)} days in {data_dir}..."
     )
 
-    task_args = [(d, all_tickers, intraday_dir, daily_dir) for d in all_dates]
-    daily_picks = {}
-    completed = 0
+    daily_picks = {d: [] for d in all_dates}
 
+    task_args = [
+        (t, intraday_dir, daily_dir, all_dates, ZoneInfo("America/New_York"))
+        for t in all_tickers
+    ]
+    completed = 0
     with ProcessPoolExecutor(max_workers=n_workers) as executor:
-        futures = {
-            executor.submit(_process_one_day, args): args[0] for args in task_args
-        }
+        futures = [executor.submit(_process_one_ticker_all_days, a) for a in task_args]
         for future in as_completed(futures):
-            date_str, picks = future.result()
-            daily_picks[date_str] = picks
+            for d, picks in future.result().items():
+                daily_picks.setdefault(d, []).extend(picks)
             completed += 1
-            sys.stdout.write(f"\r    [{completed}/{len(all_dates)}] {date_str}...")
-            sys.stdout.flush()
+            if completed % 500 == 0 or completed == len(task_args):
+                sys.stdout.write(f"\r    [{completed}/{len(task_args)}] tickers...")
+                sys.stdout.flush()
+
+    # Sort + cap each day to TOP_N
+    for d in daily_picks:
+        daily_picks[d].sort(key=lambda x: x["gap_pct"], reverse=True)
+        daily_picks[d] = daily_picks[d][:TOP_N]
+    daily_picks = {d: v for d, v in daily_picks.items() if v}
 
     print(f"\r    Loaded {len(daily_picks)} days.                        ")
     with open(pickle_path, "wb") as f:

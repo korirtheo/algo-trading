@@ -1,23 +1,31 @@
-"""Build a unified index of (date -> top-20 tickers) for 2024-01-01 -> now
+"""Build a unified index of (date -> top-20 tickers) for a date range
 from all existing stored_data*/daily_top_gainers.csv files.
 
 Merges across directories (some overlap, e.g. stored_data_combined), dedupes,
-and keeps the top-20 by gap_pct per day. Saves to gainers_index_2024_2026.json.
+and keeps the top-20 by gap_pct per day.
 
-Also derives, per ticker, the min/max date range so the downloader can fetch
-1-min bars over the correct window (with a small buffer).
+Usage:
+  python build_gainers_index.py                          # 2024-01-01 -> now  (default)
+  python build_gainers_index.py --start 2022-01-01 --end 2023-12-31 --out gainers_index_2022_2023.json
 """
 import csv
 import json
 import glob
 import os
+import argparse
 from collections import defaultdict
 
-START = "2024-01-01"
+parser = argparse.ArgumentParser()
+parser.add_argument("--start", default="2024-01-01")
+parser.add_argument("--end", default="2099-12-31")
+parser.add_argument("--out", default="gainers_index_2024_2026.json")
+parser.add_argument("--live-watchlists", default="replay_watchlists.json")
+args = parser.parse_args()
 
-# Merge in the live AWS watchlists (Jul 27 - Aug 7 2026) so the index covers
-# through the most recent trading day under trial_1655.
-LIVE_WATCHLISTS = "replay_watchlists.json"
+START = args.start
+END = args.end
+OUT = args.out
+LIVE_WATCHLISTS = args.live_watchlists
 
 by_date = defaultdict(dict)  # date -> {ticker: gap_pct}
 
@@ -28,8 +36,10 @@ for path in sorted(glob.glob("stored_data*/daily_top_gainers.csv")):
             cols = r.fieldnames
             for row in r:
                 d = row.get("date", "")
+                if not d or d < START or d > END:
+                    continue
                 t = row.get("ticker", "")
-                if not d or not t or d < START:
+                if not t:
                     continue
                 if "gap_pct" in cols:
                     gap = row["gap_pct"]
@@ -83,7 +93,7 @@ for d, tk in index.items():
         appear[t] += 1
 
 out = {"days": len(index), "tickers": len(all_tickers), "index": index, "ticker_ranges": ticker_ranges, "appearances": dict(appear)}
-with open("gainers_index_2024_2026.json", "w") as f:
+with open(OUT, "w") as f:
     json.dump(out, f)
 
 print(f"Days: {len(index)} | unique tickers: {len(all_tickers)}")

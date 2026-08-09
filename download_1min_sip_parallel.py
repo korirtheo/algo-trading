@@ -5,8 +5,10 @@ threads (well under Alpaca free-tier 200 req/min), each ticker = 2 requests
 (1-min + daily). Retries transient connection errors.
 
 Usage:
-  python download_1min_sip_parallel.py
+  python download_1min_sip_parallel.py                                 # 2024-2026
+  python download_1min_sip_parallel.py --index gainers_index_2022_2023.json --out-dir stored_data_1min_2022_2023
 """
+import argparse
 import csv
 import json
 import os
@@ -23,17 +25,23 @@ from alpaca.data.timeframe import TimeFrame
 
 from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
 
+parser = argparse.ArgumentParser()
+parser.add_argument("--index", default="gainers_index_2024_2026.json")
+parser.add_argument("--out-dir", default="stored_data_1min")
+parser.add_argument("--workers", type=int, default=8)
+args = parser.parse_args()
+
 ET = ZoneInfo("America/New_York")
-OUT_DIR = "stored_data_1min"
+OUT_DIR = args.out_dir
 INTRADAY_DIR = os.path.join(OUT_DIR, "intraday")
 DAILY_DIR = os.path.join(OUT_DIR, "daily")
 GAINERS_CSV = os.path.join(OUT_DIR, "daily_top_gainers.csv")
-N_WORKERS = 8
+N_WORKERS = args.workers
 MIN_GAP_BETWEEN_REQS = 0.15  # seconds per request -> ~8 req/s across 8 workers
 
 WIN_RESERVED = {"CON", "PRN", "AUX", "NUL"} | {f"COM{i}" for i in range(1, 10)} | {f"LPT{i}" for i in range(1, 10)}
 
-with open("gainers_index_2024_2026.json") as f:
+with open(args.index) as f:
     INDEX = json.load(f)
 ranges = INDEX["ticker_ranges"]
 
