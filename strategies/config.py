@@ -79,6 +79,12 @@ _reg("G", "G_MIN_GAP_PCT", 1, [
     ("G_REQUIRE_2ND_NEW_HIGH", "g_require_2nd_new_high", True, "bool"),
     ("G_REQUIRE_3RD_GREEN", "g_require_3rd_green", False, "bool"),
     ("G_REQUIRE_4TH_GREEN", "g_require_4th_green", False, "bool"),
+    # Bar-strength gates (G2 experiment): filter weak opens by candle-1/2 size
+    # and candle-2 volume, and scale position by conviction.
+    ("G_MIN_1ST_BODY_PCT", "g_min_1st_body_pct", 0.0, "num"),
+    ("G_MIN_2ND_BODY_PCT", "g_min_2nd_body_pct", 0.0, "num"),
+    ("G_MIN_2ND_VOL_MULT", "g_min_2nd_vol_mult", 0.0, "num"),
+    ("G_CONVICTION_MULT", "g_conviction_mult", 0.0, "num"),
     ("G_TARGET_PCT", "g_target_pct", 11.0, "num"),
     ("G_TARGET2_PCT", "g_target2_pct", 30.0, "num"),
     ("G_PARTIAL_SELL_PCT", "g_partial_sell_pct", 0.0, "num"),

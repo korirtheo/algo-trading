@@ -109,13 +109,55 @@ MAX_2MIN_PARTICIPATION = (
 #   - MAX_REGIME_PARTICIPATION * v_10min              (regime cap)
 #   - MAX_2MIN_PARTICIPATION   * v_eff_adj            (execution cap, usually binds)
 USE_MULTIWINDOW_SLIPPAGE = True
-WINDOW_BARS_LOCAL = 3  # 3 bars = ~6 minutes (mid-range window)
-WINDOW_BARS_REGIME = 5  # 5 bars = ~10 minutes (regime window)
+WINDOW_BARS_LOCAL = 3  # 3 bars = ~6 minutes (mid-range window) — on 2-min bars
+WINDOW_BARS_REGIME = 5  # 5 bars = ~10 minutes (regime window) — on 2-min bars
+# Design-time bar interval these window counts were calibrated against.
+# Liquidity is a *flow*, so the windows must represent FIXED TIME spans
+# (2/6/10 minutes) regardless of the bar granularity fed to the sim. On
+# 1-min bars the same 3/5-bar windows would only see 3/5 minutes of volume
+# (half the liquidity), which halves position caps and inflates modeled
+# slippage — a pure granularity artifact that bleeds PnL for no reason.
+# Scale the bar counts by (reference_interval / actual_interval).
+WINDOW_REF_BAR_MINUTES = 2
 MULTIWIN_LOCAL_WEIGHT = 0.5  # weight of 6-min window
 MULTIWIN_REGIME_WEIGHT = 0.25  # weight of 10-min window
 USE_VOLATILITY_ADJUSTMENT = True  # divide v_eff by (1 + range_pct/VOL_FACTOR_SCALE)
 VOL_FACTOR_SCALE = 5.0  # 10% recent range -> 2x vol factor (capped at 2x)
 MAX_REGIME_PARTICIPATION = 0.08  # 8% of 10-min vol regime cap
+
+# DIAG_VOLCAPS: when True, _diag_volcap() records alpha-vs-final size per entry
+# and which liquidity cap bound. Used by diag_volcaps.py; False in production.
+DIAG_VOLCAPS = False
+DIAG_VOLCAP_STATS = {"by_strat": {}, "total": {"entries": 0, "capped": 0,
+                                               "alpha_sum": 0.0, "final_sum": 0.0,
+                                               "cap1_bind": 0, "cap2_bind": 0, "cap3_bind": 0}}
+
+
+def _diag_volcap(alpha_size, final_size, vol_limit, cap1, cap2, cap3, strat):
+    """Record one entry's sizing in DIAG_VOLCAP_STATS."""
+    stats = DIAG_VOLCAP_STATS
+    stats["total"]["entries"] += 1
+    stats["total"]["alpha_sum"] += alpha_size
+    stats["total"]["final_sum"] += final_size
+    bs = stats["by_strat"].setdefault(
+        strat,
+        {"entries": 0, "capped": 0, "alpha_sum": 0.0, "final_sum": 0.0,
+         "cap1_bind": 0, "cap2_bind": 0, "cap3_bind": 0},
+    )
+    bs["entries"] += 1
+    bs["alpha_sum"] += alpha_size
+    bs["final_sum"] += final_size
+    if final_size < alpha_size:
+        stats["total"]["capped"] += 1
+        bs["capped"] += 1
+    # which cap was the min
+    if vol_limit is not None:
+        parts = [(cap1, "cap1"), (cap2, "cap2"), (cap3, "cap3")]
+        parts = [(c, n) for c, n in parts if c is not None and c > 0]
+        if parts:
+            _, winner = min(parts)
+            stats["total"][winner + "_bind"] += 1
+            bs[winner + "_bind"] += 1
 
 
 # --- NEWS SIZE MODULATOR (added 2026-06-22) ---
@@ -366,6 +408,31 @@ def _last_2min_dollar_vol(mh, ts, fill_price=None):
     return px * float(last["Volume"].iloc[0])
 
 
+def _liquidity_windows(mh):
+    """Return (v2min_bars, local_bars, regime_bars) sized for FIXED TIME spans.
+
+    The multi-window liquidity model is calibrated against 2-min bars
+    (WINDOW_REF_BAR_MINUTES=2): "2-min / 6-min / 10-min" windows are
+    WINDOW_REF_BAR_MINUTES/2/6/10 bar-counts respectively. Liquidity is a
+    flow, so on a different bar interval (e.g. 1-min) the SAME time span is
+    covered by proportionally MORE bars. Rescaling keeps the measured dollar
+    volume independent of bar granularity — otherwise 1-min bars would see
+    half the liquidity (halved position caps + inflated slippage) and bleed
+    PnL for no reason.
+    """
+    from strategies.bars import detect_bar_size_minutes
+
+    interval = detect_bar_size_minutes(mh) or WINDOW_REF_BAR_MINUTES
+    if interval <= 0:
+        interval = WINDOW_REF_BAR_MINUTES
+    scale = WINDOW_REF_BAR_MINUTES / float(interval)
+    return (
+        max(1, int(round(1 * scale))),          # v_2min  -> 2 minutes of volume
+        max(1, int(round(WINDOW_BARS_LOCAL * scale))),    # local  -> 6 minutes
+        max(1, int(round(WINDOW_BARS_REGIME * scale))),   # regime -> 10 minutes
+    )
+
+
 def _multi_window_effective_volume(mh, ts, fill_price=None):
     """Multi-window effective dollar volume with optional volatility adjustment.
 
@@ -383,18 +450,24 @@ def _multi_window_effective_volume(mh, ts, fill_price=None):
     if n == 0:
         return 0.0, 0.0, 0.0, 0.0
 
+    # Window sizes are TIME-based (fixed 2/6/10-minute spans) rescaled to
+    # whatever bar interval the DataFrame uses. On 2-min bars this equals the
+    # legacy 1/3/5-bar counts; on 1-min bars it's 2/6/10 bars — so the
+    # measured dollar volume is identical regardless of granularity.
+    v2min_bars, local_bars, regime_bars = _liquidity_windows(mh)
+
     # Dollar volume per bar = Close * Volume
     pre_close = pre["Close"]
     pre_vol = pre["Volume"]
 
     # Window slices — use fewer bars if data is short
-    last_1 = pre.tail(1)
-    last_local = pre.tail(min(n, WINDOW_BARS_LOCAL))
-    last_regime = pre.tail(min(n, WINDOW_BARS_REGIME))
+    last_1 = pre.tail(min(n, v2min_bars))
+    last_local = pre.tail(min(n, local_bars))
+    last_regime = pre.tail(min(n, regime_bars))
 
-    px = float(fill_price) if fill_price else float(last_1["Close"].iloc[0])
+    px = float(fill_price) if fill_price else float(last_1["Close"].iloc[-1])
 
-    v_2min = px * float(last_1["Volume"].iloc[0])
+    v_2min = px * float(last_1["Volume"].sum())
     v_local = float((last_local["Close"] * last_local["Volume"]).sum())
     v_regime = float((last_regime["Close"] * last_regime["Volume"]).sum())
 
@@ -483,6 +556,16 @@ H_MIN_BODY_PCT = 4.0
 H_REQUIRE_VOL_CONFIRM = True
 # G (Big Gap Runner)
 G_MIN_BODY_PCT = 0.0
+# G bar-strength gates (G2 experiment). Defaults all 0/off = unchanged behavior.
+G_MIN_1ST_BODY_PCT = 0.0   # min candle-1 body % (filter weak opens)
+G_MIN_2ND_BODY_PCT = 0.0   # min candle-2 body % (filter weak confirmation)
+G_MIN_2ND_VOL_MULT = 0.0   # candle-2 volume >= X * candle-1 volume (0 = off)
+G_CONVICTION_MULT = 0.0    # size multiplier per combined bar strength (0 = off)
+# G_FIRST_BAR_ONLY (diagnostic): when True, G only fills on candle 2 (the first
+# confirmation candle); retry-fills on later candles are dropped. Diagnostic
+# only — production runs keep this False. Env override G_FIRST_BAR_ONLY=1 lets
+# a launcher switch it for a study without code changes.
+G_FIRST_BAR_ONLY = os.environ.get("G_FIRST_BAR_ONLY", "") == "1"
 # A (Quick Scalp)
 A_MIN_BODY_PCT = 4.0
 A_MAX_BODY_PCT = 999
@@ -2640,6 +2723,13 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 second_green = c_close > c_open
                 second_new_high = c_high > st["first_candle_high"]
                 vol_confirm = float(candle["Volume"]) > st["first_candle_volume"]
+                # Bar-strength fields for G bar gates + conviction sizing
+                if c_open > 0:
+                    st["second_candle_body_pct"] = (c_close / c_open - 1) * 100
+                else:
+                    st["second_candle_body_pct"] = 0.0
+                st["second_candle_volume"] = float(candle["Volume"])
+                st["second_candle_high"] = c_high
 
                 strategy = _classify_candle2(
                     st["gap_pct"],
@@ -2650,6 +2740,23 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     params=params,
                     green_streak=2,
                 )
+                if strategy == "G":
+                    # G bar-strength gates (G2 experiment): filter weak opens.
+                    # All default to 0/off so existing behavior is unchanged.
+                    _p1 = params or {}
+                    _g1body = float(_p1.get("G_MIN_1ST_BODY_PCT", G_MIN_1ST_BODY_PCT))
+                    _g2body = float(_p1.get("G_MIN_2ND_BODY_PCT", G_MIN_2ND_BODY_PCT))
+                    _g2vol = float(_p1.get("G_MIN_2ND_VOL_MULT", G_MIN_2ND_VOL_MULT))
+                    if st["first_candle_body_pct"] < _g1body:
+                        strategy = None
+                    elif st["second_candle_body_pct"] < _g2body:
+                        strategy = None
+                    elif (
+                        _g2vol > 0
+                        and st["first_candle_volume"] > 0
+                        and st["second_candle_volume"] < _g2vol * st["first_candle_volume"]
+                    ):
+                        strategy = None
                 if strategy:
                     st["strategy"] = strategy
                     st["signal"] = True
@@ -2756,6 +2863,18 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
             # Retry fill on later candles (H/G/A/F)
             elif st["signal"] and st["entry_price"] is None and not st["done"]:
+                # G_FIRST_BAR_ONLY (diagnostic): restrict G fills to candle 2
+                # (the 09:31 confirmation bar) only. Without this, a signal that
+                # missed its fill at 09:31 keeps re-proposing on every later
+                # candle (09:32/09:33...), which the time-of-day analysis shows
+                # is net-negative OOS (WR ~30% vs 75% at 09:31).
+                if (
+                    G_FIRST_BAR_ONLY
+                    and st.get("strategy") == "G"
+                    and st.get("candle_count", 0) > 2
+                ):
+                    st["done"] = True
+                    continue
                 if c_close > 0:
                     st["signal_price"] = c_close
                     entry_candidates.append(st)
@@ -3735,6 +3854,24 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 except Exception:
                     pass
             trade_size = cash_box[0] * MARGIN_MULTIPLIER * _news_mult
+            alpha_size = trade_size  # pre-cap alpha target (DIAG_VOLCAPS)
+            # G conviction sizing (G2 experiment): scale size by combined bar
+            # strength (candle-1 body + candle-2 body + volume surge), capped
+            # at G_CONVICTION_MULT x. 0 = off (unchanged behavior).
+            if st.get("strategy") == "G" and G_CONVICTION_MULT > 0:
+                _strength = (
+                    st.get("first_candle_body_pct", 0.0)
+                    + st.get("second_candle_body_pct", 0.0)
+                )
+                if st.get("second_candle_volume", 0) > 0 and st.get("first_candle_volume", 0) > 0:
+                    _vmult = st["second_candle_volume"] / st["first_candle_volume"]
+                else:
+                    _vmult = 0.0
+                # normalize: body ~% adds 1.0 per ~2%, vol surge 1.0 per 1.5x
+                _conv = 1.0 + _strength / 2.0 + max(0.0, _vmult - 1.0) / 1.5
+                _conv = min(_conv, 1.0 + G_CONVICTION_MULT)
+                trade_size = trade_size * _conv
+                alpha_size = trade_size
 
             fill_price = st["signal_price"]
             if fill_price is None or fill_price <= 0:
@@ -3813,6 +3950,13 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     st["vol_capped"] = True
                 if trade_size < 50:
                     continue
+                # DIAG: record alpha->final size + which cap bound
+                if DIAG_VOLCAPS:
+                    _diag_volcap(alpha_size, trade_size, vol_limit,
+                                 dollar_vol * (VOL_CAP_PCT / 100) if VOL_CAP_PCT > 0 else 0.0,
+                                 v_regime * MAX_REGIME_PARTICIPATION if MAX_REGIME_PARTICIPATION > 0 else 0.0,
+                                 v_eff_adj * _exec_cap if (USE_MULTIWINDOW_SLIPPAGE and _exec_cap > 0) else 0.0,
+                                 st.get("strategy", "?"))
 
             # Pick the slippage-impact denominator that matches the binding liquidity model.
             if USE_MULTIWINDOW_SLIPPAGE:

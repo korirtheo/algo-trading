@@ -46,7 +46,10 @@ if _env_params:
         else os.path.join(_PROJECT_ROOT, _env_params)
     )
 else:
-    PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_432_params.json")
+    # Default live config: gl_1min_v3_g2 OOS-best trial #232 (G2, first-bar
+    # entry + conviction sizing, PF ~20 median OOS). Override with
+    # LIVE_PARAMS_PATH for ad-hoc switches.
+    PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_gl_1min_g2_deploy.json")
 
 
 def load_trial_params(path=None):
@@ -79,6 +82,13 @@ def load_trial_params(path=None):
         params = raw
     set_strategy_params(params)
     log.info("Loaded %d params from %s", len(params), os.path.basename(path))
+
+    # G2 first-bar-only: when the deploy config opts in, G only fills on candle 2
+    # (the 09:31 confirmation bar); later retry-fills are dropped. The G2 study
+    # (gl_1min_v3_g2) was tuned with this behavior.
+    if isinstance(raw, dict) and raw.get("g_first_bar_only"):
+        tgc.G_FIRST_BAR_ONLY = True
+        log.info("G2 first-bar-only entry ENABLED (config g_first_bar_only=true)")
 
     # Live-only: zero the volume caps when IEX feed under-counts cum_$vol.
     # Without this, sizing binds at ~$100 on hot gappers because the IEX feed
@@ -2120,7 +2130,16 @@ class CombinedEngine:
             return float(sum(float(b["Close"]) * float(b["Volume"]) for b in bars))
 
     def eod_close(self):
-        """Force close all positions."""
+        """Force close all positions.
+
+        FIX 2026-08-09: removed the redundant executor.close_all_positions()
+        call. It raced the per-ticker loop above and double-sold any position
+        whose first sell was still in flight (observed 2026-08-07 QNST: one
+        281-share position, two EOD_CLOSE sell orders 3s apart). The loop over
+        active_positions already sells every tracked position and clears the
+        set; close_all_positions then re-fetched from Alpaca while the async
+        fills were pending and sold the same names again.
+        """
         for ticker in list(self.active_positions):
             try:
                 self.executor.sell(ticker, reason="EOD_CLOSE")
@@ -2132,7 +2151,6 @@ class CombinedEngine:
         # entries on the next session if the process keeps running.
         for st in self.halt_states.values():
             st["done"] = True
-        self.executor.close_all_positions(reason="EOD_CLOSE")
         self._log_eod_diagnostics()
 
     def _log_eod_diagnostics(self):

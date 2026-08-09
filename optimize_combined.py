@@ -104,19 +104,32 @@ def suggest_all_params(trial):
     # g_min_gap_pct made TUNABLE (was hardcoded 30%). ChatGPT hypothesis: edge
     # may concentrate in larger gaps (e.g., 50%+). Range 15-80% covers both
     # below-default exploration and well above #254's effective threshold.
-    params["g_min_gap_pct"] = trial.suggest_float("g_min_gap_pct", 15.0, 80.0, step=5.0)
-    # W11: 2nd-candle structural gates made tunable.
-    # W12: g_require_2nd_green hardcoded True via env var (ablation proved it load-bearing).
-    import os as _os_g
-    if _os_g.environ.get("HARDCODE_2ND_GREEN", "") == "1":
+    # G_SIMPLE_ENTRY mode (2026-08): fix the entry structure to "2nd green +
+    # 15% gap, buy on the second candle" and tune ONLY the exit side. Edge is
+    # concentrated in the 09:31 open print; 3rd/4th green and new-high gates
+    # were never selected OOS, and retry-fills past candle 2 are net-negative.
+    import os as _os_g2
+    _g_simple = _os_g2.environ.get("G_SIMPLE_ENTRY", "") == "1"
+    if _g_simple:
+        params["g_min_gap_pct"] = 15.0
         params["g_require_2nd_green"] = True
+        params["g_require_2nd_new_high"] = False
+        params["g_require_3rd_green"] = False
+        params["g_require_4th_green"] = False
     else:
-        params["g_require_2nd_green"] = trial.suggest_categorical("g_require_2nd_green", [True, False])
-    params["g_require_2nd_new_high"] = trial.suggest_categorical("g_require_2nd_new_high", [True, False])
-    # 3rd/4th-green confirmation: require N consecutive green candles before G
-    # fires (2nd = 2 greens, 3rd = 3 greens, 4th = 4 greens). Hierarchical.
-    params["g_require_3rd_green"] = trial.suggest_categorical("g_require_3rd_green", [True, False])
-    params["g_require_4th_green"] = trial.suggest_categorical("g_require_4th_green", [True, False])
+        params["g_min_gap_pct"] = trial.suggest_float("g_min_gap_pct", 15.0, 80.0, step=5.0)
+        # W11: 2nd-candle structural gates made tunable.
+        # W12: g_require_2nd_green hardcoded True via env var (ablation proved it load-bearing).
+        import os as _os_g
+        if _os_g.environ.get("HARDCODE_2ND_GREEN", "") == "1":
+            params["g_require_2nd_green"] = True
+        else:
+            params["g_require_2nd_green"] = trial.suggest_categorical("g_require_2nd_green", [True, False])
+        params["g_require_2nd_new_high"] = trial.suggest_categorical("g_require_2nd_new_high", [True, False])
+        # 3rd/4th-green confirmation: require N consecutive green candles before G
+        # fires (2nd = 2 greens, 3rd = 3 greens, 4th = 4 greens). Hierarchical.
+        params["g_require_3rd_green"] = trial.suggest_categorical("g_require_3rd_green", [True, False])
+        params["g_require_4th_green"] = trial.suggest_categorical("g_require_4th_green", [True, False])
     params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
     params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
     import os as _os_gs
@@ -124,6 +137,14 @@ def suggest_all_params(trial):
     params["g_stop_pct"] = trial.suggest_float("g_stop_pct", _g_stop_lo, 12.0, step=2.0)
     params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
     params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
+    # G bar-strength gates + conviction sizing (G2 experiment). Suggested only
+    # in G_SIMPLE_ENTRY mode so legacy G-only/L studies keep their exact space.
+    import os as _os_g3
+    if _os_g3.environ.get("G_SIMPLE_ENTRY", "") == "1":
+        params["g_min_1st_body_pct"] = trial.suggest_float("g_min_1st_body_pct", 0.0, 5.0, step=0.5)
+        params["g_min_2nd_body_pct"] = trial.suggest_float("g_min_2nd_body_pct", 0.0, 5.0, step=0.5)
+        params["g_min_2nd_vol_mult"] = trial.suggest_float("g_min_2nd_vol_mult", 0.0, 3.0, step=0.25)
+        params["g_conviction_mult"] = trial.suggest_float("g_conviction_mult", 0.0, 3.0, step=0.5)
 
     # === A: Quick Scalp (5 params) ===
     params["a_target_pct"] = trial.suggest_float("a_target_pct", 2.0, 15.0, step=1.0)
@@ -1928,15 +1949,23 @@ def main():
 
     # --dump-best: extract best params from existing DB without running trials
     if args.dump_best:
-        if not os.path.exists(db_path):
-            print(f"ERROR: {db_path} not found. Run optimizer first.")
-            sys.exit(1)
-        study = optuna.create_study(
-            direction="maximize",
-            study_name=study_name,
-            storage=f"sqlite:///{db_path}",
-            load_if_exists=True,
-        )
+        if db_path.startswith("postgresql://") or db_path.startswith("postgres://"):
+            study = optuna.create_study(
+                direction="maximize",
+                study_name=study_name,
+                storage=optuna.storages.RDBStorage(url=db_path),
+                load_if_exists=True,
+            )
+        else:
+            if not os.path.exists(db_path):
+                print(f"ERROR: {db_path} not found. Run optimizer first.")
+                sys.exit(1)
+            study = optuna.create_study(
+                direction="maximize",
+                study_name=study_name,
+                storage=f"sqlite:///{db_path}",
+                load_if_exists=True,
+            )
         if len(study.trials) == 0:
             print("No completed trials in DB.")
             sys.exit(1)
