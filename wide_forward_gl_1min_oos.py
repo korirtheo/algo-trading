@@ -45,10 +45,18 @@ def _run_one(job):
         # G2 studies were trained with first-bar-only fills; replicate the same
         # runtime behavior for OOS so params behave identically to training.
         import os as _os
-        if _os.environ.get("G_FIRST_BAR_ONLY", "") == "1":
-            tgc.G_FIRST_BAR_ONLY = True
 
         set_strategy_params(params)
+        if _os.environ.get("G_FIRST_BAR_ONLY", "") == "1":
+            tgc.G_FIRST_BAR_ONLY = True
+        # PM credit overrides must be applied AFTER set_strategy_params (which
+        # resets G_PM_* to registry defaults for untuned params).
+        _pmfrac = _os.environ.get("PM_CREDIT_FRACTION", "")
+        if _pmfrac:
+            tgc.G_PM_CREDIT_FRACTION = float(_pmfrac)
+        _pmgate = _os.environ.get("PM_GATE_SCALE", "")
+        if _pmgate:
+            tgc.G_PM_GATE_STRENGTH_SCALE = float(_pmgate)
         snapshot = _build_param_snapshot()
 
         dates = sorted(d for d in _picks_by_date if date_lo <= d <= date_hi)

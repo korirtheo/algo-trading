@@ -433,7 +433,22 @@ def _liquidity_windows(mh):
     )
 
 
-def _multi_window_effective_volume(mh, ts, fill_price=None):
+def _pm_conviction_gate(st):
+    """PM-liquidity trust gate in [0,1] for a state's opening signal.
+
+    PM volume is potential liquidity; the opening tape decides how much of it
+    this entry may trust as executable capacity. Weak signal -> ~0 (PM
+    ignored), strong signal -> ~1 (PM usable). G_PM_GATE_STRENGTH_SCALE
+    controls how fast the gate opens (0 = off).
+    """
+    scale = float(G_PM_GATE_STRENGTH_SCALE or 0.0)
+    if scale <= 0:
+        return 0.0
+    score = float(st.get("g_conviction_score", 0.0) or 0.0)
+    return min(max(score / scale, 0.0), 1.0)
+
+
+def _multi_window_effective_volume(mh, ts, fill_price=None, pm_volume=None, pm_gate=0.0):
     """Multi-window effective dollar volume with optional volatility adjustment.
 
     Returns (v_eff_adj, v_2min, v_local, v_regime) — the volatility-adjusted
@@ -442,6 +457,13 @@ def _multi_window_effective_volume(mh, ts, fill_price=None):
     Implements:
       V_eff      = max(v_2min, 0.5*v_local, 0.25*v_regime)
       V_eff_adj  = V_eff / (1 + min(recent_range_pct/VOL_FACTOR_SCALE, 1.0))
+
+    pm_volume / pm_gate: gated pre-market liquidity credit. Pre-market volume
+    is POTENTIAL liquidity, but only a fraction (pm_gate in [0,1]) is trusted
+    as executable capacity for this entry — the opening tape decides how much.
+    Weak signal -> gate ~0 -> PM adds almost nothing; strong signal -> gate ~1
+    -> PM volume becomes usable capacity. Applied to V_eff so the execution
+    cap (cap3, 15% of V_eff) reflects real open-time liquidity.
 
     Falls back gracefully when there aren't enough bars yet (early in the day).
     """
@@ -477,6 +499,13 @@ def _multi_window_effective_volume(mh, ts, fill_price=None):
         MULTIWIN_REGIME_WEIGHT * v_regime,
     )
 
+    # Gated PM liquidity credit into V_eff (execution-cap denominator).
+    # pm_gate in [0,1] from conviction; also apply a fixed credit fraction
+    # (empirically ~0.05-0.10 of PM $vol shows up as opening liquidity) so we
+    # never treat the full PM flow as executable capacity.
+    if pm_volume is not None and pm_volume > 0 and px > 0 and pm_gate > 0:
+        v_eff += pm_volume * px * pm_gate * G_PM_CREDIT_FRACTION
+
     if USE_VOLATILITY_ADJUSTMENT and px > 0 and n >= 2:
         # Recent range as % of price across the regime window
         rng_hi = float(last_regime["High"].max())
@@ -499,7 +528,9 @@ def _exit_slip_pct(price, shares_being_sold, st, ts, regime_factor=20.0):
         return SLIPPAGE_PCT
     pos_dollars = shares_being_sold * price
     if USE_MULTIWINDOW_SLIPPAGE:
-        dvol, _, _, _ = _multi_window_effective_volume(st["mh"], ts, price)
+        dvol, _, _, _ = _multi_window_effective_volume(
+            st["mh"], ts, price, st.get("pm_volume"), _pm_conviction_gate(st)
+        )
     elif USE_2MIN_SLIPPAGE:
         dvol = _last_2min_dollar_vol(st["mh"], ts, price)
     else:
@@ -561,6 +592,17 @@ G_MIN_1ST_BODY_PCT = 0.0   # min candle-1 body % (filter weak opens)
 G_MIN_2ND_BODY_PCT = 0.0   # min candle-2 body % (filter weak confirmation)
 G_MIN_2ND_VOL_MULT = 0.0   # candle-2 volume >= X * candle-1 volume (0 = off)
 G_CONVICTION_MULT = 0.0    # size multiplier per combined bar strength (0 = off)
+# G_PM_GATE_STRENGTH_SCALE: denominator for the PM-liquidity credit gate.
+# The gate = clamp(conviction_score / scale, 0, 1) where conviction_score is
+# the same opening-signal evidence used by the position multiplier. PM volume
+# is potential liquidity; the gate decides how much of it this entry may trust
+# as executable capacity (weak open -> gate ~0 -> PM ignored). 0 = off.
+G_PM_GATE_STRENGTH_SCALE = 0.0
+# G_PM_CREDIT_FRACTION: fraction of gated PM $vol credited as opening
+# liquidity. Empirical R = open10_dol / pm_dol is ~0.05-0.10 for this universe
+# (median 0.05 for G trades), so ~5-10% of PM flow actually becomes executable
+# opening liquidity. Applied on top of the conviction gate.
+G_PM_CREDIT_FRACTION = 1.0
 # G_FIRST_BAR_ONLY (diagnostic): when True, G only fills on candle 2 (the first
 # confirmation candle); retry-fills on later candles are dropped. Diagnostic
 # only — production runs keep this False. Env override G_FIRST_BAR_ONLY=1 lets
@@ -3857,8 +3899,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             alpha_size = trade_size  # pre-cap alpha target (DIAG_VOLCAPS)
             # G conviction sizing (G2 experiment): scale size by combined bar
             # strength (candle-1 body + candle-2 body + volume surge), capped
-            # at G_CONVICTION_MULT x. 0 = off (unchanged behavior).
-            if st.get("strategy") == "G" and G_CONVICTION_MULT > 0:
+            # at G_CONVICTION_MULT x. 0 = off (unchanged behavior). The raw
+            # conviction score is always computed for G so the PM-liquidity
+            # gate (which shares the same opening evidence) works even when
+            # the position multiplier is off.
+            if st.get("strategy") == "G":
                 _strength = (
                     st.get("first_candle_body_pct", 0.0)
                     + st.get("second_candle_body_pct", 0.0)
@@ -3867,11 +3912,17 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     _vmult = st["second_candle_volume"] / st["first_candle_volume"]
                 else:
                     _vmult = 0.0
-                # normalize: body ~% adds 1.0 per ~2%, vol surge 1.0 per 1.5x
-                _conv = 1.0 + _strength / 2.0 + max(0.0, _vmult - 1.0) / 1.5
-                _conv = min(_conv, 1.0 + G_CONVICTION_MULT)
-                trade_size = trade_size * _conv
-                alpha_size = trade_size
+                # Raw opening-signal score (evidence), shared by the position
+                # multiplier and the PM-liquidity gate. Same evidence, two
+                # different transformations.
+                _conv_score = _strength / 2.0 + max(0.0, _vmult - 1.0) / 1.5
+                st["g_conviction_score"] = _conv_score
+                if G_CONVICTION_MULT > 0:
+                    # normalize: body ~% adds 1.0 per ~2%, vol surge 1.0 per 1.5x
+                    _conv = 1.0 + _conv_score
+                    _conv = min(_conv, 1.0 + G_CONVICTION_MULT)
+                    trade_size = trade_size * _conv
+                    alpha_size = trade_size
 
             fill_price = st["signal_price"]
             if fill_price is None or fill_price <= 0:
@@ -3917,7 +3968,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                 if USE_MULTIWINDOW_SLIPPAGE:
                     v_eff_adj, dollar_vol_2min, _v_local, v_regime = (
-                        _multi_window_effective_volume(st["mh"], ts, fill_price)
+                        _multi_window_effective_volume(
+                            st["mh"], ts, fill_price,
+                            st.get("pm_volume"), _pm_conviction_gate(st),
+                        )
                     )
                     # Cap 2: regime cap (8% of 10-min)
                     if MAX_REGIME_PARTICIPATION > 0:
@@ -3962,7 +4016,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             if USE_MULTIWINDOW_SLIPPAGE:
                 if v_eff_adj == 0.0:
                     v_eff_adj, _, _, _ = _multi_window_effective_volume(
-                        st["mh"], ts, fill_price
+                        st["mh"], ts, fill_price,
+                        st.get("pm_volume"), _pm_conviction_gate(st),
                     )
                 slip_dollar_vol = v_eff_adj
             elif USE_2MIN_SLIPPAGE:

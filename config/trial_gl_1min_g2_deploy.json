@@ -263,7 +263,9 @@
     "enable_s": false,
     "enable_i": false,
     "enable_n": false,
-    "enable_x": false
+    "enable_x": false,
+    "g_pm_credit_fraction": 0.1,
+    "g_pm_gate_strength_scale": 8.0
   },
   "g_first_bar_only": true
 }

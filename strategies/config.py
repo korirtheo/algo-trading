@@ -85,6 +85,8 @@ _reg("G", "G_MIN_GAP_PCT", 1, [
     ("G_MIN_2ND_BODY_PCT", "g_min_2nd_body_pct", 0.0, "num"),
     ("G_MIN_2ND_VOL_MULT", "g_min_2nd_vol_mult", 0.0, "num"),
     ("G_CONVICTION_MULT", "g_conviction_mult", 0.0, "num"),
+    ("G_PM_GATE_STRENGTH_SCALE", "g_pm_gate_strength_scale", 0.0, "num"),
+    ("G_PM_CREDIT_FRACTION", "g_pm_credit_fraction", 1.0, "num"),
     ("G_TARGET_PCT", "g_target_pct", 11.0, "num"),
     ("G_TARGET2_PCT", "g_target2_pct", 30.0, "num"),
     ("G_PARTIAL_SELL_PCT", "g_partial_sell_pct", 0.0, "num"),
