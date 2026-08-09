@@ -574,7 +574,7 @@ def _run_one_day(executor, args, log):
     _last_bar_time = {}
 
     def on_tradier_bar(symbol, bar):
-        """Tradier bar: drives the engine + log for comparison."""
+        """Tradier 1-min bar: drives the engine + log for comparison."""
         _last_bar_time[symbol] = bar["timestamp"]
         feed_logger.log(SOURCE_TRADIER, symbol, bar)
         on_bar_with_ws(symbol, bar) if not args.no_dash else engine.on_bar(symbol, bar)
@@ -591,7 +591,7 @@ def _run_one_day(executor, args, log):
         from live.tradier_streamer import TradierStreamer
 
         tradier_streamer = TradierStreamer(
-            api_key=TRADIER_API_KEY, on_2min_bar=on_tradier_bar
+            api_key=TRADIER_API_KEY, on_1min_bar=on_tradier_bar
         )
         tradier_streamer.subscribe(symbols)
         tradier_stream_thread = tradier_streamer.start_async()

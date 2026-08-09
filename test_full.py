@@ -155,14 +155,6 @@ def _pick_for_ticker_day(ticker, test_date, et_index, idf, dpath, et_tz):
     if len(market_hours) == 0:
         return None
 
-    # 1-min data pipeline (stored_data_1min): deterministically aggregate
-    # to the 2-min bars the strategy layer expects, slot-aligned to 9:30 ET.
-    from strategies.bars import ensure_2min_bars
-
-    market_hours = ensure_2min_bars(market_hours, et_tz)
-    if len(market_hours) == 0:
-        return None
-
     market_open = float(market_hours.iloc[0]["Open"])
     premarket_high = (
         float(premarket["High"].max()) if len(premarket) > 0 else market_open
@@ -312,13 +304,6 @@ def _process_one_ticker_all_days(args):
 
         gap_pct = (market_open - prev_close) / prev_close * 100
         if gap_pct < MIN_GAP_PCT:
-            continue
-
-        # 1-min -> 2-min deterministic aggregation (slot-aligned to 9:30 ET).
-        from strategies.bars import ensure_2min_bars
-
-        mh = ensure_2min_bars(mh, et_tz)
-        if len(mh) == 0:
             continue
 
         out.setdefault(test_date, []).append(

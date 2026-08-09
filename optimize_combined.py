@@ -113,6 +113,10 @@ def suggest_all_params(trial):
     else:
         params["g_require_2nd_green"] = trial.suggest_categorical("g_require_2nd_green", [True, False])
     params["g_require_2nd_new_high"] = trial.suggest_categorical("g_require_2nd_new_high", [True, False])
+    # 3rd/4th-green confirmation: require N consecutive green candles before G
+    # fires (2nd = 2 greens, 3rd = 3 greens, 4th = 4 greens). Hierarchical.
+    params["g_require_3rd_green"] = trial.suggest_categorical("g_require_3rd_green", [True, False])
+    params["g_require_4th_green"] = trial.suggest_categorical("g_require_4th_green", [True, False])
     params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
     params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
     import os as _os_gs
@@ -832,7 +836,8 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
-    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    # ── Safety check: disabled strategies MUST have gap=DISABLED_GAP ──
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     _gap_keys_check = {
         "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -844,10 +849,10 @@ def objective_val_multi_sortino(trial, daily_picks, train_dates, val_windows_lis
     for s in ALL_STRATS:
         if not params.get(f"enable_{s}", False):
             gap_key = _gap_keys_check.get(s)
-            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+            if gap_key and snapshot.get(gap_key, _DISABLED_GAP) < _DISABLED_GAP:
                 raise RuntimeError(
                     f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
-                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                    f"{snapshot[gap_key]} < _DISABLED_GAP in snapshot!"
                 )
 
     def _safe(x, default=-9.9e12):
@@ -930,7 +935,8 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
-    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    # ── Safety check: disabled strategies MUST have gap=DISABLED_GAP ──
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     _gap_keys_check = {
         "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -942,10 +948,10 @@ def objective_val_multi(trial, daily_picks, train_dates, val_windows_list):
     for s in ALL_STRATS:
         if not params.get(f"enable_{s}", False):
             gap_key = _gap_keys_check.get(s)
-            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+            if gap_key and snapshot.get(gap_key, _DISABLED_GAP) < _DISABLED_GAP:
                 raise RuntimeError(
                     f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
-                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                    f"{snapshot[gap_key]} < _DISABLED_GAP in snapshot!"
                 )
 
     def _safe(x, default=-9.9e12):
@@ -1027,7 +1033,8 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
-    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    # ── Safety check: disabled strategies MUST have gap=DISABLED_GAP ──
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     _gap_keys_check = {
         "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -1039,10 +1046,10 @@ def objective_val(trial, daily_picks, train_dates, val_dates):
     for s in ALL_STRATS:
         if not params.get(f"enable_{s}", False):
             gap_key = _gap_keys_check.get(s)
-            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+            if gap_key and snapshot.get(gap_key, _DISABLED_GAP) < _DISABLED_GAP:
                 raise RuntimeError(
                     f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
-                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                    f"{snapshot[gap_key]} < _DISABLED_GAP in snapshot!"
                 )
 
     def _safe(x, default=-9.9e12):
@@ -1112,7 +1119,8 @@ def objective(trial, daily_picks, all_dates):
             tgc.USE_2MIN_SLIPPAGE = True
         snapshot = _build_param_snapshot()
 
-    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    # ── Safety check: disabled strategies MUST have gap=DISABLED_GAP ──
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     _gap_keys_check = {
         "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -1124,10 +1132,10 @@ def objective(trial, daily_picks, all_dates):
     for s in ALL_STRATS:
         if not params.get(f"enable_{s}", False):
             gap_key = _gap_keys_check.get(s)
-            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+            if gap_key and snapshot.get(gap_key, _DISABLED_GAP) < _DISABLED_GAP:
                 raise RuntimeError(
                     f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
-                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                    f"{snapshot[gap_key]} < _DISABLED_GAP in snapshot!"
                 )
 
     # ----------------------------------------------------------------------
@@ -1594,7 +1602,8 @@ def objective_gl_trail(trial, data):
         configure_gl_trail_for_optimization()
         snapshot = _build_param_snapshot()
 
-    # ── Safety check: disabled strategies MUST have gap=9999 ──
+    # ── Safety check: disabled strategies MUST have gap=DISABLED_GAP ──
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     _gap_keys_check = {
         "h": "H_MIN_GAP_PCT", "a": "A_MIN_GAP_PCT", "f": "F_MIN_GAP_PCT",
         "d": "D_MIN_GAP_PCT", "v": "V_MIN_GAP_PCT", "p": "P_MIN_GAP_PCT",
@@ -1603,13 +1612,14 @@ def objective_gl_trail(trial, data):
         "e": "E_MIN_GAP_PCT", "i": "I_MIN_GAP_PCT", "j": "J_MIN_GAP_PCT",
         "n": "N_MIN_GAP_PCT", "w": "W_MIN_GAP_PCT", "r": "R_DAY1_MIN_GAP",
     }
+    from strategies.config import DISABLED_GAP as _DISABLED_GAP
     for s in ALL_STRATS:
-        if not p.get(f"enable_{s}", False):
+        if not params.get(f"enable_{s}", False):
             gap_key = _gap_keys_check.get(s)
-            if gap_key and snapshot.get(gap_key, 9999) < 9999:
+            if gap_key and snapshot.get(gap_key, _DISABLED_GAP) < _DISABLED_GAP:
                 raise RuntimeError(
                     f"SNAPSHOT BUG: {s} is disabled but {gap_key}="
-                    f"{snapshot[gap_key]} < 9999 in snapshot!"
+                    f"{snapshot[gap_key]} < {_DISABLED_GAP} in snapshot!"
                 )
 
     result = run_gl_trail_backtest(dates, picks_by_date, snapshot)
@@ -1817,6 +1827,10 @@ def main():
                              "'gl_trail' (G+L trail specialist with PostgreSQL backend).")
     parser.add_argument("--workers", type=int, default=1,
                         help="Parallel worker processes for gl_trail mode (default: 1).")
+    parser.add_argument("--data-dirs", default=None,
+                        help="Comma-separated data dirs (e.g. 'stored_data_1min'). "
+                             "Overrides DATA_DIRS for the combined study. Default: "
+                             "use DATA_DIRS (legacy 2-min dirs).")
     args = parser.parse_args()
 
     # ------------------------------------------------------------------
@@ -1957,10 +1971,16 @@ def main():
     print("=" * 70)
 
     print("\nLoading data...")
-    all_dates, daily_picks = load_all_picks(DATA_DIRS)
+    _data_dirs = (
+        [d.strip() for d in args.data_dirs.split(",")]
+        if args.data_dirs
+        else DATA_DIRS
+    )
+    all_dates, daily_picks = load_all_picks(_data_dirs)
     _date_start = args.date_start if args.date_start else DATE_RANGE[0]
     _date_end = args.date_end if args.date_end else DATE_RANGE[1]
     all_dates = [d for d in all_dates if _date_start <= d <= _date_end]
+    print(f"  Data dirs:   {_data_dirs}")
     print(f"  Training date range: {_date_start} to {_date_end} ({len(all_dates)} days)")
     print(f"  {len(all_dates)} trading days: {all_dates[0]} to {all_dates[-1]}")
 

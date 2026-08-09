@@ -595,12 +595,19 @@ def _get_tiered_targets(float_shares, params=None):
 
 
 def _classify_candle2(
-    gap_pct, body_pct, second_green, second_new_high, vol_confirm=False, params=None
+    gap_pct, body_pct, second_green, second_new_high, vol_confirm=False, params=None,
+    third_green=False, fourth_green=False, green_streak=1,
 ):
     """Classify on candle 2 for strategies H, G, A, F.
     Priority: H > G > A > F (highest conviction first).
     When params is a dict, read mutable min_gap thresholds from it (thread-safe);
-    else fall back to module globals (back-compat)."""
+    else fall back to module globals (back-compat).
+
+    green_streak: number of consecutive green candles seen so far (including
+    the current one). G fires only when green_streak satisfies the required
+    N-green gate:
+      required = 2 + (1 if G_REQUIRE_3RD_GREEN) + (1 if G_REQUIRE_4TH_GREEN)
+    """
     if params is None:
         h_gap, g_gap, a_gap, f_gap = (
             H_MIN_GAP_PCT,
@@ -622,11 +629,23 @@ def _classify_candle2(
         and (not H_REQUIRE_VOL_CONFIRM or vol_confirm)
     ):
         return "H"
-    # G: gap>=25%, 2nd green + new hi (strong runners)
+    # G: gap>=30%, N consecutive green candles (2nd/3rd/4th tunable)
+    required_green = 2
+    if params is not None:
+        req3 = params.get("G_REQUIRE_3RD_GREEN", G_REQUIRE_3RD_GREEN)
+        req4 = params.get("G_REQUIRE_4TH_GREEN", G_REQUIRE_4TH_GREEN)
+    else:
+        req3 = G_REQUIRE_3RD_GREEN
+        req4 = G_REQUIRE_4TH_GREEN
+    if req3:
+        required_green += 1
+    if req4:
+        required_green += 1
+    green_ok = (not G_REQUIRE_2ND_GREEN or second_green) and green_streak >= required_green
     if (
         gap_pct >= g_gap
         and body_pct >= G_MIN_BODY_PCT
-        and (not G_REQUIRE_2ND_GREEN or second_green)
+        and green_ok
         and (not G_REQUIRE_2ND_NEW_HIGH or second_new_high)
     ):
         return "G"
@@ -1226,6 +1245,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "signal": False,
                 "signal_price": None,
                 "open_price": None,
+                "g_armed": False,  # G waiting for 3rd/4th-green confirmation
                 "strategy": None,  # "H", "G", "A", "F", "D", or "P"
                 # State — D (Opening Dip Buy fallback)
                 "d_eligible": False,  # Set True after candle 2 if H/G/A/F failed
@@ -2628,52 +2648,110 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     second_new_high,
                     vol_confirm,
                     params=params,
+                    green_streak=2,
                 )
                 if strategy:
                     st["strategy"] = strategy
                     st["signal"] = True
                     entry_candidates.append(st)
                 else:
-                    # H/G/A/F rejected — enable D, V, M, P, W fallbacks if gap qualifies
-                    eligible = False
-                    if st["gap_pct"] >= D_MIN_GAP_PCT:
-                        st["d_eligible"] = True
-                        # Initialize D spike tracking retroactively
-                        st["d_spike_high"] = max(st["first_candle_high"], c_high)
-                        eligible = True
-                    if st["gap_pct"] >= V_MIN_GAP_PCT:
-                        st["v_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= M_MIN_GAP_PCT:
-                        st["m_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= P_MIN_GAP_PCT:
-                        st["p_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= W_MIN_GAP_PCT:
-                        st["w_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= K_MIN_GAP_PCT:
-                        st["k_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= C_MIN_GAP_PCT:
-                        st["c_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= S_MIN_GAP_PCT:
-                        st["s_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= I_MIN_GAP_PCT:
-                        st["i_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= J_MIN_GAP_PCT:
-                        st["j_eligible"] = True
-                        eligible = True
-                    if st["gap_pct"] >= N_MIN_GAP_PCT:
-                        st["n_eligible"] = True
-                        eligible = True
-                    if st["l_eligible"]:  # Already set at init based on float + gap
-                        eligible = True
-                    if not eligible:
+                    # G may be armed for 3rd/4th-green confirmation: if G's gap/body
+                    # qualify but the green-streak gate isn't met yet, hold it.
+                    # Only G supports multi-green arming (H/A/F fire on candle 2 only).
+                    _armed = False
+                    if st["gap_pct"] >= (params or {}).get("G_MIN_GAP_PCT", G_MIN_GAP_PCT):
+                        _req3 = (params or {}).get("G_REQUIRE_3RD_GREEN", G_REQUIRE_3RD_GREEN)
+                        _req4 = (params or {}).get("G_REQUIRE_4TH_GREEN", G_REQUIRE_4TH_GREEN)
+                        if (_req3 or _req4) and second_green:
+                            st["g_armed"] = True
+                            _armed = True
+                    if not _armed:
+                        # H/G/A/F rejected — enable D, V, M, P, W fallbacks if gap qualifies
+                        eligible = False
+                        if st["gap_pct"] >= D_MIN_GAP_PCT:
+                            st["d_eligible"] = True
+                            st["d_spike_high"] = max(st["first_candle_high"], c_high)
+                            eligible = True
+                        if st["gap_pct"] >= V_MIN_GAP_PCT:
+                            st["v_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= M_MIN_GAP_PCT:
+                            st["m_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= P_MIN_GAP_PCT:
+                            st["p_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= W_MIN_GAP_PCT:
+                            st["w_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= K_MIN_GAP_PCT:
+                            st["k_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= C_MIN_GAP_PCT:
+                            st["c_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= S_MIN_GAP_PCT:
+                            st["s_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= I_MIN_GAP_PCT:
+                            st["i_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= J_MIN_GAP_PCT:
+                            st["j_eligible"] = True
+                            eligible = True
+                        if st["gap_pct"] >= N_MIN_GAP_PCT:
+                            st["n_eligible"] = True
+                            eligible = True
+                        if st["l_eligible"]:
+                            eligible = True
+                        if not eligible:
+                            st["done"] = True
+
+            # G armed for 3rd/4th-green confirmation: re-evaluate at candle 3/4.
+            elif (
+                st.get("g_armed")
+                and not st["signal"]
+                and not st["done"]
+                and not st.get("l_only")
+            ):
+                if st["candle_count"] >= 3:
+                    third_green = c_close > c_open
+                    streak = 3 if third_green else 0
+                    # count streak back over candles 2-4 using stored closes
+                    if third_green and st["candle_count"] >= 3:
+                        # streak = consecutive green candles ending at current
+                        closes = [float(r["Close"]) for _, r in st["mh"].iloc[: st["candle_count"]].iterrows()]
+                        opens = [float(r["Open"]) for _, r in st["mh"].iloc[: st["candle_count"]].iterrows()]
+                        streak = 0
+                        for co, cl in zip(reversed(opens), reversed(closes)):
+                            if cl > co:
+                                streak += 1
+                            else:
+                                break
+                    _req3 = (params or {}).get("G_REQUIRE_3RD_GREEN", G_REQUIRE_3RD_GREEN)
+                    _req4 = (params or {}).get("G_REQUIRE_4TH_GREEN", G_REQUIRE_4TH_GREEN)
+                    required = 2 + (1 if _req3 else 0) + (1 if _req4 else 0)
+                    if streak >= required:
+                        strategy = _classify_candle2(
+                            st["gap_pct"],
+                            st["first_candle_body_pct"],
+                            third_green,
+                            c_high > st["first_candle_high"],
+                            float(candle["Volume"]) > st["first_candle_volume"],
+                            params=params,
+                            green_streak=streak,
+                        )
+                        if strategy == "G":
+                            st["strategy"] = "G"
+                            st["signal"] = True
+                            st["signal_price"] = c_close
+                            entry_candidates.append(st)
+                        else:
+                            st["g_armed"] = False
+                            if not st.get("d_eligible") and not st.get("v_eligible"):
+                                st["done"] = True
+                    elif st["candle_count"] > 4:
+                        st["g_armed"] = False
                         st["done"] = True
 
             # Retry fill on later candles (H/G/A/F)

@@ -1,12 +1,11 @@
 """
-Tradier SSE streaming feed — aggregates real-time trade ticks into 2-min bars.
+Tradier SSE streaming feed — aggregates real-time trade ticks into 1-min bars.
 
 Flow:
   1. POST /v1/markets/events/session  → get a streaming session token
   2. GET  stream.tradier.com/v1/markets/events?sessionid=...&symbols=...&filter=trade
-  3. Parse SSE `trade` events  → accumulate ticks into TwoMinBar buckets
-  4. Emit completed 2-min bar via on_2min_bar(symbol, bar_dict) — same
-     signature as BarStreamer in streamer.py so wiring is a drop-in swap.
+  3. Parse SSE `trade` events  → accumulate ticks into OneMinBar buckets
+  4. Emit completed 1-min bar via on_1min_bar(symbol, bar_dict)
 
 Thread model:
   start_async() → background daemon thread runs _stream_loop() which
@@ -34,14 +33,20 @@ EVENTS_URL = f"{TRADIER_STREAM_BASE}/v1/markets/events"
 
 
 def _bar_slot(ts: datetime) -> int:
-    """Return 2-min slot index from an ET datetime (same logic as streamer.py)."""
+    """Return 1-min slot index from an ET datetime.
+
+    The streamer aggregates ticks into 1-MINUTE bars. The strategy engine
+    consumes 1-min bars directly (the whole pipeline is 1-min now). Prior to
+    2026-08 the streamer produced 2-min bars (slot = minutes_since_open // 2),
+    which was unreliable (slot-roll emission on single ticks, out-of-order bars).
+    """
     et = ts.astimezone(ET)
     minutes_since_open = (et.hour * 60 + et.minute) - (9 * 60 + 30)
-    return minutes_since_open // 2
+    return minutes_since_open
 
 
-class _TwoMinBar:
-    """Accumulates ticks for a single 2-min slot."""
+class _OneMinBar:
+    """Accumulates ticks for a single 1-min slot."""
     __slots__ = ("open", "high", "low", "close", "volume", "timestamp", "tick_count")
 
     def __init__(self, price: float, size: int, ts: datetime):
@@ -73,16 +78,16 @@ class _TwoMinBar:
 
 class TradierStreamer:
     """
-    Streams real-time trade ticks from Tradier and emits 2-min bars.
+    Streams real-time trade ticks from Tradier and emits 1-min bars.
 
-    Identical on_2min_bar callback signature to BarStreamer (streamer.py).
+    Identical on_1min_bar callback signature to BarStreamer (streamer.py).
     """
 
-    def __init__(self, api_key: str, on_2min_bar):
+    def __init__(self, api_key: str, on_1min_bar):
         self.api_key = api_key
-        self.on_2min_bar = on_2min_bar
+        self.on_1min_bar = on_1min_bar
         self._symbols: list[str] = []
-        self._pending: dict[str, tuple[int, _TwoMinBar]] = {}
+        self._pending: dict[str, tuple[int, _OneMinBar]] = {}
         self._session_id: str | None = None
         self._running = False
         self._lock = threading.Lock()
@@ -134,7 +139,7 @@ class TradierStreamer:
             self._pending.clear()
         for symbol, (_, bar) in pending.items():
             try:
-                self.on_2min_bar(symbol, bar.to_dict())
+                self.on_1min_bar(symbol, bar.to_dict())
             except Exception as e:
                 log.warning(f"TradierStreamer flush error for {symbol}: {e}")
                 log_event("tradier_stream_error", "warning", f"TradierStreamer flush error for {symbol}: {e}")
@@ -228,7 +233,7 @@ class TradierStreamer:
                     backoff = min(backoff * 2, 60)
 
     def _handle_line(self, raw_line: bytes | str):
-        """Parse one SSE JSON line and accumulate into 2-min bar."""
+        """Parse one SSE JSON line and accumulate into 1-min bar."""
         if isinstance(raw_line, bytes):
             raw_line = raw_line.decode("utf-8").strip()
         if not raw_line:
@@ -269,14 +274,14 @@ class TradierStreamer:
                 else:
                     # Slot rolled — emit previous bar
                     completed = bar
-                    self._pending[symbol] = (slot, _TwoMinBar(price, size, ts))
+                    self._pending[symbol] = (slot, _OneMinBar(price, size, ts))
             else:
-                self._pending[symbol] = (slot, _TwoMinBar(price, size, ts))
+                self._pending[symbol] = (slot, _OneMinBar(price, size, ts))
                 return
 
         # Emit outside the lock
         try:
-            self.on_2min_bar(symbol, completed.to_dict())
+            self.on_1min_bar(symbol, completed.to_dict())
         except Exception as e:
-            log.warning(f"TradierStreamer on_2min_bar error for {symbol}: {e}\n{traceback.format_exc()}")
-            log_event("tradier_stream_error", "warning", f"TradierStreamer on_2min_bar error for {symbol}: {e}")
+            log.warning(f"TradierStreamer on_1min_bar error for {symbol}: {e}\n{traceback.format_exc()}")
+            log_event("tradier_stream_error", "warning", f"TradierStreamer on_1min_bar error for {symbol}: {e}")

@@ -31,6 +31,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+# Sentinel used to disable a strategy: its MIN_GAP_PCT is set to this value so
+# `gap_pct >= MIN_GAP_PCT` is never satisfied by a real pick. Must exceed ANY
+# possible gap_pct — reverse-split artifacts have produced gaps > 9999%
+# (e.g. PAVS 14020%, OCG 24751%), which leaked past the old 9999.0 sentinel.
+DISABLED_GAP = 9e9
+
 # ---------------------------------------------------------------------------
 # Param entries: (GLOBAL_NAME, lowercase param key, default, kind)
 # kind: 'num' -> float(...)    'bool' -> bool(...)    'str' -> raw
@@ -71,6 +77,8 @@ _reg("G", "G_MIN_GAP_PCT", 1, [
     ("G_MIN_GAP_PCT", "g_min_gap_pct", 30.0, "num"),
     ("G_REQUIRE_2ND_GREEN", "g_require_2nd_green", True, "bool"),
     ("G_REQUIRE_2ND_NEW_HIGH", "g_require_2nd_new_high", True, "bool"),
+    ("G_REQUIRE_3RD_GREEN", "g_require_3rd_green", False, "bool"),
+    ("G_REQUIRE_4TH_GREEN", "g_require_4th_green", False, "bool"),
     ("G_TARGET_PCT", "g_target_pct", 11.0, "num"),
     ("G_TARGET2_PCT", "g_target2_pct", 30.0, "num"),
     ("G_PARTIAL_SELL_PCT", "g_partial_sell_pct", 0.0, "num"),
@@ -503,21 +511,21 @@ def apply_params(params, target):
                 # else: raw — preserve params-dict type exactly (original behavior)
             setattr(target, global_name, val)
 
-    # Enable/disable gates: set min_gap (or X first-leg) to 9999 when disabled.
-    # Re-reset enabled strategies' min gaps afterward (matches original reset
-    # of ALL min_gap thresholds at the top of set_strategy_params, which only
-    # runs for the tunable gap globals).
+    # Enable/disable gates: set min_gap (or X first-leg) to DISABLED_GAP when
+    # disabled. Re-reset enabled strategies' min gaps afterward (matches
+    # original reset of ALL min_gap thresholds at the top of set_strategy_params,
+    # which only runs for the tunable gap globals).
     for s, cfg in STRATEGIES.items():
         low = s.lower()
         enabled = params.get(f"enable_{low}", False)
         if s == "R":
             if not enabled:
-                setattr(target, "R_DAY1_MIN_GAP", 9999.0)
+                setattr(target, "R_DAY1_MIN_GAP", DISABLED_GAP)
             else:
                 setattr(target, "R_DAY1_MIN_GAP", float(params.get("r_day1_min_gap", 40.0)))
         else:
             if not enabled:
-                setattr(target, cfg.min_gap_global, 9999.0)
+                setattr(target, cfg.min_gap_global, DISABLED_GAP)
             else:
                 # re-apply the min gap from params (matches original reset)
                 first = cfg.params[0]

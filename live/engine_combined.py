@@ -558,6 +558,8 @@ class CombinedEngine:
         and runs the full simulation to detect state changes.
         """
         # Halt-resume path runs separately from the simulate_day_combined flow.
+        # It consumes the same 1-min bars as the main engine (halt-resume
+        # params are tuned on 1-min bars now).
         if symbol in self.halt_states:
             self._on_bar_halt(symbol, bar)
             return
@@ -591,7 +593,6 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
-            df.index = df.index.floor("2min")
             df = df[~df.index.duplicated(keep="last")]
 
             pick_copy = dict(pick)
@@ -2148,7 +2149,6 @@ class CombinedEngine:
             df = pd.DataFrame(bars)
             df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
             df = df.set_index("timestamp").sort_index()
-            df.index = df.index.floor("2min")
             df = df[~df.index.duplicated(keep="last")]
             pick_copy = dict(pick)
             pick_copy["market_hour_candles"] = df
