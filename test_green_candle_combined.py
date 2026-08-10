@@ -625,6 +625,10 @@ W_REQUIRE_ABOVE_VWAP = True
 
 # --- SHARED CONFIG ---
 EOD_EXIT_MINUTES = 15
+# MAX_POSITION_PCT_OF_CASH: hard ceiling on any single position as % of
+# available cash. 100 = no leverage (cash account semantics); >100 opts into
+# modeled margin. Prevents the conviction multiplier from deploying >cash.
+MAX_POSITION_PCT_OF_CASH = 100
 FULL_BALANCE_SIZING = True  # Use full balance for each trade
 
 STRAT_KEYS = [
@@ -3923,6 +3927,19 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     _conv = min(_conv, 1.0 + G_CONVICTION_MULT)
                     trade_size = trade_size * _conv
                     alpha_size = trade_size
+
+            # Hard cash cap: never deploy more than available cash. Applied
+            # AFTER conviction sizing so the multiplier can't push past cash.
+            # Restores the "can't spend more than we have" invariant — without
+            # this, conviction (up to 3x) pushed positions into modeled margin
+            # debt (APPS/CNSP/CELZ etc. $1M+ positions on compounded ~$700k
+            # cash). MAX_POSITION_PCT_OF_CASH=100 matches a cash account (no
+            # leverage); >100 opts into modeled margin.
+            _cash_cap = cash_box[0] * (MAX_POSITION_PCT_OF_CASH / 100.0)
+            if trade_size > _cash_cap:
+                trade_size = _cash_cap
+                st["cash_capped"] = True
+            alpha_size = trade_size  # reflect final cap for diagnostics
 
             fill_price = st["signal_price"]
             if fill_price is None or fill_price <= 0:

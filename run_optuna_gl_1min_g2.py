@@ -14,21 +14,21 @@ import argparse
 import time
 
 STRATS = "g"  # only G fires; G2 is the fixed-entry variant of G
-STUDY = "gl_1min_v3_g2"
+STUDY = "gl_1min_v5_g2_2x"
 DB = "postgresql://postgres@127.0.0.1:5432/optuna_gl_1min"
-PARAMS_OUT = "config/trial_gl_1min_v3_g2_best.json"
+PARAMS_OUT = "config/trial_gl_1min_v5_g2_2x_best.json"
 DATA_DIRS = "stored_data_1min"
 
 
 def main():
     parser = argparse.ArgumentParser(description="Launch G2 (simplified G) 1-min Optuna study")
     parser.add_argument("--workers", type=int, default=8)
-    # G2 tunes 9 meaningful dims (5 exit + 3 bar gates + 1 conviction).
-    # Optuna TPE guidance: trials ~20-50x dims (9 -> 180-450), startup ~10x (60).
-    # 250 trials / 60 startup balances convergence vs runtime.
-    parser.add_argument("--trials", type=int, default=250,
-                        help="Total trials (G2 tunes 9 dims)")
-    parser.add_argument("--startup", type=int, default=60)
+    # G2 tunes 11 meaningful dims (5 exit + 3 bar gates + conviction + PM gate
+    # + PM credit). Optuna TPE guidance: startup ~10x dims (110), trials
+    # ~30x dims (330) for solid convergence.
+    parser.add_argument("--trials", type=int, default=330,
+                        help="Total trials (G2 tunes 11 dims)")
+    parser.add_argument("--startup", type=int, default=110)
     parser.add_argument("--date-start", default="2024-01-01")
     parser.add_argument("--date-end", default="2026-02-28")
     parser.add_argument("--data-dirs", default=DATA_DIRS)
@@ -67,6 +67,11 @@ def main():
     worker_env["ALLOWED_STRATS"] = STRATS
     worker_env["G_SIMPLE_ENTRY"] = "1"      # fix entry: 2nd green + 15% gap
     worker_env["G_FIRST_BAR_ONLY"] = "1"    # buy candle 2 only, no retry fills
+    # Leverage overrides (opt-in): MARGIN_MULTIPLIER scales size by cash;
+    # MAX_POSITION_PCT_OF_CASH caps a position at that % of cash (100 = 1x,
+    # 200 = 2x margin). Default 1x / 100 = cash-account semantics.
+    worker_env.setdefault("MARGIN_MULTIPLIER", os.environ.get("MARGIN_MULTIPLIER", "1.0"))
+    worker_env.setdefault("MAX_POSITION_PCT_OF_CASH", os.environ.get("MAX_POSITION_PCT_OF_CASH", "100"))
 
     print(f"\nInitializing PostgreSQL schema (1-trial bootstrap)...")
     init_cmd = base_cmd + ["--trials", "1", "--startup-trials", "1"]

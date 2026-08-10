@@ -575,6 +575,18 @@ def apply_params(params, target):
     setattr(target, "NEWS_MIN_ARTICLES", int(params.get("min_news_articles", 0)))
     setattr(target, "NEWS_REQUIRE_CATALYST", bool(params.get("require_news_catalyst", False)))
 
+    # Env-driven sizing overrides (used by study launchers): MARGIN_MULTIPLIER
+    # scales position size by account cash; MAX_POSITION_PCT_OF_CASH caps any
+    # single position at that % of cash (100 = no leverage, 200 = 2x margin).
+    # Applied after registry so Optuna runs can test leverage scenarios.
+    import os as _os_cfg
+    _mm = _os_cfg.environ.get("MARGIN_MULTIPLIER", "")
+    if _mm:
+        setattr(target, "MARGIN_MULTIPLIER", float(_mm))
+    _pc = _os_cfg.environ.get("MAX_POSITION_PCT_OF_CASH", "")
+    if _pc:
+        setattr(target, "MAX_POSITION_PCT_OF_CASH", float(_pc))
+
     return target
 
 

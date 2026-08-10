@@ -146,6 +146,7 @@ def suggest_all_params(trial):
         params["g_min_2nd_vol_mult"] = trial.suggest_float("g_min_2nd_vol_mult", 0.0, 3.0, step=0.25)
         params["g_conviction_mult"] = trial.suggest_float("g_conviction_mult", 0.0, 3.0, step=0.5)
         params["g_pm_gate_strength_scale"] = trial.suggest_float("g_pm_gate_strength_scale", 0.0, 12.0, step=1.0)
+        params["g_pm_credit_fraction"] = trial.suggest_float("g_pm_credit_fraction", 0.05, 0.5, step=0.05)
 
     # === A: Quick Scalp (5 params) ===
     params["a_target_pct"] = trial.suggest_float("a_target_pct", 2.0, 15.0, step=1.0)
