@@ -57,6 +57,14 @@ def _run_one(job):
         _pmgate = _os.environ.get("PM_GATE_SCALE", "")
         if _pmgate:
             tgc.G_PM_GATE_STRENGTH_SCALE = float(_pmgate)
+        # Margin/cash-cap overrides (must be after set_strategy_params, which
+        # resets non-registry globals). Replicates study-time leverage.
+        _mm = _os.environ.get("MARGIN_MULTIPLIER", "")
+        if _mm:
+            tgc.MARGIN_MULTIPLIER = float(_mm)
+        _pc = _os.environ.get("MAX_POSITION_PCT_OF_CASH", "")
+        if _pc:
+            tgc.MAX_POSITION_PCT_OF_CASH = float(_pc)
         snapshot = _build_param_snapshot()
 
         dates = sorted(d for d in _picks_by_date if date_lo <= d <= date_hi)

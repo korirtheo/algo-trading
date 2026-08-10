@@ -46,10 +46,10 @@ if _env_params:
         else os.path.join(_PROJECT_ROOT, _env_params)
     )
 else:
-    # Default live config: gl_1min_v3_g2 OOS-best trial #232 (G2, first-bar
-    # entry + conviction sizing, PF ~20 median OOS). Override with
+    # Default live config: gl_1min_v5_g2_2x OOS-best trial #106 (G2 first-bar
+    # entry, 2x margin, 100% OOS profitable, median $1.37M). Override with
     # LIVE_PARAMS_PATH for ad-hoc switches.
-    PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_gl_1min_g2_deploy.json")
+    PARAMS_PATH = os.path.join(_PROJECT_ROOT, "config", "trial_gl_1min_g2_2x_deploy.json")
 
 
 def load_trial_params(path=None):
@@ -89,6 +89,19 @@ def load_trial_params(path=None):
     if isinstance(raw, dict) and raw.get("g_first_bar_only"):
         tgc.G_FIRST_BAR_ONLY = True
         log.info("G2 first-bar-only entry ENABLED (config g_first_bar_only=true)")
+
+    # Margin sizing overrides from the deploy config (must be applied AFTER
+    # set_strategy_params, which resets non-registry globals). Default 1x/100%
+    # = cash-account semantics; the 2x deploy config sets 2.0/200.
+    if isinstance(raw, dict):
+        _mm = raw.get("margin_multiplier")
+        if _mm:
+            tgc.MARGIN_MULTIPLIER = float(_mm)
+            log.info("Margin multiplier = %.1fx (config)", float(_mm))
+        _pc = raw.get("max_position_pct_of_cash")
+        if _pc:
+            tgc.MAX_POSITION_PCT_OF_CASH = float(_pc)
+            log.info("Max position = %.0f%% of cash (config)", float(_pc))
 
     # Live-only: zero the volume caps when IEX feed under-counts cum_$vol.
     # Without this, sizing binds at ~$100 on hot gappers because the IEX feed
