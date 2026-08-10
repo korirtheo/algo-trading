@@ -433,6 +433,34 @@ def _liquidity_windows(mh):
     )
 
 
+def _bar_atr(mh, ts, period=14):
+    """Average True Range at/before ts (percent of price), computed on the
+    trailing `period` bars. Returns 0.0 when there aren't enough bars.
+
+    Used by the ATR-based trailing stop: trail = peak - k*ATR so the stop
+    widens/tightens with the stock's actual intraday volatility instead of a
+    fixed percentage that means different things on a $2 vs a $20 stock.
+    """
+    import pandas as _pd
+
+    pre = mh.loc[mh.index <= ts]
+    tail = pre.tail(period)
+    if len(tail) < 3:
+        return 0.0
+    high = tail["High"]
+    low = tail["Low"]
+    close = tail["Close"].shift(1)
+    tr1 = (high - low).to_numpy()
+    tr2 = (high - close).abs().to_numpy()
+    tr3 = (low - close).abs().to_numpy()
+    tr = _pd.DataFrame({"a": tr1, "b": tr2, "c": tr3}).max(axis=1)
+    atr = float(tr.mean())
+    last_close = float(tail["Close"].iloc[-1])
+    if last_close <= 0:
+        return 0.0
+    return atr / last_close * 100.0
+
+
 def _pm_conviction_gate(st):
     """PM-liquidity trust gate in [0,1] for a state's opening signal.
 
@@ -603,6 +631,11 @@ G_PM_GATE_STRENGTH_SCALE = 0.0
 # (median 0.05 for G trades), so ~5-10% of PM flow actually becomes executable
 # opening liquidity. Applied on top of the conviction gate.
 G_PM_CREDIT_FRACTION = 1.0
+# G_TRAIL_ATR_MULT: when >0, G uses an ATR-based trailing stop
+# (trail = peak - k*ATR) instead of the fixed percentage trail. Volatility-
+# adaptive: widens on choppy names so normal pullbacks don't stop us out,
+# tightens when the stock calms. 0 = off (fixed-% trail, unchanged).
+G_TRAIL_ATR_MULT = 0.0
 # G_FIRST_BAR_ONLY (diagnostic): when True, G only fills on candle 2 (the first
 # confirmation candle); retry-fills on later candles are dropped. Diagnostic
 # only — production runs keep this False. Env override G_FIRST_BAR_ONLY=1 lets
@@ -2566,9 +2599,24 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             st["g_highest_since_entry"] / st["entry_price"] - 1
                         ) * 100
                         if unrealized_pct >= _g_trail_act:
-                            trail_stop = st["g_highest_since_entry"] * (
-                                1 - _g_trail / 100
-                            )
+                            if G_TRAIL_ATR_MULT > 0:
+                                # ATR-based trail: widen/tighten with actual
+                                # volatility. trail = peak - k*ATR% so a $2
+                                # stock with huge range doesn't get stopped on
+                                # normal noise. k = G_TRAIL_ATR_MULT.
+                                _atr_pct = _bar_atr(st["mh"], ts)
+                                if _atr_pct > 0:
+                                    trail_stop = st["g_highest_since_entry"] * (
+                                        1 - G_TRAIL_ATR_MULT * _atr_pct / 100
+                                    )
+                                else:
+                                    trail_stop = st["g_highest_since_entry"] * (
+                                        1 - _g_trail / 100
+                                    )
+                            else:
+                                trail_stop = st["g_highest_since_entry"] * (
+                                    1 - _g_trail / 100
+                                )
                             if trail_stop > st.get("hgaf_trail_stop", 0):
                                 st["hgaf_trail_stop"] = trail_stop
                         if (
