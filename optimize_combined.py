@@ -67,7 +67,7 @@ GL_TRAIL_DATA_DIRS = [
 GL_TRAIL_DATE_LO = "2024-01-01"
 GL_TRAIL_DATE_HI = "2026-02-28"
 
-ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x"]
+ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x","ge"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
 
 
@@ -396,6 +396,17 @@ def suggest_all_params(trial):
     params["n_trail_pct"] = trial.suggest_float("n_trail_pct", 1.0, 5.0, step=1.0)
     params["n_trail_activate_pct"] = trial.suggest_float("n_trail_activate_pct", 1.0, 6.0, step=1.0)
     params["n_time_limit_min"] = trial.suggest_int("n_time_limit_min", 30, 120, step=10)
+
+    # === GE: G-Exit re-entry (entry trigger + exits) ===
+    params["ge_max_pullback_pct"] = trial.suggest_float("ge_max_pullback_pct", 5.0, 25.0, step=2.5)
+    params["ge_reclaim_pct"] = trial.suggest_float("ge_reclaim_pct", 0.0, 6.0, step=1.0)
+    params["ge_min_below_bars"] = trial.suggest_int("ge_min_below_bars", 1, 5, step=1)
+    params["ge_window_minutes"] = trial.suggest_int("ge_window_minutes", 15, 90, step=15)
+    params["ge_target_pct"] = trial.suggest_float("ge_target_pct", 10.0, 60.0, step=10.0)
+    params["ge_stop_pct"] = trial.suggest_float("ge_stop_pct", 4.0, 20.0, step=2.0)
+    params["ge_trail_pct"] = trial.suggest_float("ge_trail_pct", 2.0, 15.0, step=1.0)
+    params["ge_trail_activate_pct"] = trial.suggest_float("ge_trail_activate_pct", 0.0, 20.0, step=2.0)
+    params["ge_time_limit_min"] = trial.suggest_int("ge_time_limit_min", 30, 180, step=15)
 
     # === L: Low Float Squeeze (19 params) ===
     # l_min_gap range widened from 15-50 to 15-80 (2026-06-20) so TPE can explore

@@ -404,6 +404,25 @@ _reg("X", "X_MIN_FIRST_LEG_GAIN_PCT", 20, [
     ("X_MAX_ENTRY_HHMM", "x_max_entry_hhmm", "14:30", "fixed"),
 ])
 
+# --- GE: G-Exit re-entry (complement to G, catches the second leg) ---
+# Re-enters tickers G bought today, after G exits, on the validated
+# "shakeout-but-held" trigger: price pulled back <= GE_MAX_PULLBACK_PCT from
+# G's exit and closes back within GE_RECLAIM_PCT. Captures the +17-28% median
+# run G's 1% trail leaves behind.
+_reg("GE", "GE_MIN_GAP_PCT", 11, [
+    ("GE_MIN_GAP_PCT", "ge_min_gap", 15.0, "num"),
+    ("GE_MAX_PULLBACK_PCT", "ge_max_pullback_pct", 15.0, "num"),
+    ("GE_RECLAIM_PCT", "ge_reclaim_pct", 3.0, "num"),
+    ("GE_MIN_BELOW_BARS", "ge_min_below_bars", 2, "num"),
+    ("GE_WINDOW_MINUTES", "ge_window_minutes", 30, "num"),
+    ("GE_MAX_ENTRY_CANDLE", "ge_max_entry_candle", 390, "num"),
+    ("GE_TARGET_PCT", "ge_target_pct", 30.0, "num"),
+    ("GE_STOP_PCT", "ge_stop_pct", 12.0, "num"),
+    ("GE_TRAIL_PCT", "ge_trail_pct", 5.0, "num"),
+    ("GE_TRAIL_ACTIVATE_PCT", "ge_trail_activate_pct", 5.0, "num"),
+    ("GE_TIME_LIMIT_MINUTES", "ge_time_limit_min", 120, "num"),
+])
+
 
 # ---------------------------------------------------------------------------
 # apply_params: data-driven replacement for optimize_combined.set_strategy_params

@@ -1343,6 +1343,14 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     # This ensures momentum continuation rather than catching falling knives
     reentry_floor = {}  # {(ticker, strategy): exit_price}
 
+    # G-bought tickers today: G screens strong gappers at the 09:31 open.
+    # GE (G-Exit re-entry) re-enters these after G exits, on the verified
+    # "shakeout-but-held" trigger (pullback <= GE_MAX_PULLBACK_PCT from G's
+    # exit and reclaim within GE_RECLAIM_PCT).
+    g_bought_tickers = set()
+    g_exit_prices = {}  # ticker -> G's exit price (for the GE trigger reference)
+    g_exit_times = {}  # ticker -> G's exit timestamp (for the GE window)
+
     def _receive_proceeds(amount):
         if cash_account:
             unsettled_box[0] += amount
@@ -1573,6 +1581,19 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "n_trailing_active": False,
                 "n_partial_taken": False,
                 "n_partial_proceeds": 0.0,
+                # State — GE (G-Exit re-entry): re-enter G-bought tickers after
+                # G exits, on the "shakeout-but-held" trigger. Armed per-day via
+                # g_bought_tickers; GE detection handles the rest.
+                "ge_eligible": True,  # GE runs on any pick; detection gates on G-bought
+                "ge_armed": False,    # set True when this ticker was G-bought today
+                "ge_was_above_exit": False,   # saw close >= G's exit price
+                "ge_below_count": 0,          # consecutive closes below G exit
+                "ge_pullback_seen": False,    # met max-pullback requirement
+                "ge_reclaim_armed": False,    # ready to trigger on reclaim
+                "ge_highest_since_entry": 0.0,
+                "ge_trailing_active": False,
+                "ge_partial_taken": False,
+                "ge_partial_proceeds": 0.0,
                 # State — X (Range Reversion — second-leg pattern)
                 "x_eligible": False,  # True after first-leg window closes with valid pattern
                 "x_open_price": 0.0,  # open price for first-leg gain reference
@@ -1884,6 +1905,57 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             st["e_eligible"] = False
     states.extend(e_only_states)
 
+    # Create dedicated GE-only states (G-Exit re-entry). These are independent
+    # copies that survive G's exit (which marks the main state done), so GE can
+    # re-enter a G-bought ticker on the shakeout-but-held trigger afterwards.
+    ge_only_states = []
+    for st in states:
+        if st.get("l_only") or st.get("o_only") or st.get("b_only") or st.get("e_only"):
+            continue
+        if st["ge_eligible"]:
+            ge_st = dict(st)
+            ge_st["ge_only"] = True
+            for k in [
+                "d_eligible",
+                "v_eligible",
+                "m_eligible",
+                "p_eligible",
+                "w_eligible",
+                "k_eligible",
+                "c_eligible",
+                "s_eligible",
+                "i_eligible",
+                "j_eligible",
+                "n_eligible",
+            ]:
+                ge_st[k] = False
+            ge_st["l_eligible"] = False
+            ge_st["o_eligible"] = False
+            ge_st["b_eligible"] = False
+            ge_st["e_eligible"] = False
+            ge_st["is_r_candidate"] = False
+            ge_st["r_eligible"] = False
+            ge_st["signal"] = False
+            ge_st["signal_price"] = None
+            ge_st["strategy"] = None
+            ge_st["candle_count"] = 0
+            ge_st["first_candle_ok"] = False
+            ge_st["first_candle_body_pct"] = 0.0
+            ge_st["done"] = False
+            ge_st["entry_price"] = None
+            ge_st["shares"] = 0
+            ge_st["position_cost"] = 0.0
+            ge_st["pnl"] = 0.0
+            ge_st["ge_armed"] = False
+            ge_st["ge_was_above_exit"] = False
+            ge_st["ge_below_count"] = 0
+            ge_st["ge_pullback_seen"] = False
+            ge_st["ge_reclaim_armed"] = False
+            ge_st["ge_highest_since_entry"] = 0.0
+            ge_st["ge_trailing_active"] = False
+            ge_only_states.append(ge_st)
+    states.extend(ge_only_states)
+
     # Track how many times each strategy has entered today (for G1/G2/L1/L2 split)
     day_trade_counts = {}  # strategy -> count of entries today
 
@@ -1953,6 +2025,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # Record exit price as re-entry floor for this ticker+strategy
                     reentry_floor[(st["ticker"], st["strategy"])] = price
+
+                    # Record G's exit price so GE (G-Exit re-entry) can reference
+                    # it as the trigger baseline on this same ticker.
+                    if st["strategy"] == "G" and st["ticker"] in g_bought_tickers:
+                        g_exit_prices[st["ticker"]] = price
+                        g_exit_times[st["ticker"]] = ts_now
 
                 # EOD forced exit (all strategies)
                 if minutes_to_close <= EOD_EXIT_MINUTES:
@@ -2670,7 +2748,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     continue
 
-                # ===== STRATEGIES H/A/F: target + stop + trail + time stop =====
+                # ===== STRATEGIES H/A/F/GE: target + stop + trail + time stop =====
                 strat_map = {
                     "H": (
                         H_TARGET_PCT,
@@ -2692,6 +2770,13 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         F_STOP_PCT,
                         F_TRAIL_PCT,
                         F_TRAIL_ACTIVATE_PCT,
+                    ),
+                    "GE": (
+                        GE_TARGET_PCT,
+                        GE_TIME_LIMIT_MINUTES,
+                        GE_STOP_PCT,
+                        GE_TRAIL_PCT,
+                        GE_TRAIL_ACTIVATE_PCT,
                     ),
                 }
                 target_pct, time_limit, stop_pct, trail_pct, trail_act = strat_map.get(
@@ -2785,6 +2870,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     and not st.get("o_only")
                     and not st.get("b_only")
                     and not st.get("e_only")
+                    and not st.get("ge_only")
                 ):
                     st["done"] = True
 
@@ -2805,7 +2891,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if st["pm_volume"] >= E_MIN_PM_VOL_MULT * c_vol:
                             st["e_pm_vol_ok"] = True
 
-            # CANDLE 2: Classify for H, G, A, F (skip for L/O/B/E-only states)
+            # CANDLE 2: Classify for H, G, A, F (skip for L/O/B/E/GE-only states)
             elif (
                 st["candle_count"] == 2
                 and st["first_candle_ok"]
@@ -2813,6 +2899,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 and not st.get("o_only")
                 and not st.get("b_only")
                 and not st.get("e_only")
+                and not st.get("ge_only")
             ):
                 second_green = c_close > c_open
                 second_new_high = c_high > st["first_candle_high"]
@@ -2905,6 +2992,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             eligible = True
                         if st["l_eligible"]:
                             eligible = True
+                        if st["ge_eligible"]:
+                            eligible = True
                         if not eligible:
                             st["done"] = True
 
@@ -2988,6 +3077,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     or st["i_eligible"]
                     or st["j_eligible"]
                     or st["n_eligible"]
+                    or st["ge_eligible"]
                     or st.get("o_only")
                     or st.get("b_only")
                     or st.get("e_only")
@@ -3041,6 +3131,9 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 n_timed_out = (
                     not st["n_eligible"] or st["candle_count"] > N_MAX_ENTRY_CANDLE
                 )
+                ge_timed_out = (
+                    not st["ge_eligible"] or st["candle_count"] > GE_MAX_ENTRY_CANDLE
+                )
                 if (
                     d_timed_out
                     and v_timed_out
@@ -3057,6 +3150,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     and i_timed_out
                     and j_timed_out
                     and n_timed_out
+                    and ge_timed_out
                 ):
                     st["done"] = True
                     continue
@@ -3721,6 +3815,52 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if pullback_pct >= N_PULLBACK_FROM_HOD_PCT:
                             st["n_pullback_seen"] = True
 
+                # --- GE: G-Exit re-entry detection ---
+                # Re-enter G-bought tickers after G exits, on the validated
+                # "shakeout-but-held" trigger: in the post-exit window, price
+                # pulled back <= GE_MAX_PULLBACK_PCT from G's exit and closes
+                # back within GE_RECLAIM_PCT. Captures the second leg G's 1%
+                # trail leaves behind (median +17-28% run, 98% positive OOS).
+                if (
+                    st.get("ge_only")
+                    and st["ge_eligible"]
+                    and not st["signal"]
+                    and not st["done"]
+                    and st["entry_price"] is None
+                ):
+                    if st["ticker"] in g_bought_tickers:
+                        st["ge_armed"] = True
+                    if st.get("ge_armed") and st["ticker"] in g_exit_prices:
+                        _ge_ref = g_exit_prices[st["ticker"]]
+                        _ge_exit_ts = g_exit_times.get(st["ticker"])
+                        # Only act within the post-exit window
+                        if _ge_exit_ts is None or (
+                            ts >= _ge_exit_ts
+                            and ts <= _ge_exit_ts + pd.Timedelta(minutes=GE_WINDOW_MINUTES)
+                        ):
+                            # Mark that we've traded back up near G's exit
+                            if c_close >= _ge_ref * (1 - GE_RECLAIM_PCT / 100):
+                                st["ge_was_above_exit"] = True
+                            # Track depth below G's exit
+                            if c_close < _ge_ref:
+                                _dip = (_ge_ref - c_close) / _ge_ref * 100
+                                if _dip <= GE_MAX_PULLBACK_PCT:
+                                    st["ge_below_count"] += 1
+                                if st["ge_below_count"] >= GE_MIN_BELOW_BARS:
+                                    st["ge_pullback_seen"] = True
+                            else:
+                                # Close at/above exit: trigger on reclaim after the dip
+                                if (
+                                    st["ge_pullback_seen"]
+                                    and st["ge_was_above_exit"]
+                                    and c_close >= _ge_ref * (1 - GE_RECLAIM_PCT / 100)
+                                ):
+                                    st["strategy"] = "GE"
+                                    st["signal"] = True
+                                    st["signal_price"] = c_close
+                                    entry_candidates.append(st)
+                                st["ge_below_count"] = 0
+
                 # --- L: Low Float Squeeze detection ---
                 # Always track HOD for L-eligible stocks
                 if (
@@ -4102,6 +4242,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             st["shares"] = trade_size / entry_price
             cash_box[0] -= trade_size
             filled_this_ts.append(st["strategy"])
+
+            # Record G-bought tickers for the GE re-entry strategy.
+            if st["strategy"] == "G":
+                g_bought_tickers.add(st["ticker"])
 
             # Track trade sequence and snapshot per-trade params (G1/G2/L1/L2 split)
             _strat = st["strategy"]
