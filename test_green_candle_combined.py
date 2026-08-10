@@ -1584,7 +1584,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 # State — GE (G-Exit re-entry): re-enter G-bought tickers after
                 # G exits, on the "shakeout-but-held" trigger. Armed per-day via
                 # g_bought_tickers; GE detection handles the rest.
-                "ge_eligible": True,  # GE runs on any pick; detection gates on G-bought
+                "ge_eligible": (pick["gap_pct"] >= GE_MIN_GAP_PCT),  # GE gated by gap (DISABLED_GAP when off) on G-bought
                 "ge_armed": False,    # set True when this ticker was G-bought today
                 "ge_was_above_exit": False,   # saw close >= G's exit price
                 "ge_below_count": 0,          # consecutive closes below G exit
