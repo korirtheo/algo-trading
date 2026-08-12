@@ -1,16 +1,26 @@
 {
-  "deploy_name": "G2 #106 (1x cash) + L #312 (px25>5 strength filter)",
-  "deploy_notes": "FINAL DEPLOYED STACK (2026-08-12). G2 = trial #106 (gl_1min_v5_g2_2x) at 1x CASH (no margin) because low-priced tickers are rejected on 2x sizing (PLAG/FRTT 2026-08-11). 1x OOS 2026: 48 trades 100% WR +; combined with L = .72M. L = trial #312 (gl_1min_l_standalone_v1) gated px25>5 (up >5% from open at minute 25/09:55). 82 trades 84% WR + OOS. Wide-forward 2026: 40/40 trials profitable. L fires 09:32+, G2 09:31 \u2014 no day gating needed. ALPACA PRICE-TIER SIZING (REMINDER / TODO, verified live 2026-08-12): under .50 = cash-only (100%); .50-6.00 = ~2x cash (CHMI .33 .6k, XHLD .04 .2k both placed on ,258 cash); above .00 = full margin BP (~4x, ABCL .52 .9k placed). Effective leverage cutoff ~.50-3.00; the .59 IPHA rejection was a boundary effect, not the tier. TODO: deploy price-tier-aware sizing (sim logic already coded behind PRICE_TIER_SIZING env; run base MARGIN=2.0 and let tier caps down-size sub-.50 names). Verified 2026 OOS with price-tier + 2x base = .09M vs .72M at flat 1x, with multi-window volume caps still binding (206 vol-capped vs 141 tier-capped). Not yet deployed \u2014 revisit when ready.",
+  "deploy_name": "G2 #106 (1x cash) + L #312 (px25>=12 + pmvol<=35M + price>=6 winner filter)",
+  "deploy_notes": "FINAL DEPLOYED STACK (2026-08-12). G2 = trial #106 (gl_1min_v5_g2_2x) at 1x CASH (no margin) because low-priced tickers are rejected on 2x sizing (PLAG/FRTT 2026-08-11). 1x OOS 2026: 48 trades 100% WR +; combined with L = .72M. L = trial #312 (gl_1min_l_standalone_v1). 2026-08-12 UPDATE (FINAL L FILTER, VALIDATED, NOT YET DEPLOYED): winner-vs-loser analysis over 801 L trades found px25 (25-min return at entry) and a pmvol CEILING (crowded premarket names lose) separate winners from losers; a price-tier breakdown then showed L loses money on ALL sub-$6 names over 2020-26 (T1 <$2.50 -$278k, T2 $2.5-6 -$142k) and its entire edge is >=$6 (T3). VALIDATED L FILTER = trailing-25-min return >= 12% AND premarket volume <= 35M shares AND price >= $6.00. 100-day OOS 2026 (Mar-Aug): L 24 trades, 83% WR, +$373k; G 50 @ 100% +$823k; combined +$1.20M. 2020-26 (7yr): L 114 trades, 68% WR, +$2.14M, avg_ret +1.75%; G 584 @ 93% +$10.98M; total +$13.12M. L's per-trade edge is thin full-period (+0.11% unfiltered) - the >=$6 filter fixes that (+1.75%). NOTE: this filter is RECORDED FOR DEPLOYMENT but the live bot is currently G-ONLY (see trial_gl_1min_g2_1x_G_only_deploy.json) until it ships. The earlier px25>5 filter was only config metadata - never implemented - so the live bot ran L UNFILTERED. ALPACA PRICE-TIER SIZING (REMINDER / TODO): under .50 = cash-only (100%); .50-6.00 = ~2x; above .00 = full margin BP (~4x). TODO: deploy price-tier-aware sizing. Not yet deployed - revisit when ready.",
   "g_trial": 106,
   "g_study": "gl_1min_v5_g2_2x",
   "l_trial": 312,
   "l_study": "gl_1min_l_standalone_v1",
-  "l_filter": "px25>5",
+  "l_filter": "px25>=12,pmvol<=35M,price>=6",
+  "l_filter_px25_min": 12.0,
+  "l_filter_pmvol_max": 35000000.0,
+  "l_filter_price_min": 6.0,
   "l_filter_window_min": 25,
   "l_filter_threshold_pct": 5.0,
   "g_first_bar_only": true,
   "margin_multiplier": 1.0,
   "max_position_pct_of_cash": 100.0,
+  "test_records_2026_08_12": {
+    "leverage_rule": "tiered 4x base (MARGIN=4, MAX_POS=400, PRICE_TIER_SIZING=1) with LEVERAGE_MIN_EQUITY=2000: <$2.50 = 1x, $2.50-6.00 = 2x ONLY, >=$6.00 = 4x; no leverage below $2k equity (the $2.50-6.00 tier is hard-capped at 2x, never 4x).",
+    "t1k_flat1x_100day": {"start": 1000, "end": 49987, "total_pnl": 48987, "trades": 52, "g": {"n": 37, "wr": 100, "pnl": 35905}, "l": {"n": 15, "wr": 87, "pnl": 13082}},
+    "t1k_tiered4x_2kgate_100day": {"start": 1000, "end": 1654714, "total_pnl": 1653714, "trades": 70, "g": {"n": 48, "wr": 100, "pnl": 1108969}, "l": {"n": 22, "wr": 77, "pnl": 544745}},
+    "t1k_tiered4x_2kgate_2024_now": {"start": 1000, "end": 5986466, "total_pnl": 5985466, "trades": 364, "g": {"n": 300, "wr": 95, "pnl": 4328742}, "l": {"n": 64, "wr": 70, "pnl": 1656724}},
+    "note": "Modeled-margin compounding test records only. NOT deployed. Live bot remains G-only (trial_gl_1min_g2_1x_G_only_deploy.json)."
+  },
   "oos_2026_summary": {
     "g2_standalone_1x": {
       "trades": 48,
@@ -20,6 +30,35 @@
     "l_px25_5_wideforward_top40": {
       "profitable": "40/40 = 100%",
       "median_pnl": 37495
+    },
+    "l_winner_filter_100day": {
+      "trades": 59,
+      "wr_pct": 76.0,
+      "pnl": 306643
+    },
+    "l_ge6_filter_100day": {
+      "trades": 24,
+      "wr_pct": 83.0,
+      "pnl": 373196,
+      "g_trades": 50,
+      "g_wr_pct": 100.0,
+      "g_pnl": 822704,
+      "total_pnl": 1195900
+    },
+    "l_ge6_filter_2020_2026": {
+      "l_trades": 114,
+      "l_wr_pct": 68.0,
+      "l_pnl": 2140405,
+      "l_avg_ret_pct": 1.75,
+      "g_trades": 584,
+      "g_wr_pct": 93.0,
+      "g_pnl": 10978472,
+      "total_pnl": 13118877
+    },
+    "combined_g_l_100day": {
+      "total_pnl": 1196323,
+      "g_trades": 50,
+      "l_trades": 59
     }
   },
   "params": {
