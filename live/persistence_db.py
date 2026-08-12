@@ -188,6 +188,21 @@ class TradingDatabase:
                 "CREATE INDEX IF NOT EXISTS idx_order_events_ticker ON order_events(ticker, date)"
             )
 
+            # Slippage-calibration columns (added 2026-08-12). Added via ALTER
+            # TABLE so existing DBs migrate in place; fresh DBs get them via the
+            # CREATE above plus this no-op guard.
+            _oe_cols = {r["name"] for r in conn.execute("PRAGMA table_info(order_events)")}
+            for _col, _dtype in (
+                ("veff_adj", "REAL"),
+                ("participation_eff", "REAL"),
+                ("modeled_slip_bp", "REAL"),
+                ("pm_gate", "REAL"),
+                ("pm_volume", "REAL"),
+                ("bar_range_pct", "REAL"),
+            ):
+                if _col not in _oe_cols:
+                    conn.execute(f"ALTER TABLE order_events ADD COLUMN {_col} {_dtype}")
+
             # Account snapshots table - equity curve
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS account_snapshots (
@@ -784,12 +799,21 @@ class TradingDatabase:
         slip_bp=None,
         cum_dollar_vol=None,
         timestamp=None,
+        veff_adj=None,
+        participation_eff=None,
+        modeled_slip_bp=None,
+        pm_gate=None,
+        pm_volume=None,
+        bar_range_pct=None,
     ):
         """Log an order lifecycle event.
 
         Args:
             event_type: 'placed', 'partial_fill', 'fill', 'canceled', 'rejected', 'expired'
             slip_bp: Slippage in basis points (positive = paid more, negative = got better)
+            veff_adj / participation_eff / modeled_slip_bp / pm_gate /
+            pm_volume / bar_range_pct: slippage-calibration context (see
+            executor._reconcile_fill_async). Optional — never affects trading.
         """
         today = datetime.now(ET).date().isoformat()
         if timestamp is None:
@@ -806,8 +830,10 @@ class TradingDatabase:
                 """
                 INSERT INTO order_events (date, timestamp, order_id, ticker, strategy, side,
                                         event_type, signal_price, fill_price, qty, filled_qty,
-                                        status, slip_bp, cum_dollar_vol)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        status, slip_bp, cum_dollar_vol,
+                                        veff_adj, participation_eff, modeled_slip_bp,
+                                        pm_gate, pm_volume, bar_range_pct)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
                 (
                     today,
@@ -824,6 +850,12 @@ class TradingDatabase:
                     status,
                     slip_bp,
                     cum_dollar_vol,
+                    veff_adj,
+                    participation_eff,
+                    modeled_slip_bp,
+                    pm_gate,
+                    pm_volume,
+                    bar_range_pct,
                 ),
             )
 

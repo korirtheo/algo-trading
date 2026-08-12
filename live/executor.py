@@ -78,6 +78,8 @@ _FILL_LOG_FIELDS = [
     "ts_signal", "ts_fill", "ticker", "side", "strategy",
     "signal_price", "fill_price", "slip_bp",
     "qty", "dollar_amount", "cum_dollar_vol", "participation_rate",
+    "veff_adj", "participation_eff", "modeled_slip_bp",
+    "pm_gate", "pm_volume", "bar_range_pct",
     "order_id", "status",
 ]
 _FILL_LOG_LOCK = threading.Lock()
@@ -93,6 +95,25 @@ def _ensure_fill_log_header():
         csv.DictWriter(f, fieldnames=_FILL_LOG_FIELDS).writeheader()
 
 
+def _modeled_slip_bp(price, dollar_amount, veff_adj):
+    """Model's expected one-leg slippage in basis points for this order.
+
+    Mirrors the backtest's compute_slippage_pct(price, pos_dollars, dvol)
+    with the multi-window V_eff_adj as the impact denominator — the same
+    participation that drives the position cap. Returns None when the
+    denominator is unavailable so the row stays cleanly blank.
+    """
+    try:
+        if not price or price <= 0 or not dollar_amount or dollar_amount <= 0:
+            return None
+        if not veff_adj or veff_adj <= 0:
+            return None
+        slip_pct = tgc.compute_slippage_pct(price, dollar_amount, veff_adj)
+        return slip_pct * 100.0
+    except Exception:
+        return None
+
+
 class OrderExecutor:
     def __init__(self):
         self.client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
@@ -104,12 +125,26 @@ class OrderExecutor:
 
     def _reconcile_fill_async(self, order_id, ticker, side, signal_price,
                               cum_dollar_vol, strategy, ts_signal,
+                              veff_adj=None, pm_gate=None, pm_volume=None,
+                              bar_range_pct=None,
                               poll_interval=1.0, timeout_secs=30.0):
         """Background poll for the order's terminal status, then append one
         row to fills_calibration.csv with the realized slippage. This is the
         Stage-1 calibration instrumentation — it never changes live behavior,
         only collects data for the offline regression that will later fit
         SLIP_BASE_SPREAD / SLIP_PRICE_COEFF / SLIP_IMPACT_K to actual fills.
+
+        Calibration columns (added 2026-08-12, clean-calibration restart):
+          veff_adj          — multi-window V_eff_adj at signal time (the model's
+                              impact denominator; participation must be measured
+                              against THIS, not cumulative day $vol)
+          participation_eff — dollar_amount / veff_adj (the model x-variable)
+          modeled_slip_bp   — spread + K*sqrt(participation_eff) at the model's
+                              current constants (per-fill realized-vs-modeled)
+          pm_gate / pm_volume — PM-credit trust gate + premarket shares, so
+                              trades with active PM credit can be validated
+          bar_range_pct     — regime-window range % at signal time, for testing
+                              the vol_factor haircut curve
         """
         def _worker():
             deadline = time.time() + timeout_secs
@@ -147,10 +182,15 @@ class OrderExecutor:
 
             dollar_amount = None
             participation = None
+            participation_eff = None
             if fill_price is not None and filled_qty is not None:
                 dollar_amount = fill_price * filled_qty
                 if cum_dollar_vol and cum_dollar_vol > 0:
                     participation = dollar_amount / cum_dollar_vol
+                if veff_adj and veff_adj > 0:
+                    participation_eff = dollar_amount / veff_adj
+
+            modeled = _modeled_slip_bp(fill_price, dollar_amount, veff_adj)
 
             row = {
                 "ts_signal": ts_signal,
@@ -165,6 +205,12 @@ class OrderExecutor:
                 "dollar_amount": f"{dollar_amount:.2f}" if dollar_amount is not None else "",
                 "cum_dollar_vol": f"{cum_dollar_vol:.0f}" if cum_dollar_vol else "",
                 "participation_rate": f"{participation:.6f}" if participation is not None else "",
+                "veff_adj": f"{veff_adj:.0f}" if veff_adj else "",
+                "participation_eff": f"{participation_eff:.6f}" if participation_eff is not None else "",
+                "modeled_slip_bp": f"{modeled:.2f}" if modeled is not None else "",
+                "pm_gate": f"{pm_gate:.4f}" if pm_gate is not None else "",
+                "pm_volume": f"{pm_volume:.0f}" if pm_volume else "",
+                "bar_range_pct": f"{bar_range_pct:.3f}" if bar_range_pct is not None else "",
                 "order_id": str(order_id),
                 "status": status,
             }
@@ -186,7 +232,13 @@ class OrderExecutor:
                     filled_qty=filled_qty,
                     slip_bp=slip_bp,
                     status=status,
-                    cum_dollar_vol=cum_dollar_vol
+                    cum_dollar_vol=cum_dollar_vol,
+                    veff_adj=veff_adj,
+                    participation_eff=participation_eff,
+                    modeled_slip_bp=modeled,
+                    pm_gate=pm_gate,
+                    pm_volume=pm_volume,
+                    bar_range_pct=bar_range_pct,
                 )
             except Exception as e:
                 log.error(f"Failed to log order event to DB: {e}")
@@ -263,7 +315,8 @@ class OrderExecutor:
 
     def buy(self, ticker, dollar_amount, current_price,
             cumulative_dollar_volume=0, strategy=None,
-            bracket_stop_pct=None, bracket_target_pct=None):
+            bracket_stop_pct=None, bracket_target_pct=None,
+            veff_adj=None, pm_gate=None, pm_volume=None, bar_range_pct=None):
         """Place a market buy order.
 
         Args:
@@ -275,6 +328,9 @@ class OrderExecutor:
                 turnover.  Pre-this-fix the executor multiplied a share-count
                 by `current_price`, which understated $-volume because not
                 every bar trades at the latest price.
+            veff_adj / pm_gate / pm_volume / bar_range_pct: slippage
+                calibration context (see _reconcile_fill_async). Optional —
+                never affects order placement.
 
         Returns:
             order object or None if rejected
@@ -475,7 +531,11 @@ class OrderExecutor:
                     event_type='placed',
                     signal_price=current_price,
                     qty=shares,
-                    cum_dollar_vol=cumulative_dollar_volume
+                    cum_dollar_vol=cumulative_dollar_volume,
+                    veff_adj=veff_adj,
+                    pm_gate=pm_gate,
+                    pm_volume=pm_volume,
+                    bar_range_pct=bar_range_pct,
                 )
             except Exception as e:
                 log.error(f"Failed to log order placed event: {e}")
@@ -488,6 +548,8 @@ class OrderExecutor:
                 signal_price=current_price,
                 cum_dollar_vol=cumulative_dollar_volume,
                 strategy=strategy, ts_signal=ts_signal,
+                veff_adj=veff_adj, pm_gate=pm_gate, pm_volume=pm_volume,
+                bar_range_pct=bar_range_pct,
             )
             return order
         except Exception as e:
@@ -541,7 +603,8 @@ class OrderExecutor:
             return 0
 
     def sell(self, ticker, shares=None, reason="MANUAL",
-             signal_price=None, cumulative_dollar_volume=0, strategy=None):
+             signal_price=None, cumulative_dollar_volume=0, strategy=None,
+             veff_adj=None, bar_range_pct=None):
         """Sell a position (full or partial).
 
         Args:
@@ -551,6 +614,8 @@ class OrderExecutor:
             signal_price: the price the strategy *expected* to sell at; used
                 for slippage calibration (see _reconcile_fill_async).
             cumulative_dollar_volume / strategy: calibration context.
+            veff_adj / bar_range_pct: slippage calibration context for the
+                exit leg (see _reconcile_fill_async). Optional.
         """
         ts_signal = datetime.now(ET).isoformat()
 
@@ -632,7 +697,9 @@ class OrderExecutor:
                     event_type='placed',
                     signal_price=signal_price,
                     qty=shares,
-                    cum_dollar_vol=cumulative_dollar_volume
+                    cum_dollar_vol=cumulative_dollar_volume,
+                    veff_adj=veff_adj,
+                    bar_range_pct=bar_range_pct,
                 )
             except Exception as ex:
                 log.error(f"Failed to log sell order placed event: {ex}")
@@ -645,6 +712,8 @@ class OrderExecutor:
                     signal_price=signal_price,
                     cum_dollar_vol=cumulative_dollar_volume,
                     strategy=strategy or reason, ts_signal=ts_signal,
+                    veff_adj=veff_adj,
+                    bar_range_pct=bar_range_pct,
                 )
 
             if ticker in self.positions:

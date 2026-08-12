@@ -865,12 +865,21 @@ class CombinedEngine:
                     cum_dollar,
                 )
 
+                veff_adj, pm_gate, pm_vol, brange = self._calibration_ctx(
+                    ticker, entry_price, ts, st.get("mh"),
+                    st.get("pm_volume"), tgc._pm_conviction_gate(st),
+                )
+
                 order = self.executor.buy(
                     ticker,
                     trade_size,
                     entry_price,
                     cumulative_dollar_volume=cum_dollar,
                     strategy=strategy,
+                    veff_adj=veff_adj,
+                    pm_gate=pm_gate,
+                    pm_volume=pm_vol,
+                    bar_range_pct=brange,
                 )
                 if order:
                     # Log signal as TAKEN
@@ -962,12 +971,17 @@ class CombinedEngine:
                     pnl = st.get("pnl", 0)
 
                     entry_info = self.position_entry.get(ticker, {})
+                    veff_adj, _, _, brange = self._calibration_ctx(
+                        ticker, exit_price, ts, st.get("mh")
+                    )
                     order = self.executor.sell(
                         ticker,
                         reason=exit_reason,
                         signal_price=exit_price,
                         cumulative_dollar_volume=self._cum_dollar_vol(ticker),
                         strategy=entry_info.get("strategy", "?"),
+                        veff_adj=veff_adj,
+                        bar_range_pct=brange,
                     )
                     if order:
                         # 2026-06-23: stream-based sell tracking — don't clear
@@ -1059,12 +1073,18 @@ class CombinedEngine:
                                 sim_frac_sold * 100,
                                 actual_shares,
                             )
+                            _partial_signal_price = st.get("partial_price") or st.get("close")
+                            veff_adj, _, _, brange = self._calibration_ctx(
+                                ticker, _partial_signal_price, ts, st.get("mh")
+                            )
                             sell_order = self.executor.sell(
                                 ticker,
                                 shares=sell_qty,
                                 reason="PARTIAL",
-                                signal_price=st.get("partial_price") or st.get("close"),
+                                signal_price=_partial_signal_price,
                                 strategy=pinfo.get("strategy", "?"),
+                                veff_adj=veff_adj,
+                                bar_range_pct=brange,
                             )
                             # FIX 2026-07-24: register with fill stream instead of
                             # inline poll with unsafe fallback. The fill callback
@@ -1303,12 +1323,17 @@ class CombinedEngine:
     def _fire_independent_exit(self, ticker, exit_price, exit_reason, entry_info, ts):
         """Place a sell from the independent exit fallback."""
         try:
+            veff_adj, _, _, brange = self._calibration_ctx(
+                ticker, exit_price, ts, self._ticker_mh(ticker)
+            )
             order = self.executor.sell(
                 ticker,
                 reason=exit_reason,
                 signal_price=exit_price,
                 cumulative_dollar_volume=self._cum_dollar_vol(ticker),
                 strategy=entry_info.get("strategy", "?"),
+                veff_adj=veff_adj,
+                bar_range_pct=brange,
             )
         except Exception as e:
             log.error(
@@ -1494,12 +1519,17 @@ class CombinedEngine:
                 entry_price,
                 exit_price,
             )
+            veff_adj, _, _, brange = self._calibration_ctx(
+                ticker, exit_price, bar["timestamp"], self._ticker_mh(ticker)
+            )
             order = self.executor.sell(
                 ticker,
                 reason=exit_reason,
                 signal_price=exit_price,
                 cumulative_dollar_volume=self._cum_dollar_vol(ticker),
                 strategy="V3",
+                veff_adj=veff_adj,
+                bar_range_pct=brange,
             )
             if order:
                 with self._pending_lock:
@@ -1607,6 +1637,8 @@ class CombinedEngine:
             v3_stop = self.v3_params.get("stop_pct", 30.0)
             v3_target = self.v3_params.get("target_pct", 57.0)
 
+            veff_adj, _, _, brange = self._calibration_ctx(ticker, fp, ets, mh)
+
             order = self.executor.buy(
                 ticker,
                 trade_size,
@@ -1615,6 +1647,8 @@ class CombinedEngine:
                 strategy="V3",
                 bracket_stop_pct=v3_stop,
                 bracket_target_pct=v3_target,
+                veff_adj=veff_adj,
+                bar_range_pct=brange,
             )
             if order:
                 # Track aggregate allocation and recompute remaining budget
@@ -1712,12 +1746,17 @@ class CombinedEngine:
                 state["halt_reason"],
                 cum_dollar,
             )
+            veff_adj, _, _, brange = self._calibration_ctx(
+                symbol, entry_price, ts, self._ticker_mh(symbol)
+            )
             order = self.executor.buy(
                 symbol,
                 cash,
                 entry_price,
                 cumulative_dollar_volume=cum_dollar,
                 strategy="HALT",
+                veff_adj=veff_adj,
+                bar_range_pct=brange,
             )
             if order is None:
                 log.warning("HALT BUY REJECTED %s (vol_cap or executor error)", symbol)
@@ -1783,12 +1822,17 @@ class CombinedEngine:
             log.info(
                 "HALT-PARTIAL %s: %.2f shares @ $%.3f", symbol, sell_shares, exit_price
             )
+            veff_adj, _, _, brange = self._calibration_ctx(
+                symbol, exit_price, ts, self._ticker_mh(symbol)
+            )
             self.executor.sell(
                 symbol,
                 shares=sell_shares,
                 reason="HALT_PARTIAL",
                 signal_price=exit_price,
                 strategy="HALT",
+                veff_adj=veff_adj,
+                bar_range_pct=brange,
             )
             state["shares"] = max(0.0, state["shares"] - sell_shares)
             state["partial_proceeds"] = sell_shares * exit_price
@@ -1796,8 +1840,12 @@ class CombinedEngine:
 
         # Full exit
         log.info("HALT-EXIT %s (%s): @ $%.3f", symbol, reason, exit_price)
+        veff_adj, _, _, brange = self._calibration_ctx(
+            symbol, exit_price, ts, self._ticker_mh(symbol)
+        )
         order = self.executor.sell(
-            symbol, reason=f"HALT_{reason}", signal_price=exit_price, strategy="HALT"
+            symbol, reason=f"HALT_{reason}", signal_price=exit_price, strategy="HALT",
+            veff_adj=veff_adj, bar_range_pct=brange,
         )
         if order is not None or True:  # always finalize state even if executor was noop
             entry = state["entry_price"] or 0.0
@@ -2322,6 +2370,65 @@ class CombinedEngine:
                 actual_avg,
                 format(actual_cost, ",.0f"),
             )
+
+    def _ticker_mh(self, ticker):
+        """Market-hour candles for a ticker as a timestamp-indexed DataFrame.
+
+        Built from the engine's incremental bar cache (self.bar_data). Used by
+        the calibration context in fallback paths (independent exit, V3, HALT)
+        where the sim state dict isn't in scope. Returns None if no bars yet.
+        """
+        bars = self.bar_data.get(ticker, [])
+        if not bars:
+            return None
+        try:
+            df = pd.DataFrame(bars)
+            if "timestamp" not in df.columns:
+                return None
+            df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+            df = df.set_index("timestamp").sort_index()
+            return df
+        except Exception as e:
+            log.debug(f"_ticker_mh({ticker}) failed: {e}")
+            return None
+
+    def _calibration_ctx(self, ticker, signal_price, ts, mh=None,
+                         pm_volume=None, pm_gate=0.0):
+        """Multi-window liquidity context for the slippage-calibration log.
+
+        Returns (veff_adj, pm_gate, pm_volume, bar_range_pct):
+          veff_adj      — the volatility-adjusted effective volume at signal
+                          time (the model's impact denominator)
+          pm_gate       — PM-credit trust gate (0..1) at signal time
+          pm_volume     — premarket volume (shares)
+          bar_range_pct — regime-window high-low as % of price, for testing
+                          the vol_factor haircut curve
+
+        Best-effort: returns (None, None, None, None) when the data needed
+        isn't available yet (early bars, no state mh) so the calibration row
+        stays blank instead of corrupting the fit.
+        """
+        veff_adj = None
+        bar_range_pct = None
+        try:
+            if mh is None or len(mh) == 0 or signal_price is None or signal_price <= 0:
+                return (None, pm_gate, pm_volume, None)
+            veff_adj, _, _, v_regime = tgc._multi_window_effective_volume(
+                mh, ts, signal_price, pm_volume, pm_gate
+            )
+            if veff_adj and veff_adj > 0:
+                _, _, regime_bars = tgc._liquidity_windows(mh)
+                pre = mh.loc[mh.index <= ts]
+                last_regime = pre.tail(min(len(pre), regime_bars))
+                if len(last_regime) >= 2:
+                    rng_hi = float(last_regime["High"].max())
+                    rng_lo = float(last_regime["Low"].min())
+                    if rng_hi > 0 and rng_lo > 0:
+                        bar_range_pct = (rng_hi - rng_lo) / signal_price * 100.0
+        except Exception as e:
+            log.debug(f"_calibration_ctx({ticker}) failed: {e}")
+            return (None, pm_gate, pm_volume, None)
+        return (veff_adj, pm_gate, pm_volume, bar_range_pct)
 
     def _cum_dollar_vol(self, ticker):
         """Cumulative DOLLAR volume since 9:30 ET today, fetched live from

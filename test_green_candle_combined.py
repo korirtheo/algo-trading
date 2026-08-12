@@ -408,6 +408,44 @@ def _last_2min_dollar_vol(mh, ts, fill_price=None):
     return px * float(last["Volume"].iloc[0])
 
 
+def _detect_bar_interval(mh):
+    """Detect the bar interval (minutes) for `mh`, defensively.
+
+    Uses strategies.bars.detect_bar_size_minutes. The live process can have a
+    sys.path where the `strategies` package resolves but the submodule doesn't
+    (observed 2026-08-12: "No module named 'strategies.bars' from live"), so on
+    import failure we load strategies/bars.py by absolute path from THIS
+    module's directory (the repo root). Returns 0 when it genuinely can't.
+    """
+    try:
+        from strategies.bars import detect_bar_size_minutes
+
+        return detect_bar_size_minutes(mh) or 0
+    except Exception:
+        pass
+    try:
+        import importlib.util
+        import os as _os
+        import sys as _sys
+
+        _root = _os.path.dirname(_os.path.abspath(__file__))
+        _bars_path = _os.path.join(_root, "strategies", "bars.py")
+        if not _os.path.exists(_bars_path):
+            return 0
+        _mod = _sys.modules.get("strategies.bars")
+        if _mod is None:
+            _spec = importlib.util.spec_from_file_location("strategies.bars", _bars_path)
+            _mod = importlib.util.module_from_spec(_spec)
+            _sys.modules["strategies.bars"] = _mod
+            _spec.loader.exec_module(_mod)
+        _fn = getattr(_mod, "detect_bar_size_minutes", None)
+        if _fn is None:
+            return 0
+        return _fn(mh) or 0
+    except Exception:
+        return 0
+
+
 def _liquidity_windows(mh):
     """Return (v2min_bars, local_bars, regime_bars) sized for FIXED TIME spans.
 
@@ -420,9 +458,7 @@ def _liquidity_windows(mh):
     half the liquidity (halved position caps + inflated slippage) and bleed
     PnL for no reason.
     """
-    from strategies.bars import detect_bar_size_minutes
-
-    interval = detect_bar_size_minutes(mh) or WINDOW_REF_BAR_MINUTES
+    interval = _detect_bar_interval(mh)
     if interval <= 0:
         interval = WINDOW_REF_BAR_MINUTES
     scale = WINDOW_REF_BAR_MINUTES / float(interval)
@@ -641,6 +677,12 @@ G_TRAIL_ATR_MULT = 0.0
 # only — production runs keep this False. Env override G_FIRST_BAR_ONLY=1 lets
 # a launcher switch it for a study without code changes.
 G_FIRST_BAR_ONLY = os.environ.get("G_FIRST_BAR_ONLY", "") == "1"
+# PRICE_TIER_SIZING (2026-08-12): when 1, size each position by Alpaca's
+# price-tier margin rules (<$2.50 cash-only, $2.50-6.00 2x, >$6.00 full).
+# PRICE_TIER_FULL_MULT = the intraday buying-power multiplier for >$6 names
+# (Alpaca 4x intraday on this account). Default off = unchanged behavior.
+PRICE_TIER_SIZING = os.environ.get("PRICE_TIER_SIZING", "") == "1"
+PRICE_TIER_FULL_MULT = float(os.environ.get("PRICE_TIER_FULL_MULT", "4.0"))
 # A (Quick Scalp)
 A_MIN_BODY_PCT = 4.0
 A_MAX_BODY_PCT = 999
@@ -4205,6 +4247,28 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             # the rest of the book or incur catastrophic slippage on thin names.
             if st.get("strategy") == "WOR":
                 trade_size *= WOR_POSITION_PCT / 100.0
+
+            # PRICE-TIER SIZING (2026-08-12, opt-in via env PRICE_TIER_SIZING=1).
+            # Alpaca validates buys against the price tier at order time:
+            #   < $2.50   -> cash only (100% of cash)
+            #   $2.50-6.00 -> ~2x cash
+            #   > $6.00   -> full margin buying power (~4x intraday)
+            # When enabled, we recompute the effective position % of cash from
+            # the entry price so sizing mirrors what Alpaca will accept.
+            if PRICE_TIER_SIZING and st.get("signal_price") and st["signal_price"] > 0:
+                _tier_px = float(st["signal_price"])
+                if _tier_px < 2.50:
+                    _tier_pct = 100.0
+                elif _tier_px < 6.00:
+                    _tier_pct = 200.0
+                else:
+                    _tier_pct = PRICE_TIER_FULL_MULT * 100.0
+                _tier_cap = cash_box[0] * (_tier_pct / 100.0)
+                if trade_size > _tier_cap:
+                    trade_size = _tier_cap
+                    st["price_tier_capped"] = True
+                    st["price_tier_pct"] = _tier_pct
+
             alpha_size = trade_size  # pre-cap alpha target (DIAG_VOLCAPS)
             # G conviction sizing (G2 experiment): scale size by combined bar
             # strength (candle-1 body + candle-2 body + volume surge), capped
