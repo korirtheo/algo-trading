@@ -1,6 +1,6 @@
 {
   "deploy_name": "G2 #106 (1x cash) G-ONLY - L disabled for analysis (2026-08-12)",
-  "deploy_notes": "G-ONLY DEPLOY (2026-08-12). L (#312) DISABLED while winner/loser filter analysis continues locally. G2 = trial #106 (gl_1min_v5_g2_2x) at 1x CASH, first-bar-only, cap1 (5% cum) bound. 2024-26 G-only 1x OOS: 306 trades, 95% WR, +.27M; 100-day (Mar-Aug 2026): 50 trades, 100% WR, +. Restore L by switching LIVE_PARAMS_PATH back to trial_gl_1min_g2_1x_l312_px25_deploy.json when the L filter is finalized.",
+  "deploy_notes": "G-ONLY DEPLOY (2026-08-12). L (#312) DISABLED while winner/loser filter analysis continues locally. G2 = trial #106 (gl_1min_v5_g2_2x) at 1x CASH, first-bar-only, cap1 (5% cum) bound. 2024-26 G-only 1x OOS: 306 trades, 95% WR, +.27M; 100-day (Mar-Aug 2026): 50 trades, 100% WR, +. Restore L by switching LIVE_PARAMS_PATH back to trial_gl_1min_g2_1x_l312_px25ge12_pmvol35m_price6_deploy.json when the L filter is finalized.",
   "g_trial": 106,
   "g_study": "gl_1min_v5_g2_2x",
   "l_trial": 312,
