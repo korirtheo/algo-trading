@@ -19,6 +19,7 @@
     "t1k_flat1x_100day": {"start": 1000, "end": 49987, "total_pnl": 48987, "trades": 52, "g": {"n": 37, "wr": 100, "pnl": 35905}, "l": {"n": 15, "wr": 87, "pnl": 13082}},
     "t1k_tiered4x_2kgate_100day": {"start": 1000, "end": 1654714, "total_pnl": 1653714, "trades": 70, "g": {"n": 48, "wr": 100, "pnl": 1108969}, "l": {"n": 22, "wr": 77, "pnl": 544745}},
     "t1k_tiered4x_2kgate_2024_now": {"start": 1000, "end": 5986466, "total_pnl": 5985466, "trades": 364, "g": {"n": 300, "wr": 95, "pnl": 4328742}, "l": {"n": 64, "wr": 70, "pnl": 1656724}},
+    "risk_proportional_leverage_note": "KELLY-CRITERION (2026-08-12, FOR LATER): G WR 94.8% avg_win +8.55% avg_loss -6.68% payoff 1.28 Kelly f*=0.907. L>=6 WR 73.5% avg_win +5.48% avg_loss -6.77% payoff 0.81 Kelly f*=0.409. L/G Kelly ratio = 0.45 -> L leverage should be ~0.45x G's. If G gets 4x on >=$6, L should be capped ~1.8-2x (per-strategy cap L_MAX_POSITION_PCT_OF_CASH ~180%). If G is 2x base, L ~0.9x (cash-only). Not implemented - TODO.",
     "note": "Modeled-margin compounding test records only. NOT deployed. Live bot remains G-only (trial_gl_1min_g2_1x_G_only_deploy.json)."
   },
   "oos_2026_summary": {
