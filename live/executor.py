@@ -311,27 +311,30 @@ class OrderExecutor:
         # MARGINABILITY CHECK (2026-08-12 fix). Alpaca rejects buys on some
         # low-priced / non-marginable tickers with "insufficient buying power"
         # even when we sized at 100% of equity — because the ticker can only be
-        # bought with actual cash, not margin (PLAG/FRTT on 2026-08-11).
-        # If the asset is NOT marginable, cap size at available cash so the
-        # order Alpaca will actually accept.
+        # bought with actual cash, not margin (PLAG/FRTT on 2026-08-11: order
+        # rejected with buying_power=11258.67 = the account's
+        # non_marginable_buying_power, even though the asset endpoint says
+        # marginable=True). Cap size at Alpaca's non_marginable_buying_power
+        # (cash-only purchasing power) so the order is always acceptable.
         try:
-            asset = self.client.get_asset(ticker)
-            marginable = bool(getattr(asset, "marginable", True))
-            if not marginable:
-                acc = self.client.get_account()
-                cash_amt = max(0.0, float(acc.cash))
-                if dollar_amount > cash_amt:
-                    log.warning(
-                        f"NON-MARGINABLE {ticker}: sized from ${dollar_amount:,.0f} to "
-                        f"${cash_amt:,.0f} (cash-only — marginable=False)"
-                    )
-                    dollar_amount = cash_amt
-                if dollar_amount < 50:
-                    log.info(f"Skip {ticker}: non-marginable, cash ${cash_amt:.0f} too small")
-                    return None
+            acc = self.client.get_account()
+            non_margin_bp = getattr(acc, "non_marginable_buying_power", None)
+            if non_margin_bp is None:
+                non_margin_bp = float(acc.cash)
+            else:
+                non_margin_bp = float(non_margin_bp)
+            if non_margin_bp > 0 and dollar_amount > non_margin_bp:
+                log.warning(
+                    f"NON-MARGINABLE CAP {ticker}: sized from ${dollar_amount:,.0f} to "
+                    f"${non_margin_bp:,.0f} (non_marginable_buying_power=${non_margin_bp:,.0f})"
+                )
+                dollar_amount = non_margin_bp
+            if dollar_amount < 50:
+                log.info(f"Skip {ticker}: non-marginable, limit ${non_margin_bp:.0f} too small")
+                return None
         except Exception as e:
-            log.debug(f"Marginability check failed for {ticker} (proceeding): {e}")
-            log_event("api_error", "warning", f"Marginability check failed for {ticker}: {e}")
+            log.debug(f"Non-marginable buying-power check failed for {ticker} (proceeding): {e}")
+            log_event("api_error", "warning", f"Non-marginable BP check failed for {ticker}: {e}")
 
         # Volume cap check.
         # 2026-06-23 FIX: previously this block ignored LIVE_DISABLE_VOL_CAPS,
