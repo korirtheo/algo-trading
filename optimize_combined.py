@@ -67,7 +67,7 @@ GL_TRAIL_DATA_DIRS = [
 GL_TRAIL_DATE_LO = "2024-01-01"
 GL_TRAIL_DATE_HI = "2026-02-28"
 
-ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x","ge"]
+ALL_STRATS = ["h","g","a","f","d","v","p","m","r","w","o","b","k","c","s","e","i","j","n","l","x","ge","wor"]
 STRAT_KEYS = [s.upper() for s in ALL_STRATS]
 
 
@@ -93,6 +93,26 @@ def suggest_all_params(trial):
     """Suggest params for all 20 strategies + enable/disable + priority."""
     params = {}
 
+    # === G2-L retune mode (G_FIXED_FROM_CONFIG) ===
+    # When set, G's params are locked to the referenced deploy config (G2,
+    # first-bar-only), G is always enabled with top priority, and only L is
+    # tuned (L_ONLY_NO_G_DAYS day-level fallback active via worker env).
+    import os as _os_gfixed
+    _gfix_path = _os_gfixed.environ.get("G_FIXED_FROM_CONFIG", "")
+    _gfix = None
+    if _gfix_path:
+        import json as _json
+        try:
+            with open(_gfix_path, encoding="utf-8") as _f:
+                _gfix = _json.load(_f).get("params", {})
+        except Exception:
+            _gfix = None
+    if _gfix is not None:
+        for _k, _v in _gfix.items():
+            if _k.startswith("g_") or _k == "enable_g":
+                params[_k] = _v
+        params["enable_g"] = True
+
     # === H: High Conviction (5 params) ===
     params["h_target_pct"] = trial.suggest_float("h_target_pct", 5.0, 25.0, step=1.0)
     params["h_time_limit_min"] = trial.suggest_int("h_time_limit_min", 3, 30, step=3)
@@ -110,7 +130,10 @@ def suggest_all_params(trial):
     # were never selected OOS, and retry-fills past candle 2 are net-negative.
     import os as _os_g2
     _g_simple = _os_g2.environ.get("G_SIMPLE_ENTRY", "") == "1"
-    if _g_simple:
+    if _gfix is not None:
+        # G locked from deploy config: do not touch any g_* param
+        pass
+    elif _g_simple:
         params["g_min_gap_pct"] = 15.0
         params["g_require_2nd_green"] = True
         params["g_require_2nd_new_high"] = False
@@ -130,18 +153,19 @@ def suggest_all_params(trial):
         # fires (2nd = 2 greens, 3rd = 3 greens, 4th = 4 greens). Hierarchical.
         params["g_require_3rd_green"] = trial.suggest_categorical("g_require_3rd_green", [True, False])
         params["g_require_4th_green"] = trial.suggest_categorical("g_require_4th_green", [True, False])
-    params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
-    params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
-    import os as _os_gs
-    _g_stop_lo = float(_os_gs.environ.get("G_STOP_MIN", "0.0"))
-    params["g_stop_pct"] = trial.suggest_float("g_stop_pct", _g_stop_lo, 12.0, step=2.0)
-    params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
-    params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
-    # G bar-strength gates + conviction sizing (G2 experiment). Suggested only
-    # in G_SIMPLE_ENTRY mode so legacy G-only/L studies keep their exact space.
-    import os as _os_g3
-    if _os_g3.environ.get("G_SIMPLE_ENTRY", "") == "1":
-        params["g_min_1st_body_pct"] = trial.suggest_float("g_min_1st_body_pct", 0.0, 5.0, step=0.5)
+    if _gfix is None:
+        params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
+        params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
+        import os as _os_gs
+        _g_stop_lo = float(_os_gs.environ.get("G_STOP_MIN", "0.0"))
+        params["g_stop_pct"] = trial.suggest_float("g_stop_pct", _g_stop_lo, 12.0, step=2.0)
+        params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
+        params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
+        # G bar-strength gates + conviction sizing (G2 experiment). Suggested only
+        # in G_SIMPLE_ENTRY mode so legacy G-only/L studies keep their exact space.
+        import os as _os_g3
+        if _os_g3.environ.get("G_SIMPLE_ENTRY", "") == "1":
+            params["g_min_1st_body_pct"] = trial.suggest_float("g_min_1st_body_pct", 0.0, 5.0, step=0.5)
         params["g_min_2nd_body_pct"] = trial.suggest_float("g_min_2nd_body_pct", 0.0, 5.0, step=0.5)
         params["g_min_2nd_vol_mult"] = trial.suggest_float("g_min_2nd_vol_mult", 0.0, 3.0, step=0.25)
         params["g_conviction_mult"] = trial.suggest_float("g_conviction_mult", 0.0, 3.0, step=0.5)
@@ -408,6 +432,17 @@ def suggest_all_params(trial):
     params["ge_trail_activate_pct"] = trial.suggest_float("ge_trail_activate_pct", 0.0, 20.0, step=2.0)
     params["ge_time_limit_min"] = trial.suggest_int("ge_time_limit_min", 30, 180, step=15)
 
+    # === WOR: Weak-Open Reclaim (data-mined complement to G) ===
+    # Signal: open below VWAP by >= wor_open_below_vwap%, extend >=
+    # wor_ext_pm_high% above PM high by candle 10; entry at candle 5 close.
+    params["wor_open_below_vwap"] = trial.suggest_float("wor_open_below_vwap", 0.5, 6.0, step=0.5)
+    params["wor_ext_pm_high"] = trial.suggest_float("wor_ext_pm_high", 0.0, 10.0, step=1.0)
+    params["wor_target_pct"] = trial.suggest_float("wor_target_pct", 5.0, 40.0, step=1.0)
+    params["wor_stop_pct"] = trial.suggest_float("wor_stop_pct", 3.0, 15.0, step=1.0)
+    params["wor_trail_pct"] = trial.suggest_float("wor_trail_pct", 0.5, 4.0, step=0.5)
+    params["wor_trail_activate_pct"] = trial.suggest_float("wor_trail_activate_pct", 0.0, 6.0, step=1.0)
+    params["wor_time_limit_min"] = trial.suggest_int("wor_time_limit_min", 10, 120, step=10)
+
     # === L: Low Float Squeeze (19 params) ===
     # l_min_gap range widened from 15-50 to 15-80 (2026-06-20) so TPE can explore
     # the "edge concentrates in 50%+ gaps" hypothesis on the squeeze pattern too.
@@ -460,6 +495,9 @@ def suggest_all_params(trial):
         _allowed = set(ALL_STRATS)
 
     for s in ALL_STRATS:
+        if _gfix is not None and s == "g":
+            params["enable_g"] = True
+            continue
         if s in _allowed:
             params[f"enable_{s}"] = trial.suggest_categorical(f"enable_{s}", [True, False])
         else:
@@ -470,6 +508,12 @@ def suggest_all_params(trial):
         trial.set_user_attr(f"enable_{s}", params[f"enable_{s}"])
     trial.set_user_attr("allowed_strats", ",".join(sorted(_allowed)))
 
+    # G2-L retune mode: G always on + always first priority (day-level
+    # fallback means L never shares a day, so G keeps top billing).
+    if _gfix is not None:
+        params["enable_g"] = True
+        params["priority_g"] = 0  # lowest value = highest priority (fires first)
+
     enabled = [params[f"enable_{s}"] for s in ALL_STRATS]
     if not any(enabled):
         raise optuna.TrialPruned()
@@ -477,6 +521,8 @@ def suggest_all_params(trial):
     # === Strategy Priority ===
     # Only sample priority for allowed strategies (locked-OFF get priority 0)
     for s in ALL_STRATS:
+        if _gfix is not None and s == "g":
+            continue  # already locked to 0
         if s in _allowed:
             params[f"priority_{s}"] = trial.suggest_int(f"priority_{s}", 0, 20)
         else:
@@ -643,6 +689,11 @@ def _build_param_snapshot():
         'X_MIN_FIRST_LEG_GAIN_PCT', 'X_FIRST_LEG_WINDOW_BARS',
         'X_ENTRY_REQUIRE_GREEN', 'X_MIN_VOL_VS_AVG', 'X_VOL_AVG_BARS',
         'X_MAX_ENTRY_HHMM',
+        'WOR_MIN_GAP_PCT', 'WOR_OPEN_BELOW_VWAP', 'WOR_EXT_PM_HIGH',
+        'WOR_ENTRY_CANDLE', 'WOR_MAX_ENTRY_CANDLE', 'WOR_POSITION_PCT',
+        'WOR_TARGET_PCT',
+        'WOR_STOP_PCT', 'WOR_TRAIL_PCT', 'WOR_TRAIL_ACTIVATE_PCT',
+        'WOR_TIME_LIMIT_MINUTES',
     )
     return {n: g[n] for n in names}
 

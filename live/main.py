@@ -10,7 +10,7 @@ Schedule:
   9:00 AM ET  - Third scan (more PM volume data)
   9:25 AM ET  - Rescan
   9:27 AM ET  - Final scan, lock watchlist
-  9:30 AM ET  - Market open scan + strategy engine starts
+  9:20 AM ET  - Market open scan + strategy engine starts
   3:45 PM ET  - EOD close all positions
   4:00 PM ET  - Daily summary, dashboard stays alive
 
@@ -337,7 +337,7 @@ def _next_trading_day_prep_time(executor, log):
     Uses Alpaca's get_clock() so weekends and exchange holidays are handled
     automatically. We wake 2.5 hours before next_open, which lands near 7:00 ET
     on regular days (9:30 - 2:30) and gives the scan loop time to do its
-    7:00 / 7:30 / 8:30 / 9:00 / 9:25 / 9:27 / 9:30 sweep.
+    7:00 / 7:30 / 8:30 / 9:00 / 9:20 / 9:25 / 9:27 sweep.
     """
     from datetime import time as dt_time
 
@@ -444,19 +444,19 @@ def _run_one_day(executor, args, log):
             log.info("  No candidates found")
         return c
 
-    # Scan schedule: 7:00, 7:30, 9:00, 9:25, 9:27, 9:30
+    # Scan schedule: 7:00, 7:30, 9:00, 9:20, 9:25, 9:27
     scan_times = [
         (dt_time(7, 0), "7:00"),
         (dt_time(7, 30), "7:30"),
         (dt_time(8, 30), "8:30"),
         (dt_time(9, 0), "9:00"),
+        (dt_time(9, 20), "9:20"),
         (dt_time(9, 25), "9:25"),
         (dt_time(9, 27), "9:27 FINAL"),
-        (dt_time(9, 30), "9:30"),
     ]
 
     now = datetime.now(ET)
-    if now >= datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
+    if now >= datetime.combine(now.date(), dt_time(9, 20), tzinfo=ET):
         # Restarted during market hours — scan immediately
         candidates = do_scan("RESTART")
     else:
@@ -538,10 +538,10 @@ def _run_one_day(executor, args, log):
         bridge.scanner_candidates = candidates
         bridge.scan_date = trading_day
 
-    # Phase 4: Wait for market open (stream starts at 9:30)
+    # Phase 4: Wait for market open (stream starts at 9:20)
     now = datetime.now(ET)
-    if now < datetime.combine(now.date(), dt_time(9, 30), tzinfo=ET):
-        wait_until(dt_time(9, 30), log)
+    if now < datetime.combine(now.date(), dt_time(9, 20), tzinfo=ET):
+        wait_until(dt_time(9, 20), log)
 
     # Phase 5: Start bar streams (Tradier primary + Alpaca IEX for comparison)
     log.info("Starting bar streams")

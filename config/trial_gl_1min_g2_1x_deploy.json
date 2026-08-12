@@ -1,7 +1,7 @@
 {
   "trial_number": 106,
   "study": "gl_1min_v5_g2_2x",
-  "deploy_notes": "MARGIN DEPLOY TRIAL - always use #106 when deploying with margin. Tuned WITH 2x margin (MARGIN_MULTIPLIER=2, MAX_POSITION_PCT_OF_CASH=200). Train 2024-01..2026-02: 484 trades, 93.2% WR. OOS 2026-03..08: 56 trades, 100% WR, +$1.40M. Non-margin predecessor tuned immediately before: trial #121 (gl_1min_v4_g2, 1x margin). CURRENT BEST STACK: combine with L #312 (gl_1min_l_standalone_v1) gated to no-G days -> config/trial_gl_1min_g2_2x_l312_noG_days_deploy.json (OOS +$2.29M). FINAL DEPLOY (2026-08): G2 #106 + L #312 with px25>5 strength filter -> config/trial_gl_1min_g2_2x_l312_px25_deploy.json (2026 OOS 40/40 profitable, 2024-26 ~$9.04M).",
+  "deploy_notes": "G2 #106 CASH-ACCOUNT (1x) deploy \u2014 no margin. Created 2026-08-12 because some low-priced tickers are NOT marginable on Alpaca, so 2x margin sizing (200% of equity) was rejected with 'insufficient buying power' (e.g. PLAG/FRTT on 2026-08-11). At 1x/100%, sizing = available cash, matching what Alpaca will actually accept. Tuned WITH 2x margin (study gl_1min_v5_g2_2x, #106): 93.2% WR train, 100% WR OOS 2026 (56 trades, +$1.40M at 2x). At 1x the same config reproduces +$565k / 48 trades OOS (100% WR). Original 2x config kept at trial_gl_1min_g2_2x_deploy.json.",
   "score": 11383838.054982798,
   "total_pnl": 3794612.68,
   "pf": 26.136,
@@ -12,8 +12,8 @@
   "n_strategies": 1,
   "priority": "G",
   "g_first_bar_only": true,
-  "margin_multiplier": 2.0,
-  "max_position_pct_of_cash": 200.0,
+  "margin_multiplier": 1.0,
+  "max_position_pct_of_cash": 100.0,
   "params": {
     "h_target_pct": 12.0,
     "h_time_limit_min": 12,

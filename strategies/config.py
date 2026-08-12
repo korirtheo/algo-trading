@@ -362,6 +362,7 @@ _reg("N", "N_MIN_GAP_PCT", 18, [
 _reg("L", "L_MIN_GAP_PCT", 19, [
     ("L_MIN_GAP_PCT", "l_min_gap", 30.0, "num"),
     ("L_MAX_FLOAT", "l_max_float", 15000000, "num"),
+    ("L_MIN_ENTRY_CANDLE", "l_min_entry_candle", 3, "fixed"),
     ("L_EARLIEST_CANDLE", "l_earliest_candle", 8, "num"),
     ("L_LATEST_CANDLE", "l_latest_candle", 115, "num"),
     ("L_VOL_SURGE_MULT", "l_vol_surge_mult", 1.5, "num"),
@@ -421,6 +422,29 @@ _reg("GE", "GE_MIN_GAP_PCT", 11, [
     ("GE_TRAIL_PCT", "ge_trail_pct", 5.0, "num"),
     ("GE_TRAIL_ACTIVATE_PCT", "ge_trail_activate_pct", 5.0, "num"),
     ("GE_TIME_LIMIT_MINUTES", "ge_time_limit_min", 120, "num"),
+])
+
+# --- WOR: Weak-Open Reclaim (data-mined complement to G) --------------
+# Data-mined from 7 years (2020-2026): a gap stock that OPENS WEAK (below
+# VWAP by >= WOR_OPEN_BELOW_VWAP%) then RECLAIMS and extends above its
+# premarket high (by >= WOR_EXT_PM_HIGH%) within the first 10 candles has a
+# strong forward edge (trapped-seller squeeze). Entry at candle-5 close
+# (09:34) — AFTER the reclaim confirms. Gap-independent (fires on any pick
+# with a premarket high). Exits: stop/target/trail/time.
+# NOTE: WOR_MIN_GAP_PCT is a sentinel (0.0) — eligibility is gate-free; the
+# real gate is wor_eligible in the sim (requires premarket_high > 0).
+_reg("WOR", "WOR_MIN_GAP_PCT", 21, [
+    ("WOR_MIN_GAP_PCT", "wor_min_gap", 0.0, "num"),
+    ("WOR_OPEN_BELOW_VWAP", "wor_open_below_vwap", 2.0, "num"),
+    ("WOR_EXT_PM_HIGH", "wor_ext_pm_high", 0.0, "num"),
+    ("WOR_ENTRY_CANDLE", "wor_entry_candle", 10, "num"),
+    ("WOR_MAX_ENTRY_CANDLE", "wor_max_entry_candle", 10, "num"),
+    ("WOR_POSITION_PCT", "wor_position_pct", 15.0, "num"),
+    ("WOR_TARGET_PCT", "wor_target_pct", 20.0, "num"),
+    ("WOR_STOP_PCT", "wor_stop_pct", 8.0, "num"),
+    ("WOR_TRAIL_PCT", "wor_trail_pct", 1.0, "num"),
+    ("WOR_TRAIL_ACTIVATE_PCT", "wor_trail_activate_pct", 2.0, "num"),
+    ("WOR_TIME_LIMIT_MINUTES", "wor_time_limit_min", 60, "num"),
 ])
 
 

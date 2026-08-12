@@ -86,6 +86,11 @@ def load_trial_params(path=None):
     # G2 first-bar-only: when the deploy config opts in, G only fills on candle 2
     # (the 09:31 confirmation bar); later retry-fills are dropped. The G2 study
     # (gl_1min_v3_g2) was tuned with this behavior.
+    # G_FIRST_BAR_ONLY_WINDOW_MIN: wall-clock window (minutes after 09:30) during
+    # which a G entry is accepted in the LIVE engine. Guards against the restart
+    # artifact where re-accumulated bars make a late bar look like candle 2.
+    # G2's candle-2 close lands ~09:31:30, so a 2-min window is generous.
+    G_FIRST_BAR_ONLY_WINDOW_MIN = 3
     if isinstance(raw, dict) and raw.get("g_first_bar_only"):
         tgc.G_FIRST_BAR_ONLY = True
         log.info("G2 first-bar-only entry ENABLED (config g_first_bar_only=true)")
@@ -222,6 +227,7 @@ class CombinedEngine:
         self.all_states = {}  # ticker -> list of ALL sub-states (main, l_only, o_only, b_only, e_only)
         self.active_positions = set()  # set of tickers currently in position
         self._pending_entries = set()  # tickers with buy orders placed this bar (blocks dupes)
+        self._rejected_entries = set()  # (ticker, strategy) whose buy was rejected — block retries for the day
         self.position_entry = {}  # ticker -> {entry_price, shares, cost}
         self.daily_pnl = 0.0
         # Load today's trades from database
@@ -679,6 +685,15 @@ class CombinedEngine:
             per_ticker.setdefault(st["ticker"], []).append(dict(st))
         self.all_states = per_ticker
 
+        # Which active positions did the sim reproduce as in-position this bar?
+        # If the sim sees the position it will manage its exits; if it can't
+        # (buying power collapsed), the independent fallback below takes over.
+        sim_in_position_this_bar = {
+            st["ticker"]
+            for st in states
+            if st.get("entry_price") is not None
+        }
+
         # Detect state changes
         for st in states:
             ticker = st["ticker"]
@@ -711,6 +726,47 @@ class CombinedEngine:
                 entry_price = st["entry_price"]
                 strategy = st.get("strategy", "?")
                 gap_pct = st.get("gap_pct", 0)
+
+                # G2 first-bar-only TIME WINDOW guard (2026-08-12 fix).
+                # The sim's candle-count gate (G_FIRST_BAR_ONLY) resets on an
+                # engine restart: bars re-accumulate from the stream, so a late
+                # bar (e.g. 09:48 FRTT after the 09:46 restart on 2026-08-11)
+                # looks like "candle 2" and G re-fires. Gate by the signal's
+                # wall-clock timestamp instead — G only enters during the first
+                # few minutes of the session, regardless of restart state.
+                if (
+                    strategy == "G"
+                    and tgc.G_FIRST_BAR_ONLY
+                    and st.get("timestamp") is not None
+                ):
+                    try:
+                        _sig_et = pd.Timestamp(st["timestamp"])
+                        if _sig_et.tzinfo is None:
+                            _sig_et = _sig_et.tz_localize("UTC")
+                        _sig_et = _sig_et.tz_convert(ET)
+                        _sig_min = _sig_et.hour * 60 + _sig_et.minute
+                        _open_min = 9 * 60 + 30
+                        if _sig_min >= _open_min + G_FIRST_BAR_ONLY_WINDOW_MIN:
+                            log.warning(
+                                "SIGNAL %s (G) blocked — signal time %s outside first "
+                                "%d min window (restart artifact guard)",
+                                ticker,
+                                _sig_et.strftime("%H:%M:%S"),
+                                G_FIRST_BAR_ONLY_WINDOW_MIN,
+                            )
+                            if prev is None or prev.get("entry_price") is None:
+                                self.db.log_signal(
+                                    ticker,
+                                    strategy,
+                                    entry_price,
+                                    "REJECTED",
+                                    "outside_first_bar_window",
+                                    gap_pct=gap_pct,
+                                )
+                            self.last_states[state_key] = st
+                            continue
+                    except Exception as _e:
+                        log.debug("Time-window guard skipped for %s: %s", ticker, _e)
 
                 if ticker in self.active_positions or ticker in self._pending_entries:
                     log.debug("SIGNAL %s skipped — already in this ticker (active=%s pending=%s)",
@@ -777,6 +833,25 @@ class CombinedEngine:
                         )
                     self.last_states[state_key] = st
                     continue
+
+                # Buy-rejection dedup: if a buy was already rejected for this
+                # (ticker, strategy) today (e.g. insufficient buying power), don't
+                # retry on every bar — that spammed 10+ identical SIGNAL/FAILED
+                # pairs per second on 2026-08-11 (PLAG, FRTT).
+                _rej_key = (ticker, strategy)
+                if _rej_key in self._rejected_entries:
+                    if prev is None or prev.get("entry_price") is None:
+                        self.db.log_signal(
+                            ticker,
+                            strategy,
+                            entry_price,
+                            "REJECTED",
+                            "buy_already_rejected",
+                            gap_pct=gap_pct,
+                        )
+                    self.last_states[state_key] = st
+                    continue
+
                 trade_size = st.get("position_cost", cash)
                 cum_dollar = self._cum_dollar_vol(ticker)
 
@@ -873,6 +948,9 @@ class CombinedEngine:
                     # Prevent re-triggering on every bar — store state so entry
                     # detection sees prev.entry_price is not None next bar.
                     self.last_states[state_key] = st
+                    # Block all retries of this signal for the day (the rejection
+                    # is usually permanent — insufficient BP, hard-to-borrow, etc).
+                    self._rejected_entries.add((ticker, strategy))
 
             # Exit detected
             if st.get("exit_price") is not None and (
@@ -1024,6 +1102,20 @@ class CombinedEngine:
 
             self.last_states[state_key] = dict(st)
 
+        # --- independent exit fallback ---
+        # The sim is re-run each bar with LIVE buying power. When a large buy
+        # exhausts cash (e.g. VIVK 2026-08-10: BP fell to $41), the sim can no
+        # longer reproduce the open position, so st["exit_price"] never
+        # transitions and the strategy-tuned exit (STOP/TRAIL/TARGET/TIME_STOP)
+        # never fires — the position rides to EOD. Fix: for active positions
+        # the sim couldn't see this bar, evaluate exits directly from the
+        # tracked position_state levels (entry/peak/stop/target/trail/time).
+        if (
+            symbol in self.active_positions
+            and symbol not in sim_in_position_this_bar
+        ):
+            self._check_independent_exit(symbol, bar, ts)
+
         # --- v3 overlay entry check ---
         if self.v3_params.get("enabled", False) and picks_with_data:
             self._check_v3_entry(picks_with_data)
@@ -1118,6 +1210,155 @@ class CombinedEngine:
     #  Entry: first green candle after G's last hold on the same ticker  #
     #  Exit: target=57%, stop=30%, time=27min, trail=0.5% act=0%        #
     # ------------------------------------------------------------------ #
+
+    def _check_independent_exit(self, symbol, bar, ts):
+        """Exit check decoupled from the sim's live-cash sizing.
+
+        The primary exit path (on_bar -> simulate_day_combined) re-runs the
+        sim with self.executor.get_buying_power() every bar. Once a big buy
+        exhausts buying power, the sim can't reproduce the open position
+        (entry_price comes back None), so the sim never emits exit_price and
+        strategy exits silently stop firing (VIVK 2026-08-10: held all day,
+        gave back +20% to -8%, closed at EOD).
+
+        This fallback evaluates the tracked position_state levels directly
+        against the incoming bar, independent of cash/sim. It only acts when:
+          - symbol is an active position we own, AND
+          - no sell order is already pending for it, AND
+          - the sim didn't already fire an exit this bar (the sim exit path
+            sets a pending sell first; we skip when one exists).
+        """
+        if symbol not in self.active_positions:
+            return
+        entry_info = self.position_entry.get(symbol, {})
+        if not entry_info:
+            return
+        shares = float(entry_info.get("shares", 0))
+        if shares < 1:
+            return
+
+        # Already have a sell pending? Let the stream path handle it.
+        with self._pending_lock:
+            for p in self.pending_orders.values():
+                if p.get("ticker") == symbol and p.get("side") == "sell":
+                    return
+
+        pos = self.position_state.get_position(symbol)
+        if not pos:
+            return
+        entry_price = float(pos.get("entry_price", entry_info.get("entry_price", 0)))
+        if entry_price <= 0:
+            return
+
+        stop_price = float(pos.get("stop_price", 0) or 0)
+        target_price = float(pos.get("target_price", 0) or 0)
+        trail_pct = float(pos.get("trail_pct", 0) or 0)
+        peak = float(pos.get("peak_price", 0) or 0)
+        time_limit_min = int(pos.get("time_limit_min", 0) or 0)
+        entry_time = pos.get("entry_time") or entry_info.get("entry_time")
+
+        c_high = float(bar["High"])
+        c_low = float(bar["Low"])
+        c_close = float(bar["Close"])
+
+        # --- Time stop ---
+        if time_limit_min > 0 and entry_time:
+            try:
+                et = pd.Timestamp(entry_time)
+                if et.tzinfo is None:
+                    et = et.tz_localize("UTC")
+                ts_et = pd.Timestamp(ts)
+                if ts_et.tzinfo is None:
+                    ts_et = ts_et.tz_localize("UTC")
+                minutes_in_trade = (ts_et - et).total_seconds() / 60.0
+            except Exception:
+                minutes_in_trade = 0.0
+            if minutes_in_trade >= time_limit_min:
+                self._fire_independent_exit(
+                    symbol, c_close, "TIME_STOP", entry_info, ts
+                )
+                return
+
+        # --- Hard stop ---
+        if stop_price > 0 and c_low <= stop_price:
+            self._fire_independent_exit(symbol, stop_price, "STOP", entry_info, ts)
+            return
+
+        # --- Trailing stop ---
+        if trail_pct > 0 and peak > entry_price:
+            trail_stop = peak * (1 - trail_pct / 100)
+            if trail_stop > 0 and c_low <= trail_stop:
+                self._fire_independent_exit(
+                    symbol, trail_stop, "TRAIL", entry_info, ts
+                )
+                return
+
+        # --- Target ---
+        if target_price > 0 and c_high >= target_price:
+            self._fire_independent_exit(
+                symbol, target_price, "TARGET", entry_info, ts
+            )
+            return
+
+    def _fire_independent_exit(self, ticker, exit_price, exit_reason, entry_info, ts):
+        """Place a sell from the independent exit fallback."""
+        try:
+            order = self.executor.sell(
+                ticker,
+                reason=exit_reason,
+                signal_price=exit_price,
+                cumulative_dollar_volume=self._cum_dollar_vol(ticker),
+                strategy=entry_info.get("strategy", "?"),
+            )
+        except Exception as e:
+            log.error(
+                "INDEPENDENT-EXIT %s (%s) FAILED: %s",
+                ticker,
+                exit_reason,
+                e,
+                exc_info=True,
+            )
+            log_event("exit_error", "error", f"Independent exit failed {ticker}: {e}")
+            return
+        if not order:
+            log.warning(
+                "INDEPENDENT-EXIT %s (%s): no order returned", ticker, exit_reason
+            )
+            return
+        with self._pending_lock:
+            self.pending_orders[str(order.id)] = {
+                "ticker": ticker,
+                "strategy": entry_info.get("strategy", "?"),
+                "signal_price": exit_price,
+                "signal_time": ts,
+                "side": "sell",
+                "exit_reason": exit_reason,
+                "expected_pnl": (exit_price - float(entry_info.get("entry_price", 0)))
+                * float(entry_info.get("shares", 0)),
+                "pre_sell_shares": entry_info.get("shares", 0),
+                "is_partial": False,
+            }
+        if self.fill_stream is not None:
+            self.fill_stream.register(order.id, self._on_sell_fill)
+            log.info(
+                "INDEPENDENT-EXIT %s (%s): order %s placed @ $%.4f, awaiting fill",
+                ticker,
+                exit_reason,
+                order.id,
+                exit_price,
+            )
+            self._schedule_sell_safety_poll(order.id, ticker)
+        else:
+            # Legacy synchronous path
+            self.active_positions.discard(ticker)
+            self.position_entry.pop(ticker, None)
+            self.position_state.remove_position(ticker)
+            log.info(
+                "INDEPENDENT-EXIT %s (%s) [LEGACY]: closed @ $%.4f",
+                ticker,
+                exit_reason,
+                exit_price,
+            )
 
     def _v3_candidate_for_ticker(self, mh, day_open, g_holds_list):
         """Find first any-green candle after G hold expires.

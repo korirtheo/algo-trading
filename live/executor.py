@@ -308,6 +308,31 @@ class OrderExecutor:
                 # If we can't read account equity, refuse to trade — better safe than sorry
                 return None
 
+        # MARGINABILITY CHECK (2026-08-12 fix). Alpaca rejects buys on some
+        # low-priced / non-marginable tickers with "insufficient buying power"
+        # even when we sized at 100% of equity — because the ticker can only be
+        # bought with actual cash, not margin (PLAG/FRTT on 2026-08-11).
+        # If the asset is NOT marginable, cap size at available cash so the
+        # order Alpaca will actually accept.
+        try:
+            asset = self.client.get_asset(ticker)
+            marginable = bool(getattr(asset, "marginable", True))
+            if not marginable:
+                acc = self.client.get_account()
+                cash_amt = max(0.0, float(acc.cash))
+                if dollar_amount > cash_amt:
+                    log.warning(
+                        f"NON-MARGINABLE {ticker}: sized from ${dollar_amount:,.0f} to "
+                        f"${cash_amt:,.0f} (cash-only — marginable=False)"
+                    )
+                    dollar_amount = cash_amt
+                if dollar_amount < 50:
+                    log.info(f"Skip {ticker}: non-marginable, cash ${cash_amt:.0f} too small")
+                    return None
+        except Exception as e:
+            log.debug(f"Marginability check failed for {ticker} (proceeding): {e}")
+            log_event("api_error", "warning", f"Marginability check failed for {ticker}: {e}")
+
         # Volume cap check.
         # 2026-06-23 FIX: previously this block ignored LIVE_DISABLE_VOL_CAPS,
         # causing GITS to be sized to $169 (5% of $3,374 cum_$vol) instead of

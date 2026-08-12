@@ -1,5 +1,6 @@
 {
   "trial_number": 121,
+  "deploy_notes": "NON-MARGIN (1x) G2 trial - predecessor to margin trial #106 (gl_1min_v5_g2_2x). This was the last cash-account tuning immediately before the 2x-margin study. Use #106 when deploying with margin.",
   "score": 6707148.045003923,
   "total_pnl": 2235716.02,
   "pf": 9.531,

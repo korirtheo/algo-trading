@@ -686,6 +686,7 @@ STRAT_KEYS = [
     "N",
     "L",
     "X",
+    "WOR",
 ]
 
 
@@ -1209,6 +1210,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     L_HOD_BREAK_REQUIRED = params["L_HOD_BREAK_REQUIRED"]
     L_LATEST_CANDLE = params["L_LATEST_CANDLE"]
     L_MAX_FLOAT = params["L_MAX_FLOAT"]
+    L_MIN_ENTRY_CANDLE = params.get("L_MIN_ENTRY_CANDLE", 3)
     L_MIN_GAP_PCT = params["L_MIN_GAP_PCT"]
     L_MIN_PRICE_ACCEL_PCT = params["L_MIN_PRICE_ACCEL_PCT"]
     L_PARTIAL_SELL_PCT = params["L_PARTIAL_SELL_PCT"]
@@ -1350,6 +1352,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     g_bought_tickers = set()
     g_exit_prices = {}  # ticker -> G's exit price (for the GE trigger reference)
     g_exit_times = {}  # ticker -> G's exit timestamp (for the GE window)
+    g_fired_candle_by_ticker = {}  # ticker -> candle_count when G filled (L same-candle guard)
 
     def _receive_proceeds(amount):
         if cash_account:
@@ -1594,6 +1597,28 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "ge_trailing_active": False,
                 "ge_partial_taken": False,
                 "ge_partial_proceeds": 0.0,
+                # State — WOR (Weak-Open Reclaim): data-mined complement to G.
+                # Fires on any pick with a premarket high. Entry: candle 5
+                # (09:34) close, once the stock (a) opened below VWAP by >=
+                # WOR_OPEN_BELOW_VWAP% and (b) has extended >= WOR_EXT_PM_HIGH%
+                # above its PM high within the first WOR_MAX_ENTRY_CANDLE bars.
+                "wor_eligible": (
+                    pick["gap_pct"] >= WOR_MIN_GAP_PCT and pick["premarket_high"] > 0
+                ),
+                # Weak-open condition computed at init from candle-1 open vs VWAP[0]
+                # (candle 1 is the first market-hours bar = 09:30).
+                "wor_open_below_vwap_ok": (
+                    len(vwap) > 0
+                    and vwap[0] > 0
+                    and (float(mh.iloc[0]["Open"]) / vwap[0] - 1) * 100
+                    < -WOR_OPEN_BELOW_VWAP
+                ),
+                "wor_ext_pm_high": 0.0,
+                "wor_max_high": 0.0,
+                "wor_highest_since_entry": 0.0,
+                "wor_trailing_active": False,
+                "wor_partial_taken": False,
+                "wor_partial_proceeds": 0.0,
                 # State — X (Range Reversion — second-leg pattern)
                 "x_eligible": False,  # True after first-leg window closes with valid pattern
                 "x_open_price": 0.0,  # open price for first-leg gain reference
@@ -2291,6 +2316,45 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
 
                     # 5. Time stop
                     if minutes_in_trade >= V_TIME_LIMIT_MINUTES:
+                        _close_position(st, c_close, "TIME_STOP", ts)
+                        continue
+
+                    continue
+
+                # ===== STRATEGY WOR: Weak-Open Reclaim (stop + trail + target) =====
+                if st["strategy"] == "WOR":
+                    if c_high > st["wor_highest_since_entry"]:
+                        st["wor_highest_since_entry"] = c_high
+
+                    # 1. Hard stop (before trail activates)
+                    if c_low <= st["entry_price"] * (1 - WOR_STOP_PCT / 100):
+                        _close_position(
+                            st, st["entry_price"] * (1 - WOR_STOP_PCT / 100), "STOP", ts
+                        )
+                        continue
+
+                    # 2. Trailing stop (after activation threshold)
+                    if not st["wor_trailing_active"]:
+                        unrealized_pct = (c_high / st["entry_price"] - 1) * 100
+                        if unrealized_pct >= WOR_TRAIL_ACTIVATE_PCT:
+                            st["wor_trailing_active"] = True
+                    if st["wor_trailing_active"]:
+                        trail_stop = st["wor_highest_since_entry"] * (
+                            1 - WOR_TRAIL_PCT / 100
+                        )
+                        if c_low <= trail_stop:
+                            _close_position(st, trail_stop, "TRAIL", ts)
+                            continue
+
+                    # 3. Target
+                    if c_high >= st["entry_price"] * (1 + WOR_TARGET_PCT / 100):
+                        _close_position(
+                            st, st["entry_price"] * (1 + WOR_TARGET_PCT / 100), "TARGET", ts
+                        )
+                        continue
+
+                    # 4. Time stop
+                    if minutes_in_trade >= WOR_TIME_LIMIT_MINUTES:
                         _close_position(st, c_close, "TIME_STOP", ts)
                         continue
 
@@ -2994,6 +3058,8 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             eligible = True
                         if st["ge_eligible"]:
                             eligible = True
+                        if st["wor_eligible"]:
+                            eligible = True
                         if not eligible:
                             st["done"] = True
 
@@ -3078,6 +3144,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     or st["j_eligible"]
                     or st["n_eligible"]
                     or st["ge_eligible"]
+                    or st["wor_eligible"]
                     or st.get("o_only")
                     or st.get("b_only")
                     or st.get("e_only")
@@ -3134,6 +3201,10 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 ge_timed_out = (
                     not st["ge_eligible"] or st["candle_count"] > GE_MAX_ENTRY_CANDLE
                 )
+                wor_timed_out = (
+                    not st["wor_eligible"]
+                    or st["candle_count"] > WOR_MAX_ENTRY_CANDLE
+                )
                 if (
                     d_timed_out
                     and v_timed_out
@@ -3151,6 +3222,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     and j_timed_out
                     and n_timed_out
                     and ge_timed_out
+                    and wor_timed_out
                 ):
                     st["done"] = True
                     continue
@@ -3352,6 +3424,36 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                                 st["v_below_count"] = (
                                     0  # Reset, not enough below candles
                                 )
+
+                # --- WOR: Weak-Open Reclaim (data-mined complement to G) ---
+                # Data-mined from 7 years (2020-2026): a gapper that OPENS
+                # below VWAP (sellers in control) then RECLAIMS and extends
+                # above its premarket high (buyers flip control) has a strong
+                # forward edge. Entry at candle WOR_ENTRY_CANDLE (09:34) close,
+                # AFTER the reclaim confirms. Gap-independent. Weak-open state
+                # is computed at state init (candle-1 open vs VWAP[0]).
+                if (
+                    st["wor_eligible"]
+                    and st["candle_count"] <= WOR_MAX_ENTRY_CANDLE
+                    and not st["signal"]
+                ):
+                    # Track max high vs PM high (for extension)
+                    if st["premarket_high"] > 0:
+                        st["wor_max_high"] = max(st["wor_max_high"], c_high)
+                        st["wor_ext_pm_high"] = (
+                            st["wor_max_high"] / st["premarket_high"] - 1
+                        ) * 100
+                    # Entry: at candle WOR_ENTRY_CANDLE close, if the weak-open
+                    # held AND extension >= threshold was reached by now.
+                    if (
+                        st["candle_count"] == WOR_ENTRY_CANDLE
+                        and st["wor_open_below_vwap_ok"]
+                        and st["wor_ext_pm_high"] >= WOR_EXT_PM_HIGH
+                    ):
+                        st["strategy"] = "WOR"
+                        st["signal"] = True
+                        st["signal_price"] = c_close
+                        entry_candidates.append(st)
 
                 # --- P: PM high breakout + pullback + bounce ---
                 if (
@@ -3869,11 +3971,21 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                     and c_high > st["l_running_hod"]
                 ):
                     st["l_running_hod"] = c_high
+                # L entry floor: never before 09:32 (candle 3) and never on the
+                # same candle G fired. G2 fires only on candle 2 (09:31), so
+                # the candle-3 floor alone keeps them apart, but the explicit
+                # same-candle guard stays for robustness.
+                _l_floor = max(L_EARLIEST_CANDLE, L_MIN_ENTRY_CANDLE)
+                _g_fired_this_candle = (
+                    g_fired_candle_by_ticker.get(st["ticker"], 0)
+                    == st["candle_count"]
+                )
                 if (
                     st["l_eligible"]
-                    and st["candle_count"] >= L_EARLIEST_CANDLE
+                    and st["candle_count"] >= _l_floor
                     and st["candle_count"] <= L_LATEST_CANDLE
                     and not st["signal"]
+                    and not _g_fired_this_candle
                 ):
                     candle_idx = st["candle_count"] - 1
 
@@ -4088,6 +4200,11 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 except Exception:
                     pass
             trade_size = cash_box[0] * MARGIN_MULTIPLIER * _news_mult
+            # WOR (Weak-Open Reclaim): low-float late-entry pattern — cap at a
+            # small fraction of the pool so a single WOR fill can't crowd out
+            # the rest of the book or incur catastrophic slippage on thin names.
+            if st.get("strategy") == "WOR":
+                trade_size *= WOR_POSITION_PCT / 100.0
             alpha_size = trade_size  # pre-cap alpha target (DIAG_VOLCAPS)
             # G conviction sizing (G2 experiment): scale size by combined bar
             # strength (candle-1 body + candle-2 body + volume surge), capped
@@ -4246,6 +4363,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             # Record G-bought tickers for the GE re-entry strategy.
             if st["strategy"] == "G":
                 g_bought_tickers.add(st["ticker"])
+                g_fired_candle_by_ticker[st["ticker"]] = st.get("candle_count", 0)
 
             # Track trade sequence and snapshot per-trade params (G1/G2/L1/L2 split)
             _strat = st["strategy"]

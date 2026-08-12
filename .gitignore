@@ -263,3 +263,7 @@ node_modules/
 
 # Frontend build output (rebuilt in Docker)
 dashboard/frontend/dist/
+
+# Generated news cache (large, rebuildable)
+results/news_cache/
+
