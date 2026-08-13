@@ -4,7 +4,15 @@
 
 **Always deploy via git: commit + push locally, then `git pull` on AWS. NEVER edit files directly on the AWS box (no scp, no sed, no manual file writes there).**
 
-The only file edited directly on the server is `.env` (to switch `LIVE_PARAMS_PATH` between deploy configs) — and even that is just flipping a pointer, never editing code/config logic.
+The only file edited directly on the server is `.env` (keys + `LIVE_PARAMS_PATH`) — and even that is just flipping pointers / secret values, never editing code/config logic.
+
+## Secrets (.env-based, since 2026-08-13)
+
+- **API keys are NEVER in the repo.** `config/settings.py` requires them from the environment — no hardcoded fallbacks. Keys load from the repo-root `.env` (gitignored) via `dotenv`.
+- Keys required: `ALPACA_API_KEY`, `ALPACA_API_SECRET`, `TRADIER_API_KEY` (Polygon keys optional, downloads only: `POLYGON_API_KEY[_2/_3/_4]`).
+- Template: `.env.example` (committed). Never commit `.env`.
+- **Every environment** (local + each AWS server) has its own `.env`. `docker-compose.yml` passes `ALPACA_API_KEY`, `ALPACA_API_SECRET`, `TRADIER_API_KEY`, `ALPACA_PAPER`, `LIVE_PARAMS_PATH` into the container.
+- **Rotating keys**: update local `.env` → commit NOTHING secret → `git pull` on AWS → rewrite server `.env` → `sudo docker compose build && sudo docker compose up -d`. Without keys in `.env`, the container will not start (settings raises at import).
 
 ## Live bot
 
@@ -37,9 +45,17 @@ sed -i 's|LIVE_PARAMS_PATH=.*|LIVE_PARAMS_PATH=config/<name>.json|' .env
 sudo docker compose up -d
 ```
 
-## Deployed bot facts (2026-08-12)
+## Key rotation / new-account deploy
+
+1. Get new keys, write them to **local** `.env` (never commit).
+2. `git pull` on AWS (gets any new code).
+3. Rewrite the **server** `.env` with the new keys (this is the one allowed direct server edit).
+4. `sudo docker compose build && sudo docker compose up -d` — rebuild required because `config/settings.py` is baked into the image and now raises if env keys are missing.
+
+## Deployed bot facts (2026-08-13)
 
 - Currently: **G-only 1x** — `config/trial_gl_1min_g2_1x_G_only_deploy.json` (G2 #106 first-bar-only, L #312 disabled while its winner-filter analysis continues).
+- **2026-08-13: Alpaca + Tradier keys rotated** and moved out of the repo into gitignored `.env` (both local and server). Old keys were committed in history — revoke/rotate them at the provider if they're still valid.
 - `strategies/bars.py` was missing from the deployed image (root-caused 2026-08-12: `No module named 'strategies.bars'`, every bar errored, no trades). It is committed; keep it in the repo.
 - Multi-window slippage + vol caps are active live (`LIVE_DISABLE_VOL_CAPS=False`); module defaults match the OOS runner (K=3.0, 15%/8%/5% caps).
 
