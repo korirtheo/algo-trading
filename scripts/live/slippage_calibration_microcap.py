@@ -20,8 +20,7 @@ from alpaca.data.historical import StockHistoricalDataClient
 from alpaca.data.requests import StockLatestQuoteRequest, StockBarsRequest
 from alpaca.data.timeframe import TimeFrame
 
-KEY = "PK2ESU3PR3BBJH2LT2MC6NBTAQ"
-SECRET = "HCWTWV3JBKthRgYuD6avUV8gj6GFVpFek6mDKdV2oBTq"
+from config.settings import ALPACA_API_KEY as KEY, ALPACA_API_SECRET as SECRET
 
 ET = ZoneInfo("America/New_York")
 CSV_PATH = os.environ.get("CALIB_CSV", "/app/logs/fills_calibration.csv")

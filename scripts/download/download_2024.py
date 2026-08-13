@@ -11,7 +11,7 @@ import os
 import sys
 import subprocess
 
-API_KEY = "XKAw9xOfkdhbNT9iKpZit_npwf010c8q"
+from config.settings import POLYGON_API_KEY as API_KEY
 
 QUARTERS = [
     ("stored_data_jan_mar_2024", "2024-01-01", "2024-03-31"),

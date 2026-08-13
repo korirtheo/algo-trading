@@ -9,6 +9,7 @@ services:
       - ALPACA_API_KEY=${ALPACA_API_KEY}
       - ALPACA_API_SECRET=${ALPACA_API_SECRET}
       - ALPACA_PAPER=${ALPACA_PAPER:-true}
+      - TRADIER_API_KEY=${TRADIER_API_KEY}
       - LIVE_PARAMS_PATH=${LIVE_PARAMS_PATH:-config/trial_124_microcap_pump_extracted.json}
     volumes:
       - ./logs:/app/logs

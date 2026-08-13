@@ -253,6 +253,7 @@ logs/
 # Environment / secrets
 .env
 .env.*
+!.env.example
 *.pem
 
 # Large binary wheels (e.g. local PyTorch CUDA builds)

@@ -31,8 +31,7 @@ log = logging.getLogger(__name__)
 
 ET = ZoneInfo("America/New_York")
 
-ALPACA_API_KEY = "PK34OGXUBAOCLG7E6KYTI6QMZ3"
-ALPACA_API_SECRET = "DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ"
+from config.settings import ALPACA_API_KEY, ALPACA_API_SECRET
 ALPACA_FEED = "iex"
 MAX_PRICE = 50.0
 MIN_GAP_PCT = 10.0

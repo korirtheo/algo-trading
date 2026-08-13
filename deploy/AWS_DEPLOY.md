@@ -43,11 +43,12 @@ sudo apt-get install -y git
 git clone <your-repo-url> algo-trading
 cd algo-trading
 
-# Create .env with your Alpaca keys
+# Create .env with your API keys (see .env.example in the repo)
 cat > .env << 'EOF'
-ALPACA_API_KEY=PK34OGXUBAOCLG7E6KYTI6QMZ3
-ALPACA_API_SECRET=DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ
+ALPACA_API_KEY=<YOUR_ALPACA_KEY>
+ALPACA_API_SECRET=<YOUR_ALPACA_SECRET>
 ALPACA_PAPER=true
+TRADIER_API_KEY=<YOUR_TRADIER_KEY>
 EOF
 
 # Build and run

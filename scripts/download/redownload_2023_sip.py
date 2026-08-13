@@ -21,8 +21,7 @@ from alpaca.data.timeframe import TimeFrame
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(line_buffering=True)
 
-API_KEY = "PK34OGXUBAOCLG7E6KYTI6QMZ3"
-API_SECRET = "DBn7mXAKdTBAR9XZnkhnu1CykZDYNZEVzkBojKDtoYbJ"
+from config.settings import ALPACA_API_KEY as API_KEY, ALPACA_API_SECRET as API_SECRET
 RATE_LIMIT_DELAY = 0.35
 
 DATA_DIR = "stored_data_2023"

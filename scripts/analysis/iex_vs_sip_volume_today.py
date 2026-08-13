@@ -19,7 +19,7 @@ import time
 import json
 from collections import defaultdict
 
-API_KEY = "XKAw9xOfkdhbNT9iKpZit_npwf010c8q"
+from config.settings import POLYGON_API_KEY as API_KEY
 
 # Today's watchlist (from live bot log 09:30 ET)
 WATCHLIST = [

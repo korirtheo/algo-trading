@@ -19,7 +19,7 @@ import requests
 from zoneinfo import ZoneInfo
 
 # --- CONFIG ---
-API_KEY = "XKAw9xOfkdhbNT9iKpZit_npwf010c8q"
+from config.settings import POLYGON_API_KEY as API_KEY
 OOS_DIR = "stored_data_jan_mar_2025"
 TARGET_START = "2025-01-01"
 TARGET_END = "2025-03-31"

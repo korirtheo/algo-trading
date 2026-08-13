@@ -1,6 +1,10 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import requests
 
-api_key = "o9vwR8VA1nPulvAo9A5Dk8FGvoJV"
+from config.settings import TRADIER_API_KEY as api_key
 headers = {
     "Authorization": f"Bearer {api_key}",
     "Accept": "application/json",

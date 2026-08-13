@@ -14,7 +14,7 @@ sys.path.insert(0, ".")
 import test_green_candle_combined as tgc
 from optimize_combined import set_strategy_params, _build_param_snapshot, _param_lock
 
-API_KEY = "o9vwR8VA1nPulvAo9A5Dk8FGvoJV"
+from config.settings import TRADIER_API_KEY as API_KEY
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Accept": "application/json",

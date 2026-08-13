@@ -3,10 +3,33 @@ Central configuration for live trading and backtesting.
 """
 import os
 import json
+from pathlib import Path
+
+# Load secrets from .env (gitignored) — do this FIRST so every key below
+# prefers the env var, falling back to .env, never to a hardcoded default.
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv(_env_path)
+    except Exception:
+        pass
+
+
+def _req_env(name: str) -> str:
+    """Required env var (no hardcoded fallback — secrets must come from env/.env)."""
+    val = os.environ.get(name, "").strip()
+    if not val:
+        raise RuntimeError(
+            f"{name} is not set. Add it to .env (see .env.example)."
+        )
+    return val
+
 
 # --- Alpaca API ---
-ALPACA_API_KEY = os.environ.get("ALPACA_API_KEY", "PK2GSDA7DAJJLE3Y7REPAO4XV5")
-ALPACA_API_SECRET = os.environ.get("ALPACA_API_SECRET", "8gZp7Sc9QY9U6g33t4f5ycdLwfuVg4iZxZiyCJyC7tc7")
+ALPACA_API_KEY = _req_env("ALPACA_API_KEY")
+ALPACA_API_SECRET = _req_env("ALPACA_API_SECRET")
 ALPACA_PAPER = os.environ.get("ALPACA_PAPER", "true").lower() == "true"  # env override
 ALPACA_FEED = "iex"  # "iex" for live trading, "sip" for backtesting/logging only
 ALPACA_FEED_DELAYED = False  # Not used with IEX
@@ -14,7 +37,16 @@ ALPACA_FEED_DELAYED = False  # Not used with IEX
 # --- Tradier API ---
 # Live brokerage account — used as primary market data source.
 # Trading execution stays on Alpaca; Tradier provides SIP-level real-time data.
-TRADIER_API_KEY = os.environ.get("TRADIER_API_KEY", "o9vwR8VA1nPulvAo9A5Dk8FGvoJV")
+TRADIER_API_KEY = _req_env("TRADIER_API_KEY")
+
+# --- Polygon API (historical data downloads) ---
+# Optional: used only by download scripts. May be empty if not needed.
+# _2/_3/_4 support the quarterly parallel-download scripts (separate keys so
+# they don't trip Polygon's per-key rate limit).
+POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY", "").strip()
+POLYGON_API_KEY_2 = os.environ.get("POLYGON_API_KEY_2", "").strip()
+POLYGON_API_KEY_3 = os.environ.get("POLYGON_API_KEY_3", "").strip()
+POLYGON_API_KEY_4 = os.environ.get("POLYGON_API_KEY_4", "").strip()
 
 # Data Logging: Use SIP (delayed) for comprehensive bar logging and backtest validation
 # This logs all bar data with accurate volume for post-trade analysis and backtesting.

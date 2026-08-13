@@ -11,7 +11,7 @@ import os
 import sys
 import subprocess
 
-API_KEY = "dE5ScpEiJH3M5slg3pFjcC7tkL1b4JXI"
+from config.settings import POLYGON_API_KEY_3 as API_KEY
 OUT_DIR = "stored_data_jul_sep_2024"
 START = "2024-07-01"
 END = "2024-09-30"
