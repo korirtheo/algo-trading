@@ -87,6 +87,17 @@ it with per-trade mean/median AND a bootstrap CI before treating a $ result as s
   (2) align on the common (date,ticker) trade set; (3) bootstrap the per-trade
   edge (10k resamples); (4) only claim an edge if the CI excludes 0. If CI
   straddles 0, the result is INCONCLUSIVE — say so, don't call it a win.
+- **Graduation gate**: a candidate may only move from "inconclusive" to "deploy"
+  when (a) the aligned bootstrap CI excludes 0, AND (b) the aligned common trade
+  set is ≥ ~100 trades (below that, an exclusion can still be small-sample luck),
+  AND (c) it clears at least one genuinely-unused period (a held-out year, or a
+  different era like 2020-23). Otherwise it stays "inconclusive" — never a soft win.
+- **Sim/engine divergence rule**: exploratory/fast sims (gross, no slippage,
+  hand-rolled exit loops) may be used for SEARCH-SPACE SCREENING ONLY. No numeric
+  conclusion is trusted until reproduced through `simulate_day_combined` with the
+  deploy gates. Real example: partial_swing looked +6.5% gross but was −2.58%
+  through the real engine; A#101 was −1.3% in a hand-rolled sim but +0.3%
+  (inconclusive) in the real engine. Direction can survive, magnitudes can't.
 - Also: hold out a genuinely-unused year (e.g. 2025) BEFORE trusting any "edge"
   found on the search window; check for degenerate basins (e.g. stop=0 W16 trap);
   and don't trust single-best-trial selection — use wide-forward distributions.

@@ -274,7 +274,28 @@ bootstrap CI over the aligned common trade set before treating a $ result as
 signal. Compounding math + fat right tails (p95 MFE +142%) can make a losing
 per-trade config look like a winner on $ over a short window.
 
+---
 
+## 6d. GENUINELY-UNUSED ERA TEST: 2020-2023 (2026-08-14)
+
+Claude's graduation gate demands a genuinely-unused period. Ran baseline vs A#101
+through the REAL engine on 2020-23 1-min data (876 days), aligned-trade bootstrap
+(5,000 resamples):
+
+| year | baseline n | #101 n | aligned n | edge | 95% CI | P(edge<=0) |
+|---|---|---|---|---|---|---|
+| 2020 | 94 | 140 | 54 | +0.01% | [-0.13%, +0.16%] | 45% |
+| 2021 | 53 | 78 | 35 | -0.10% | [-0.26%, +0.07%] | 88% |
+| 2022 | 47 | 61 | 25 | -0.39% | [-1.09%, +0.18%] | 90% |
+| 2023 | 3 | 4 | 2 | +0.46% | (n too small) | 26% |
+
+Per-trade means: baseline wins every year (2020 +11.0%/96% WR vs +8.8%/92%;
+2021 +8.5%/100% vs +6.1%/90%; 2022 +6.3%/81% vs +4.4%/75%).
+
+VERDICT: A#101's edge does NOT generalize to 2020-23. Flat on 2020, negative-
+leaning on 2021-22, inconclusive on 2024-26, and only "won" via compounding
+variance on the specific 2025/2026 $ windows. CLOSED: baseline is optimal, #101
+does not graduate to deploy. This is a clean null across every era tested.
 
 ---
 
