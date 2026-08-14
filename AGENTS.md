@@ -72,3 +72,24 @@ sudo docker compose up -d
 - **Slippage parity is mandatory**: the objectives assert `USE_DYNAMIC_SLIPPAGE` + `USE_MULTIWINDOW_SLIPPAGE` are True. Never disable for a study.
 - G exit-shape study (2026-08-14): entry locked from `config/trial_gl_1min_g2_1x_G_only_deploy.json`, only exit params tunable, via env `G_FIXED_FROM_CONFIG=<config> G_TUNE_EXITS_ONLY=1 ALLOWED_STRATS=g`. Tunable exit vars: `g_target_pct`, `g_target2_pct`, `g_partial_sell_pct`, `g_time_limit_min`, `g_stop_pct`, `g_trail_pct`, `g_trail_activate_pct`, `g_exit_mode` (fixed/atr/swing/staged), `g_exit_atr_mult`, `g_exit_swing_k`, `g_exit_swing_window`, `g_exit_staged_thresh`, `g_exit_staged_wide`.
 - Best-trial params go to `results/params/` (e.g. `--params-out results/params/<study>_best.json`), then validate OOS before deploying.
+
+## Exit-strategy evaluation — STANDING RULE (2026-08-14, after STKH/G exit study)
+
+**Never evaluate an exit-strategy candidate on compounded $ PnL alone.** Always pair
+it with per-trade mean/median AND a bootstrap CI before treating a $ result as signal.
+
+- Why: compounding math + fat right tails (G MFE p95 +142%) can make a LOSING
+  per-trade config look like a winner on $ PnL over a short window. Example: #101
+  looked +20-24% on 2025/2026 OOS $ PnL but was −1.3%/trade (hand-rolled sim) or
+  +0.3% inconclusive (real engine) on the aligned full-sample bootstrap.
+- Protocol: (1) run the candidate AND baseline through the REAL
+  `simulate_day_combined` (slippage ON, volcaps ON, deploy entry gates applied);
+  (2) align on the common (date,ticker) trade set; (3) bootstrap the per-trade
+  edge (10k resamples); (4) only claim an edge if the CI excludes 0. If CI
+  straddles 0, the result is INCONCLUSIVE — say so, don't call it a win.
+- Also: hold out a genuinely-unused year (e.g. 2025) BEFORE trusting any "edge"
+  found on the search window; check for degenerate basins (e.g. stop=0 W16 trap);
+  and don't trust single-best-trial selection — use wide-forward distributions.
+- The deployed G baseline (1% trail, tgt +18, stop 10, no partial) is currently
+  the only config supported by per-trade bootstrap evidence. Full study:
+  `results/g_exit_investigation_summary.md`.
