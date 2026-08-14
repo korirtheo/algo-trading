@@ -14,6 +14,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./config:/app/config
+      - ./scripts:/app/scripts
     logging:
       driver: json-file
       options:
