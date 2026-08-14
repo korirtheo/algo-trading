@@ -153,6 +153,45 @@ export interface HaltEvent {
   reason_exit?: string;
 }
 
+export interface ReconcileTrade {
+  ticker: string;
+  pnl?: number;
+  reason?: string;
+  entry_time?: string;
+}
+
+export interface ReconcileComment {
+  // free-text comments explaining the match / divergence findings
+}
+
+export interface DailyReconcile {
+  id: number;
+  date: string;
+  run_at: string;
+  watchlist_count: number;
+  sip_fetched: number;
+  sip_missing: string | null;
+  bt_trades: number;
+  bt_pnl: number;
+  live_trades: number;
+  live_pnl: number;
+  live_signals: number;
+  match_count: number;
+  live_only_count: number;
+  bt_only_count: number;
+  match_tickers: string | null;
+  live_only_tickers: string | null;
+  bt_only_tickers: string | null;
+  summary: string;
+  details: {
+    live_trades: ReconcileTrade[];
+    bt_trades: ReconcileTrade[];
+    live_signals: { ticker: string; price?: number; gap?: number }[];
+    comments: string[];
+  };
+  status: string;
+}
+
 export const api = {
   account: () => fetchJSON<Account>('/api/account'),
   positions: () => fetchJSON<Position[]>('/api/positions'),
@@ -167,6 +206,8 @@ export const api = {
   halts: () => fetchJSON<HaltEvent[]>('/api/halts/today'),
   slippage: () => fetchJSON<SlippageData>('/api/slippage/recent'),
   health: () => fetchJSON<{healthy: boolean | null, checks: HealthCheck[]}>('/api/health'),
+  reconcile: () => fetchJSON<DailyReconcile[]>('/api/reconcile/daily'),
+  reconcileByDate: (date: string) => fetchJSON<DailyReconcile[]>(`/api/reconcile/daily/${date}`),
 };
 
 export interface HealthCheck {

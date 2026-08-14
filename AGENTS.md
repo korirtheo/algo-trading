@@ -73,6 +73,32 @@ sudo docker compose up -d
 - G exit-shape study (2026-08-14): entry locked from `config/trial_gl_1min_g2_1x_G_only_deploy.json`, only exit params tunable, via env `G_FIXED_FROM_CONFIG=<config> G_TUNE_EXITS_ONLY=1 ALLOWED_STRATS=g`. Tunable exit vars: `g_target_pct`, `g_target2_pct`, `g_partial_sell_pct`, `g_time_limit_min`, `g_stop_pct`, `g_trail_pct`, `g_trail_activate_pct`, `g_exit_mode` (fixed/atr/swing/staged), `g_exit_atr_mult`, `g_exit_swing_k`, `g_exit_swing_window`, `g_exit_staged_thresh`, `g_exit_staged_wide`.
 - Best-trial params go to `results/params/` (e.g. `--params-out results/params/<study>_best.json`), then validate OOS before deploying.
 
+## Post-close daily reconcile (2026-08-15)
+
+- **Purpose**: after extended-hours close (~8:15pm ET, Mon-Fri), verify the live
+  day's trades match a SIP-feed replay of the same day through the deployed
+  engine. Catches the class of divergence that Yahoo/IEX can't (wrong volume /
+  wrong candle-1 color) — Alpaca SIP is the ONLY feed that matches live Tradier
+  candle structure.
+- **Script**: `scripts/reconcile/post_close_reconcile.py` — reads the day's
+  watchlist + signals + trades from `logs/trading.db`, downloads 1-min SIP bars
+  for the watchlist, runs the deploy G config through the real
+  `simulate_day_combined` (slippage+volcaps ON), compares (match / live-only /
+  bt-only), and writes a human-readable summary + comments to the
+  `daily_reconcile` DB table.
+- **Cron**: `deploy/cron_post_close_reconcile.txt` → installed to
+  `/etc/cron.d/algo-reconcile` on AWS by `sudo bash deploy/install_cron.sh`.
+  Runs `15 20 * * 1-5` (8:15pm ET) inside the `algotrader` container.
+- **Dashboard**: `GET /api/reconcile/daily` (router `reconcile.py`), surfaced in
+  the frontend `Reconcile.tsx` component ("Daily Reconcile" card). Shows status
+  (match / divergence / no_trades), live-vs-bt counts, ticker breakdowns, and the
+  human-readable comments on the divergence.
+- **Why after 8pm**: Alpaca's free SIP forbids querying the CURRENT in-progress
+  day (`subscription does not permit querying recent SIP data`) but allows any
+  COMPLETED trading day. So the reconcile must run after close.
+- **SIP fetch**: mirrors `download_losers_alpaca.py` (feed='sip', rate-limit
+  0.6s). NEVER use IEX (wrong volume) or Yahoo (wrong candle structure) for this.
+
 ## Exit-strategy evaluation — STANDING RULE (2026-08-14, after STKH/G exit study)
 
 **Never evaluate an exit-strategy candidate on compounded $ PnL alone.** Always pair

@@ -10,6 +10,7 @@ import { HaltMonitor } from './components/HaltMonitor';
 import { Slippage } from './components/Slippage';
 import { SystemHealth } from './components/SystemHealth';
 import { Analytics } from './components/Analytics';
+import { Reconcile } from './components/Reconcile';
 import { useWebSocket } from './hooks/useWebSocket';
 
 type Page = 'dashboard' | 'analytics';
@@ -83,6 +84,10 @@ function App() {
 
             <div className="row-diagnostics">
               <Slippage />
+            </div>
+
+            <div className="row-diagnostics">
+              <Reconcile />
             </div>
           </>
         ) : (

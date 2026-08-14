@@ -341,8 +341,7 @@ class TradingDatabase:
                     volume REAL,
                     float_shares REAL,
                     gap_pct REAL,
-                    prev_close REAL,
-                    day_high REAL,
+                    prev_close REAL,                    day_high REAL,
                     day_low REAL,
                     avg_volume REAL,
                     source TEXT,
@@ -353,6 +352,38 @@ class TradingDatabase:
             """)
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ticker_stream_date ON ticker_stream_data(date)"
+            )
+
+            # Daily post-close reconcile table — compares the live day's watchlist,
+            # signals, and trades against a SIP-feed replay of the same day through
+            # the deployed engine. Populated by scripts/reconcile/post_close_reconcile.py
+            # (cron, after extended hours). Drives the "Daily Reconcile" dashboard view.
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS daily_reconcile (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date TEXT NOT NULL,
+                    run_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    watchlist_count INTEGER,
+                    sip_fetched INTEGER,
+                    sip_missing TEXT,
+                    bt_trades INTEGER,
+                    bt_pnl REAL,
+                    live_trades INTEGER,
+                    live_pnl REAL,
+                    live_signals INTEGER,
+                    match_count INTEGER,
+                    live_only_count INTEGER,
+                    bt_only_count INTEGER,
+                    match_tickers TEXT,
+                    live_only_tickers TEXT,
+                    bt_only_tickers TEXT,
+                    summary TEXT,
+                    details TEXT,
+                    status TEXT
+                )
+            """)
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_daily_reconcile_date ON daily_reconcile(date)"
             )
 
     # ===== TRADES =====
@@ -447,6 +478,67 @@ class TradingDatabase:
         """Get today's trades."""
         today = datetime.now(ET).date().isoformat()
         return self.get_trades_by_date(today)
+
+    # ===== DAILY RECONCILE (post-close SIP replay vs live) =====
+
+    def save_daily_reconcile(self, data: dict) -> int:
+        """Insert or update a daily reconcile record (one per date, newest wins)."""
+        with self._conn() as conn:
+            conn.execute("""
+                INSERT INTO daily_reconcile (
+                    date, watchlist_count, sip_fetched, sip_missing,
+                    bt_trades, bt_pnl, live_trades, live_pnl, live_signals,
+                    match_count, live_only_count, bt_only_count,
+                    match_tickers, live_only_tickers, bt_only_tickers,
+                    summary, details, status
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(id) DO NOTHING
+            """, (
+                data.get("date"),
+                data.get("watchlist_count"),
+                data.get("sip_fetched"),
+                data.get("sip_missing"),
+                data.get("bt_trades"),
+                data.get("bt_pnl"),
+                data.get("live_trades"),
+                data.get("live_pnl"),
+                data.get("live_signals"),
+                data.get("match_count"),
+                data.get("live_only_count"),
+                data.get("bt_only_count"),
+                data.get("match_tickers"),
+                data.get("live_only_tickers"),
+                data.get("bt_only_tickers"),
+                data.get("summary"),
+                data.get("details"),
+                data.get("status"),
+            ))
+            # keep one row per date — delete older runs for the same date
+            conn.execute("""
+                DELETE FROM daily_reconcile WHERE date=? AND id NOT IN (
+                    SELECT id FROM daily_reconcile WHERE date=?
+                    ORDER BY id DESC LIMIT 1
+                )
+            """, (data.get("date"), data.get("date")))
+            row = conn.execute(
+                "SELECT id FROM daily_reconcile WHERE date=? ORDER BY id DESC LIMIT 1",
+                (data.get("date"),),
+            ).fetchone()
+            return row["id"] if row else None
+
+    def get_daily_reconcile(self, reconcile_date=None, limit=30):
+        """Get reconcile records, newest first. date=None -> latest across all days."""
+        with self._conn() as conn:
+            if reconcile_date:
+                rows = conn.execute(
+                    "SELECT * FROM daily_reconcile WHERE date=? ORDER BY id DESC LIMIT 1",
+                    (reconcile_date,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM daily_reconcile ORDER BY id DESC LIMIT ?", (limit,)
+                ).fetchall()
+            return [dict(r) for r in rows]
 
     # ===== DAILY STATE =====
 
