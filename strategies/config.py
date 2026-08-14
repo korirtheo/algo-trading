@@ -94,6 +94,20 @@ _reg("G", "G_MIN_GAP_PCT", 1, [
     ("G_STOP_PCT", "g_stop_pct", 0.0, "num"),
     ("G_TRAIL_PCT", "g_trail_pct", 0.0, "num"),
     ("G_TRAIL_ACTIVATE_PCT", "g_trail_activate_pct", 0.0, "num"),
+    # G trail-shape params (2026-08-14): G_EXIT_MODE selects the trailing-stop
+    # mechanism; the *_EXIT_* params feed it. All default OFF so existing
+    # behavior (fixed-% trail via G_TRAIL_PCT) is unchanged when not tuned.
+    #   "fixed"  -> G_TRAIL_PCT (legacy; unchanged)
+    #   "atr"    -> trail = peak - G_EXIT_ATR_MULT * ATR%  (vol-adaptive, Chandelier)
+    #   "swing"  -> trail = peak - G_EXIT_SWING_K*(peak - swing_low_lastN)
+    #   "staged" -> tight G_TRAIL_PCT below G_EXIT_STAGED_THRESH, wide
+    #               G_EXIT_STAGED_WIDE above it (ratchets as profit grows)
+    ("G_EXIT_MODE", "g_exit_mode", "fixed", "raw"),
+    ("G_EXIT_ATR_MULT", "g_exit_atr_mult", 0.0, "num"),
+    ("G_EXIT_SWING_K", "g_exit_swing_k", 0.0, "num"),
+    ("G_EXIT_SWING_WINDOW", "g_exit_swing_window", 5, "int"),
+    ("G_EXIT_STAGED_THRESH", "g_exit_staged_thresh", 0.0, "num"),
+    ("G_EXIT_STAGED_WIDE", "g_exit_staged_wide", 0.0, "num"),
 ])
 
 # --- A: Quick Scalp ------------------------------------------------------

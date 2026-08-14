@@ -108,6 +108,43 @@ def load_trial_params(path=None):
             tgc.MAX_POSITION_PCT_OF_CASH = float(_pc)
             log.info("Max position = %.0f%% of cash (config)", float(_pc))
 
+        # L entry filter (config l_filter). The full winner-identified filter
+        # stack (2026-08-12): l_filter_px25_min / px10_min / gap_min / pmvol_min /
+        # range10_min / pmvol_max / price_min / from_open_min map to the
+        # corresponding tgc.L_FILTER_* thresholds. The legacy single px25 gate
+        # (l_filter_window_min / l_filter_threshold_pct) is only enabled when
+        # l_filter_mode="gate".
+        _lf = raw.get("l_filter")
+        if _lf:
+            _map = {
+                "px25_min": "L_FILTER_PX25_MIN",
+                "px10_min": "L_FILTER_PX10_MIN",
+                "gap_min": "L_FILTER_GAP_MIN",
+                "pmvol_min": "L_FILTER_PMVOL_MIN",
+                "range10_min": "L_FILTER_RANGE10_MIN",
+                "pmvol_max": "L_FILTER_PMVOL_MAX",
+                "price_min": "L_FILTER_PRICE_MIN",
+                "from_open_min": "L_FILTER_FROM_OPEN_MIN",
+            }
+            _n = 0
+            for _cfg_key, _tgc_key in _map.items():
+                _v = raw.get(f"l_filter_{_cfg_key}")
+                if _v is not None:
+                    setattr(tgc, _tgc_key, float(_v))
+                    _n += 1
+            if raw.get("l_filter_mode") == "gate":
+                tgc.L_PX25_GATE_ENABLED = True
+                if raw.get("l_filter_window_min"):
+                    tgc.L_PX25_GATE_MINUTE = int(raw["l_filter_window_min"])
+                if raw.get("l_filter_threshold_pct"):
+                    tgc.L_PX25_GATE_THRESHOLD_PCT = float(raw["l_filter_threshold_pct"])
+            log.info(
+                "L entry filter ENABLED (filter=%s, %d stack fields%s)",
+                _lf,
+                _n,
+                ", hard gate" if raw.get("l_filter_mode") == "gate" else "",
+            )
+
     # Live-only: zero the volume caps when IEX feed under-counts cum_$vol.
     # Without this, sizing binds at ~$100 on hot gappers because the IEX feed
     # only sees ~0.1% of market volume. The 30% equity cap in the executor
@@ -257,6 +294,13 @@ class CombinedEngine:
         self.fill_stream = (
             fill_stream  # FillStream instance, or None for legacy polling
         )
+
+        # 2026-08-14 (STKH incident): periodic FULL reconciliation against Alpaca's
+        # GET /positions. Backstop for orphaned positions (engine abandoned an order
+        # that Alpaca kept filling). Runs on a 5-min cadence from on_bar; rehydrates
+        # any real Alpaca position the engine lost track of.
+        self._last_full_reconcile = 0.0
+        self.FULL_RECONCILE_INTERVAL_SEC = 300.0
 
         # Data feed status — set by main.py after streamers are started
         # Values: 'tradier', 'alpaca_iex', 'unknown'
@@ -670,6 +714,15 @@ class CombinedEngine:
                 new_peak = max(old_peak, bar["High"])
                 if new_peak > old_peak:
                     self.position_state.update_peak(symbol, new_peak)
+
+        # 2026-08-14 FIX (STKH incident): periodic FULL reconcile (5-min cadence)
+        # backstops orphaned positions — a real Alpaca position the engine lost track
+        # of (slow fill outliving the old 60s abandon) gets rehydrated here even though
+        # the per-ticker reconcile above never sees it (ticker no longer in active_positions).
+        if (
+            time.time() - self._last_full_reconcile >= self.FULL_RECONCILE_INTERVAL_SEC
+        ):
+            self._reconcile_all_positions(ts)
 
         # --- v3 overlay exit check ---
         if (
@@ -1220,10 +1273,103 @@ class CombinedEngine:
                     "RECONCILE %s: no Alpaca position yet but pending buy exists — holding slot",
                     ticker,
                 )
+            elif ticker in self.position_entry and self.position_entry.get(ticker, {}).get("shares", 0) > 0:
+                # FIX 2026-08-14 (STKH incident): the old code cleared internal state when
+                # get_open_position raised. But that exception is just "no position returned" —
+                # it is NOT proof the order never filled. A slow market order can fill AFTER
+                # the engine polled. Never destroy position state from an order/position check
+                # alone when we already believe we own shares; keep it and let the periodic
+                # full reconcile re-verify against GET /positions.
+                log.warning(
+                    "RECONCILE %s: position lookup failed but internal shares>0 — "
+                    "KEEPING state (order may still be filling), periodic reconcile backstops",
+                    ticker,
+                )
             else:
                 log.warning("RECONCILE %s: no position at Alpaca → clearing", ticker)
                 self.position_entry.pop(ticker, None)
                 self.active_positions.discard(ticker)
+
+    def _reconcile_all_positions(self, current_ts):
+        """FULL reconciliation: compare internal position_entry vs Alpaca GET /positions.
+
+        2026-08-14 FIX (STKH incident): the old reconcile only ran for tickers already in
+        active_positions. If the engine abandoned a slow-filling order (old 60s safety-poll),
+        the ticker was dropped from active_positions and NEVER reconciled again — a real
+        position (STKH, 2125 sh @ $5.99) stayed "forgotten" all day: no trail, no stop.
+
+        This runs on a 5-min cadence and:
+          - Rehydrates any Alpaca open position the engine doesn't know about (orphan).
+          - Flags (but does NOT auto-close) engine-tracked positions missing from Alpaca,
+            so an external close gets picked up without us nuking a filling order.
+        """
+        try:
+            positions = self.executor.get_positions()
+        except Exception as e:
+            log.error(f"FULL-RECONCILE: get_positions failed: {e}")
+            log_event("full_reconcile_error", "error", f"FULL-RECONCILE get_positions failed: {e}")
+            return
+        alpaca_qty = {}
+        for p in positions:
+            sym = str(getattr(p, "symbol", ""))
+            qty = float(getattr(p, "qty", 0) or 0)
+            if sym and qty >= 1.0:
+                alpaca_qty[sym] = qty
+
+        # 1) Orphans: Alpaca has shares we don't track. Rehydrate (never auto-close —
+        #    strategy is unknown; rehydrating with a best-effort default lets the exit
+        #    machinery at least protect the position going forward).
+        for sym, qty in alpaca_qty.items():
+            internal = self.position_entry.get(sym)
+            internal_qty = float(internal.get("shares", 0)) if internal else 0.0
+            if abs(internal_qty - qty) >= 1.0 or internal is None:
+                with self._pending_lock:
+                    pending = any(
+                        p.get("ticker") == sym and p.get("side") == "buy"
+                        for p in self.pending_orders.values()
+                    )
+                if pending:
+                    # A buy is still being worked — reconcile already covers it on each bar.
+                    continue
+                strategy = "G"  # best-effort default; entry params came from G entry
+                pos_obj = next((p for p in positions if str(getattr(p, "symbol", "")) == sym), None)
+                avg = float(getattr(pos_obj, "avg_entry_price", 0) or 0) if pos_obj else 0.0
+                log.warning(
+                    "FULL-RECONCILE: ORPHAN position %s — Alpaca qty=%.0f, internal=%.0f → rehydrating",
+                    sym,
+                    qty,
+                    internal_qty,
+                )
+                self._rehydrate_position_from_alpaca(sym, qty, strategy, current_ts, force_avg=avg)
+                log_event(
+                    "orphan_recovered",
+                    "warning",
+                    f"FULL-RECONCILE recovered orphan {sym}: {qty:.0f} sh",
+                )
+
+        # 2) Engine-tracked but absent from Alpaca AND no pending buy: external close.
+        #    Only clear if we have a real internal record (not a placeholder share=0).
+        for sym in list(self.active_positions):
+            if sym in alpaca_qty:
+                continue
+            internal = self.position_entry.get(sym)
+            if not internal or float(internal.get("shares", 0)) < 1:
+                continue  # placeholder / pending — leave it
+            with self._pending_lock:
+                pending = any(
+                    p.get("ticker") == sym and p.get("side") == "buy"
+                    for p in self.pending_orders.values()
+                )
+            if pending:
+                continue  # buy still working
+            log.warning(
+                "FULL-RECONCILE: %s internal shares but no Alpaca position (no pending buy) — clearing",
+                sym,
+            )
+            self.position_entry.pop(sym, None)
+            self.active_positions.discard(sym)
+
+        self._last_full_reconcile = time.time()
 
     # ------------------------------------------------------------------ #
     #  v3 OVERLAY (R-O any-green after G hold expires)                  #
@@ -2229,39 +2375,60 @@ class CombinedEngine:
             log.debug(f"SELL {ticker} STREAM event={event_type} order={oid}")
 
     def _schedule_sell_safety_poll(self, order_id, ticker):
-        """Safety net for sell orders — same logic as buy, polls after 60s."""
+        """Safety net for sell orders — same logic as buy, polls with backoff.
+        2026-08-14: extended from single-60s to backoff so slow-filling exits aren't
+        abandoned early (the engine retries exits anyway, but a filled-but-missed exit
+        would otherwise linger as a stale pending order)."""
 
         def _poll():
-            time.sleep(60.0)
-            with self._pending_lock:
-                still_pending = str(order_id) in self.pending_orders
-            if not still_pending:
-                return
+            delays = [60.0, 120.0, 300.0]
+            attempt = 0
+            t0 = time.time()
+            while time.time() - t0 < 3600.0:
+                if attempt < len(delays):
+                    time.sleep(delays[attempt])
+                else:
+                    time.sleep(delays[-1])
+                attempt += 1
+                with self._pending_lock:
+                    still_pending = str(order_id) in self.pending_orders
+                if not still_pending:
+                    return
+                log.warning(
+                    "SAFETY-POLL SELL %s order %s: stream silent %ds, polling Alpaca (attempt %d)",
+                    ticker,
+                    order_id,
+                    int(time.time() - t0),
+                    attempt,
+                )
+                try:
+                    o = self.executor.client.get_order_by_id(order_id)
+                    status = o.status.value if hasattr(o.status, "value") else str(o.status)
+                    status = status.lower().replace("orderstatus.", "")
+                    filled_qty = float(o.filled_qty) if o.filled_qty else 0.0
+                    if status == "filled" or filled_qty > 0:
+                        self._on_sell_fill("fill", o)
+                        return
+                    elif status in ("canceled", "rejected", "expired"):
+                        self._on_sell_fill(status, o)
+                        return
+                    else:
+                        log.warning(
+                            "SAFETY-POLL SELL %s order %s: still %s after %ds — continuing backoff",
+                            ticker,
+                            order_id,
+                            status,
+                            int(time.time() - t0),
+                        )
+                except Exception as e:
+                    log.error(f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
+                    log_event("safety_poll_error", "error", f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
             log.warning(
-                "SAFETY-POLL SELL %s order %s: stream silent 60s, polling Alpaca",
+                "SAFETY-POLL SELL %s order %s: gave up polling after %.0fs",
                 ticker,
                 order_id,
+                time.time() - t0,
             )
-            try:
-                o = self.executor.client.get_order_by_id(order_id)
-                status = o.status.value if hasattr(o.status, "value") else str(o.status)
-                status = status.lower().replace("orderstatus.", "")
-                if status == "filled" or (o.filled_qty and float(o.filled_qty) > 0):
-                    self._on_sell_fill("fill", o)
-                elif status in ("canceled", "rejected", "expired"):
-                    self._on_sell_fill(status, o)
-                else:
-                    log.warning(
-                        "SAFETY-POLL SELL %s order %s: still %s after 60s — abandoning callback",
-                        ticker,
-                        order_id,
-                        status,
-                    )
-                    with self._pending_lock:
-                        self.pending_orders.pop(str(order_id), None)
-            except Exception as e:
-                log.error(f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
-                log_event("safety_poll_error", "error", f"SAFETY-POLL SELL {ticker} order {order_id} failed: {e}")
 
         threading.Thread(
             target=_poll, daemon=True, name=f"sell-safety-{str(order_id)[:8]}"
@@ -2271,51 +2438,152 @@ class CombinedEngine:
         self, order_id, ticker, side, signal_price, signal_time, strategy
     ):
         """Background safety net: if TradingStream misses an event (stream disconnect,
-        callback bug, etc.), poll Alpaca after 60s to force-resolve the pending order.
+        callback bug, etc.), poll Alpaca with exponential backoff to force-resolve the
+        pending order.
+
+        2026-08-14 FIX (STKH incident): previously this did ONE 60s poll and ABANDONED
+        on status!=filled, popping pending_orders and clearing active_positions. But a
+        slow-filling market order on a volatile microcap can legitimately take 3+ minutes
+        (STKH: 2125 sh filled 09:33-09:34 vs order placed 09:32), and Alpaca KEEPS filling
+        after the engine abandons. The engine then "forgot" a real position → no trail/stop
+        management → trapped at -20%. Now we:
+          1. Poll with exponential backoff (60s, 120s, 300s, then every 300s up to a cap)
+             instead of a single hard 60s abandon.
+          2. On each poll, if the order is still working, CHECK ACTUAL POSITIONS before
+             clearing — an order may be part-filled even when status reads "new".
+          3. NEVER clear position_state from an order-status check alone; position state
+             is only cleared when a positions-endpoint check confirms zero shares.
         """
         order_id = str(order_id)  # Alpaca returns UUID objects, not strings
 
         def _poll():
-            time.sleep(60.0)
-            with self._pending_lock:
-                still_pending = str(order_id) in self.pending_orders
-            if not still_pending:
-                return  # stream already handled it
+            delays = [60.0, 120.0, 300.0]  # then every 300s
+            attempt = 0
+            max_wall = 3600.0  # keep polling up to 1h (covers the slowest fills)
+            t0 = time.time()
+            while time.time() - t0 < max_wall:
+                if attempt < len(delays):
+                    time.sleep(delays[attempt])
+                else:
+                    time.sleep(delays[-1])
+                attempt += 1
+                with self._pending_lock:
+                    still_pending = str(order_id) in self.pending_orders
+                if not still_pending:
+                    return  # stream already handled it (fill/cancel/etc.)
+                log.warning(
+                    "SAFETY-POLL %s order %s: stream silent %ds, polling Alpaca (attempt %d)",
+                    ticker,
+                    order_id,
+                    int(time.time() - t0),
+                    attempt,
+                )
+                try:
+                    o = self.executor.client.get_order_by_id(order_id)
+                    status = o.status.value if hasattr(o.status, "value") else str(o.status)
+                    status = status.lower().replace("orderstatus.", "")
+                    filled_qty = float(o.filled_qty) if o.filled_qty else 0.0
+                    if status == "filled" or filled_qty > 0:
+                        # Manually invoke the same handler as stream would
+                        self._on_buy_fill("fill", o)
+                        return
+                    elif status in ("canceled", "rejected", "expired"):
+                        self._on_buy_fill(status, o)
+                        return
+                    else:
+                        # Order still working ("new"/"partially_filled"/"accepted").
+                        # FIX: before considering abandonment, check the actual position.
+                        # A slow market order can have fills in flight even when the
+                        # order-status endpoint lags. Only clear if Alpaca truly shows
+                        # zero shares AND the order is genuinely terminal.
+                        try:
+                            pos = self.executor.client.get_open_position(ticker)
+                            pos_qty = float(getattr(pos, "qty", 0) or 0)
+                        except Exception:
+                            pos_qty = 0.0  # no position endpoint hit (no open position)
+                        if pos_qty >= 1.0:
+                            log.warning(
+                                "SAFETY-POLL %s: order status=%s but Alpaca has %.0f shares "
+                                "— position exists, rehydrating (do NOT abandon)",
+                                ticker,
+                                status,
+                                pos_qty,
+                            )
+                            self._rehydrate_position_from_alpaca(
+                                ticker, pos_qty, strategy, signal_time
+                            )
+                            with self._pending_lock:
+                                self.pending_orders.pop(str(order_id), None)
+                            self.active_positions.add(ticker)
+                            return
+                        log.warning(
+                            "SAFETY-POLL %s order %s: status=%s still pending, "
+                            "Alpaca pos=%.0f — continuing backoff (not abandoning)",
+                            ticker,
+                            order_id,
+                            status,
+                            pos_qty,
+                        )
+                        # Continue polling — do NOT pop pending or clear position.
+                except Exception as e:
+                    log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
+                    log_event("safety_poll_error", "error", f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
+                    # Transient error — keep polling; do not abandon on exception either.
+            # Ran out of wall-clock budget: give up polling but keep state (stream may still
+            # resolve it; periodic reconcile is the backstop).
             log.warning(
-                "SAFETY-POLL %s order %s: stream didn't notify in 60s, polling Alpaca",
+                "SAFETY-POLL %s order %s: gave up polling after %.0fs — periodic reconcile will backstop",
                 ticker,
                 order_id,
+                time.time() - t0,
             )
-            try:
-                o = self.executor.client.get_order_by_id(order_id)
-                status = o.status.value if hasattr(o.status, "value") else str(o.status)
-                status = status.lower().replace("orderstatus.", "")
-                if status == "filled" or (o.filled_qty and float(o.filled_qty) > 0):
-                    # Manually invoke the same handler as stream would
-                    self._on_buy_fill("fill", o)
-                elif status in ("canceled", "rejected", "expired"):
-                    self._on_buy_fill(status, o)
-                else:
-                    log.warning(
-                        "SAFETY-POLL %s order %s: status=%s after 60s, still pending — abandoning",
-                        ticker,
-                        order_id,
-                        status,
-                    )
-                    with self._pending_lock:
-                        self.pending_orders.pop(str(order_id), None)
-                    if (
-                        ticker in self.active_positions
-                        and ticker not in self.position_entry
-                    ):
-                        self.active_positions.discard(ticker)
-            except Exception as e:
-                log.error(f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
-                log_event("safety_poll_error", "error", f"SAFETY-POLL {ticker} order {order_id} failed: {e}")
 
         threading.Thread(
             target=_poll, daemon=True, name=f"safety-poll-{str(order_id)[:8]}"
         ).start()
+
+    def _rehydrate_position_from_alpaca(
+        self, ticker, qty, strategy, entry_time, force_avg=None
+    ):
+        """Rehydrate internal position_entry from an Alpaca open position.
+        Used by the safety-poll (FIX 2026-08-14) and periodic reconcile when the engine
+        lost track of a real position (slow fill that outlived the old 60s abandon)."""
+        try:
+            client = getattr(self.executor, "client", None)
+            if client is not None and hasattr(client, "get_open_position"):
+                pos = client.get_open_position(ticker)
+            else:
+                pos = self.executor.get_open_position(ticker)
+            actual_avg = float(getattr(pos, "avg_entry_price", 0) or 0)
+            if actual_avg <= 0 and force_avg:
+                actual_avg = float(force_avg)
+        except Exception:
+            actual_avg = float(force_avg) if force_avg else 0.0
+        if actual_avg <= 0:
+            actual_avg = 0.0
+        qty = float(qty)
+        self.position_entry[ticker] = {
+            "entry_price": actual_avg,
+            "shares": qty,
+            "cost": qty * actual_avg,
+            "strategy": strategy,
+            "entry_time": entry_time,
+        }
+        self.active_positions.add(ticker)
+        if hasattr(self, "_pending_entries"):
+            self._pending_entries.discard(ticker)
+        log.warning(
+            "REHYDRATE %s: rebuilt position from Alpaca — qty=%.0f avg=$%.3f strategy=%s",
+            ticker,
+            qty,
+            actual_avg,
+            strategy,
+        )
+        log_event(
+            "position_rehydrated",
+            "warning",
+            f"REHYDRATE {ticker}: qty={qty:.0f} avg=${actual_avg:.3f} strategy={strategy}",
+        )
 
     def _poll_buy_fill_inline(self, order, ticker, strategy, entry_price, ts):
         """LEGACY synchronous polling — used only when fill_stream is None.

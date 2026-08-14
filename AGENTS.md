@@ -64,3 +64,11 @@ sudo docker compose up -d
 - 1-min data cache: `stored_data_1min/fulltest_picks_gap2_vol250k.pkl` (picks keyed by date).
 - Deploy OOS window: **2026-03-01 → 2026-08-07 (~100 trading days)**; full-sample runs use 2024-01-01 → 2026-12-31.
 - Run OOS with the deploy config top-level fields applied exactly like `load_trial_params`: `g_first_bar_only`, `margin_multiplier`, `max_position_pct_of_cash`, and `l_filter*` → `tgc.L_FILTER_*`. `set_strategy_params(cfg['params'])` alone misses these.
+
+## Optuna conventions
+
+- **ALWAYS use PostgreSQL for the Optuna study DB** — never SQLite for a real run. Postgres 16/17 runs locally at `postgresql://postgres@127.0.0.1:5432/` (trust auth, no password). One **database per study family** (e.g. `optuna_gl_1min`, `optuna_g_wide`, `optuna_g_only`), study name = the variant (e.g. `gl_1min_v5_g2_2x`, `g_wide_w21b`). Pass via `--db postgresql://postgres@127.0.0.1:5432/<db> --study <name>`. SQLite (`--db *.db`) is only for throwaway smoke tests.
+- **Optimal startup trials for TPE**: use `--startup-trials 4x` the number of tunable dimensions (a ~13-param exit study → `--startup-trials 50-80`). The default 200 is for the 20-strategy combined space; scale down for focused single-strategy studies.
+- **Slippage parity is mandatory**: the objectives assert `USE_DYNAMIC_SLIPPAGE` + `USE_MULTIWINDOW_SLIPPAGE` are True. Never disable for a study.
+- G exit-shape study (2026-08-14): entry locked from `config/trial_gl_1min_g2_1x_G_only_deploy.json`, only exit params tunable, via env `G_FIXED_FROM_CONFIG=<config> G_TUNE_EXITS_ONLY=1 ALLOWED_STRATS=g`. Tunable exit vars: `g_target_pct`, `g_target2_pct`, `g_partial_sell_pct`, `g_time_limit_min`, `g_stop_pct`, `g_trail_pct`, `g_trail_activate_pct`, `g_exit_mode` (fixed/atr/swing/staged), `g_exit_atr_mult`, `g_exit_swing_k`, `g_exit_swing_window`, `g_exit_staged_thresh`, `g_exit_staged_wide`.
+- Best-trial params go to `results/params/` (e.g. `--params-out results/params/<study>_best.json`), then validate OOS before deploying.

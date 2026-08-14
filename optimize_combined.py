@@ -107,9 +107,22 @@ def suggest_all_params(trial):
                 _gfix = _json.load(_f).get("params", {})
         except Exception:
             _gfix = None
+    # G_TUNE_EXITS_ONLY: copy G ENTRY params from the fixed config but leave the
+    # EXIT params (targets, partial, stop, time, trail, exit-shape) tunable. Used
+    # for the 2026-08-14 "G exit shape" study — entry matches the deployed bot,
+    # only the exit side is optimized.
+    _g_exits_only = _os_gfixed.environ.get("G_TUNE_EXITS_ONLY", "") == "1"
+    _G_EXIT_KEYS = {
+        "g_target_pct", "g_target2_pct", "g_partial_sell_pct",
+        "g_time_limit_min", "g_stop_pct", "g_trail_pct", "g_trail_activate_pct",
+        "g_exit_mode", "g_exit_atr_mult", "g_exit_swing_k",
+        "g_exit_swing_window", "g_exit_staged_thresh", "g_exit_staged_wide",
+    }
     if _gfix is not None:
         for _k, _v in _gfix.items():
             if _k.startswith("g_") or _k == "enable_g":
+                if _g_exits_only and _k in _G_EXIT_KEYS:
+                    continue  # exit keys stay tunable
                 params[_k] = _v
         params["enable_g"] = True
 
@@ -131,7 +144,9 @@ def suggest_all_params(trial):
     import os as _os_g2
     _g_simple = _os_g2.environ.get("G_SIMPLE_ENTRY", "") == "1"
     if _gfix is not None:
-        # G locked from deploy config: do not touch any g_* param
+        # Locked-from-config (G_FIXED_FROM_CONFIG): entry params already copied
+        # above; never re-tune them. With G_TUNE_EXITS_ONLY the exit block below
+        # still runs (via the `_gfix is None or _g_exits_only` gate).
         pass
     elif _g_simple:
         params["g_min_gap_pct"] = 15.0
@@ -153,7 +168,7 @@ def suggest_all_params(trial):
         # fires (2nd = 2 greens, 3rd = 3 greens, 4th = 4 greens). Hierarchical.
         params["g_require_3rd_green"] = trial.suggest_categorical("g_require_3rd_green", [True, False])
         params["g_require_4th_green"] = trial.suggest_categorical("g_require_4th_green", [True, False])
-    if _gfix is None:
+    if _gfix is None or _g_exits_only:
         params["g_target_pct"] = trial.suggest_float("g_target_pct", 4.0, 20.0, step=1.0)
         params["g_time_limit_min"] = trial.suggest_int("g_time_limit_min", 3, 30, step=3)
         import os as _os_gs
@@ -161,16 +176,52 @@ def suggest_all_params(trial):
         params["g_stop_pct"] = trial.suggest_float("g_stop_pct", _g_stop_lo, 12.0, step=2.0)
         params["g_trail_pct"] = trial.suggest_float("g_trail_pct", 0.0, 5.0, step=1.0)
         params["g_trail_activate_pct"] = trial.suggest_float("g_trail_activate_pct", 0.0, 8.0, step=2.0)
+        # G EXIT-SHAPE (2026-08-14): partial-sell + runner target + trail mode.
+        # Partial sell at g_target_pct banks a fraction; the remainder rides to
+        # g_target2_pct. g_exit_mode selects the trailing mechanism:
+        #   fixed  -> g_trail_pct (legacy)
+        #   atr    -> Chandelier  (peak - g_exit_atr_mult*ATR%)
+        #   swing  -> swing-low   (peak - g_exit_swing_k*(peak - recent swing low))
+        #   staged -> tight g_trail_pct below g_exit_staged_thresh%, wide
+        #             g_exit_staged_wide% above it (ratchets with profit)
+        params["g_partial_sell_pct"] = trial.suggest_float("g_partial_sell_pct", 0.0, 75.0, step=25.0)
+        if params["g_partial_sell_pct"] > 0:
+            params["g_target2_pct"] = trial.suggest_float("g_target2_pct", 20.0, 200.0, step=10.0)
+        else:
+            params["g_target2_pct"] = params["g_target_pct"]
+        # G_PARTIAL_EXITS_ONLY (2026-08-14): isolate the partial-sell effect —
+        # fix exit_mode=fixed and zero the ATR/swing/staged params so ONLY the
+        # classic exits (target, partial, stop, trail, time) are tunable.
+        import os as _os_gp
+        _g_partial_only = _os_gp.environ.get("G_PARTIAL_EXITS_ONLY", "") == "1"
+        if _g_partial_only:
+            params["g_exit_mode"] = "fixed"
+            params["g_exit_atr_mult"] = 0.0
+            params["g_exit_swing_k"] = 0.0
+            params["g_exit_swing_window"] = 5
+            params["g_exit_staged_thresh"] = 0.0
+            params["g_exit_staged_wide"] = 0.0
+        else:
+            params["g_exit_mode"] = trial.suggest_categorical(
+                "g_exit_mode", ["fixed", "atr", "swing", "staged"]
+            )
+            params["g_exit_atr_mult"] = trial.suggest_float("g_exit_atr_mult", 0.5, 4.0, step=0.5)
+            params["g_exit_swing_k"] = trial.suggest_float("g_exit_swing_k", 1.0, 4.0, step=0.5)
+            params["g_exit_swing_window"] = trial.suggest_int("g_exit_swing_window", 3, 20, step=2)
+            params["g_exit_staged_thresh"] = trial.suggest_float("g_exit_staged_thresh", 5.0, 30.0, step=2.5)
+            params["g_exit_staged_wide"] = trial.suggest_float("g_exit_staged_wide", 2.0, 12.0, step=1.0)
         # G bar-strength gates + conviction sizing (G2 experiment). Suggested only
-        # in G_SIMPLE_ENTRY mode so legacy G-only/L studies keep their exact space.
-        import os as _os_g3
-        if _os_g3.environ.get("G_SIMPLE_ENTRY", "") == "1":
-            params["g_min_1st_body_pct"] = trial.suggest_float("g_min_1st_body_pct", 0.0, 5.0, step=0.5)
-        params["g_min_2nd_body_pct"] = trial.suggest_float("g_min_2nd_body_pct", 0.0, 5.0, step=0.5)
-        params["g_min_2nd_vol_mult"] = trial.suggest_float("g_min_2nd_vol_mult", 0.0, 3.0, step=0.25)
-        params["g_conviction_mult"] = trial.suggest_float("g_conviction_mult", 0.0, 3.0, step=0.5)
-        params["g_pm_gate_strength_scale"] = trial.suggest_float("g_pm_gate_strength_scale", 0.0, 12.0, step=1.0)
-        params["g_pm_credit_fraction"] = trial.suggest_float("g_pm_credit_fraction", 0.05, 0.5, step=0.05)
+        # when G is NOT locked from a config — in G_TUNE_EXITS_ONLY mode these
+        # entry-side gates stay at the deployed config values.
+        if _gfix is None:
+            import os as _os_g3
+            if _os_g3.environ.get("G_SIMPLE_ENTRY", "") == "1":
+                params["g_min_1st_body_pct"] = trial.suggest_float("g_min_1st_body_pct", 0.0, 5.0, step=0.5)
+            params["g_min_2nd_body_pct"] = trial.suggest_float("g_min_2nd_body_pct", 0.0, 5.0, step=0.5)
+            params["g_min_2nd_vol_mult"] = trial.suggest_float("g_min_2nd_vol_mult", 0.0, 3.0, step=0.25)
+            params["g_conviction_mult"] = trial.suggest_float("g_conviction_mult", 0.0, 3.0, step=0.5)
+            params["g_pm_gate_strength_scale"] = trial.suggest_float("g_pm_gate_strength_scale", 0.0, 12.0, step=1.0)
+            params["g_pm_credit_fraction"] = trial.suggest_float("g_pm_credit_fraction", 0.05, 0.5, step=0.05)
 
     # === A: Quick Scalp (5 params) ===
     params["a_target_pct"] = trial.suggest_float("a_target_pct", 2.0, 15.0, step=1.0)
@@ -639,6 +690,8 @@ def _build_param_snapshot():
         'F_STOP_PCT', 'F_TARGET_PCT', 'F_TIME_LIMIT_MINUTES', 'F_TRAIL_ACTIVATE_PCT', 'F_TRAIL_PCT',
         'G_PARTIAL_SELL_PCT', 'G_STOP_PCT', 'G_TARGET_PCT', 'G_TARGET2_PCT',
         'G_TIME_LIMIT_MINUTES', 'G_TRAIL_ACTIVATE_PCT', 'G_TRAIL_PCT',
+        'G_EXIT_MODE', 'G_EXIT_ATR_MULT', 'G_EXIT_SWING_K', 'G_EXIT_SWING_WINDOW',
+        'G_EXIT_STAGED_THRESH', 'G_EXIT_STAGED_WIDE',
         'H_STOP_PCT', 'H_TARGET_PCT', 'H_TIME_LIMIT_MINUTES', 'H_TRAIL_ACTIVATE_PCT', 'H_TRAIL_PCT',
         'I_BREAKOUT_VOL_MULT', 'I_MAX_ENTRY_CANDLE', 'I_MIN_GAP_PCT', 'I_PARTIAL_SELL_PCT',
         'I_STOP_PCT', 'I_TARGET1_PCT', 'I_TARGET2_PCT', 'I_TIME_LIMIT_MINUTES',

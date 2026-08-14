@@ -683,6 +683,9 @@ G_FIRST_BAR_ONLY = os.environ.get("G_FIRST_BAR_ONLY", "") == "1"
 # (Alpaca 4x intraday on this account). Default off = unchanged behavior.
 PRICE_TIER_SIZING = os.environ.get("PRICE_TIER_SIZING", "") == "1"
 PRICE_TIER_FULL_MULT = float(os.environ.get("PRICE_TIER_FULL_MULT", "4.0"))
+# LEVERAGE_MIN_EQUITY: no leverage below this equity level (cash-only). Once
+# equity crosses the threshold, tiered/configured leverage applies.
+LEVERAGE_MIN_EQUITY = float(os.environ.get("LEVERAGE_MIN_EQUITY", "2000"))
 # A (Quick Scalp)
 A_MIN_BODY_PCT = 4.0
 A_MAX_BODY_PCT = 999
@@ -695,6 +698,29 @@ F_REQUIRE_2ND_NEW_HIGH = False
 # L (Low Float Squeeze)
 L_HOD_BREAK_REQUIRED = True
 L_REQUIRE_ABOVE_VWAP = True
+# L px25>5 strength gate (deploy config l_filter="px25>5"). Hard time gate:
+# L may not fill before minute L_PX25_GATE_MINUTE after the 09:30 session open
+# (25 -> 09:55), and from then on only if the current price is up more than
+# L_PX25_GATE_THRESHOLD_PCT from the session open. Default OFF (no behavior
+# change); enabled by the deploy config's top-level l_filter* fields.
+L_PX25_GATE_ENABLED = False
+L_PX25_GATE_MINUTE = 25
+L_PX25_GATE_THRESHOLD_PCT = 5.0
+L_PX25_GATE_MODE = os.environ.get("L_PX25_GATE_MODE", "trail")
+# Full L-entry filter stack from the earlier filters study
+# (gl_1min_g2_1x_l_filters_v1): px25_min / px10_min = trailing-window returns %,
+# gap_min = day gap %, pmvol_min = premarket volume (shares), range10_min =
+# 10-min high-low range %. Each active only when its threshold > 0.
+L_FILTER_PX25_MIN = 0.0
+L_FILTER_PX10_MIN = 0.0
+L_FILTER_GAP_MIN = 0.0
+L_FILTER_PMVOL_MIN = 0.0
+L_FILTER_RANGE10_MIN = 0.0
+# Winner-vs-loser filters (2026-08-12 analysis): pmvol too high = crowded =
+# losers; higher-priced and stronger-from-open winners.
+L_FILTER_PMVOL_MAX = 0.0
+L_FILTER_PRICE_MIN = 0.0
+L_FILTER_FROM_OPEN_MIN = 0.0
 # W (Power Hour Breakout)
 W_REQUIRE_ABOVE_VWAP = True
 
@@ -973,6 +999,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 "G_TIME_LIMIT_MINUTES",
                 "G_TRAIL_ACTIVATE_PCT",
                 "G_TRAIL_PCT",
+                "G_EXIT_MODE",
+                "G_EXIT_ATR_MULT",
+                "G_EXIT_SWING_K",
+                "G_EXIT_SWING_WINDOW",
+                "G_EXIT_STAGED_THRESH",
+                "G_EXIT_STAGED_WIDE",
                 "H_STOP_PCT",
                 "H_TARGET_PCT",
                 "H_TIME_LIMIT_MINUTES",
@@ -1209,6 +1241,12 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
     G_TIME_LIMIT_MINUTES = params["G_TIME_LIMIT_MINUTES"]
     G_TRAIL_ACTIVATE_PCT = params["G_TRAIL_ACTIVATE_PCT"]
     G_TRAIL_PCT = params["G_TRAIL_PCT"]
+    G_EXIT_MODE = params.get("G_EXIT_MODE", "fixed")
+    G_EXIT_ATR_MULT = params.get("G_EXIT_ATR_MULT", 0.0)
+    G_EXIT_SWING_K = params.get("G_EXIT_SWING_K", 0.0)
+    G_EXIT_SWING_WINDOW = params.get("G_EXIT_SWING_WINDOW", 5)
+    G_EXIT_STAGED_THRESH = params.get("G_EXIT_STAGED_THRESH", 0.0)
+    G_EXIT_STAGED_WIDE = params.get("G_EXIT_STAGED_WIDE", 0.0)
     H_STOP_PCT = params["H_STOP_PCT"]
     H_TARGET_PCT = params["H_TARGET_PCT"]
     H_TIME_LIMIT_MINUTES = params["H_TIME_LIMIT_MINUTES"]
@@ -2783,20 +2821,105 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                             st["g_highest_since_entry"] / st["entry_price"] - 1
                         ) * 100
                         if unrealized_pct >= _g_trail_act:
-                            if G_TRAIL_ATR_MULT > 0:
+                            # G trail-shape selector: which trailing mechanism to
+                            # use. "fixed" = legacy G_TRAIL_PCT; "atr" = Chandelier
+                            # (peak - k*ATR%); "swing" = (peak - k*(peak-swinglow));
+                            # "staged" = tight trail below a profit threshold, wide
+                            # trail above it. All new modes default OFF (mode
+                            # "fixed" unless G_EXIT_MODE explicitly set).
+                            _g_exit_mode = str(
+                                _ep.get(f"{_gp}_exit_mode", G_EXIT_MODE)
+                            ).lower()
+                            if _g_exit_mode == "atr" and float(
+                                _ep.get(f"{_gp}_exit_atr_mult", G_EXIT_ATR_MULT)
+                            ) > 0:
                                 # ATR-based trail: widen/tighten with actual
                                 # volatility. trail = peak - k*ATR% so a $2
                                 # stock with huge range doesn't get stopped on
-                                # normal noise. k = G_TRAIL_ATR_MULT.
+                                # normal noise. k = G_EXIT_ATR_MULT.
                                 _atr_pct = _bar_atr(st["mh"], ts)
                                 if _atr_pct > 0:
                                     trail_stop = st["g_highest_since_entry"] * (
-                                        1 - G_TRAIL_ATR_MULT * _atr_pct / 100
+                                        1
+                                        - float(
+                                            _ep.get(
+                                                f"{_gp}_exit_atr_mult",
+                                                G_EXIT_ATR_MULT,
+                                            )
+                                        )
+                                        * _atr_pct
+                                        / 100
                                     )
                                 else:
                                     trail_stop = st["g_highest_since_entry"] * (
                                         1 - _g_trail / 100
                                     )
+                            elif _g_exit_mode == "swing" and float(
+                                _ep.get(f"{_gp}_exit_swing_k", G_EXIT_SWING_K)
+                            ) > 0:
+                                # Swing-low trail: stop rides a multiple of the
+                                # distance from peak down to the recent swing low.
+                                # Widens during expansion (parabolic runners keep
+                                # swinging higher), tightens on contraction.
+                                _sw_k = float(
+                                    _ep.get(
+                                        f"{_gp}_exit_swing_k", G_EXIT_SWING_K
+                                    )
+                                )
+                                _sw_win = max(
+                                    1,
+                                    int(
+                                        _ep.get(
+                                            f"{_gp}_exit_swing_window",
+                                            G_EXIT_SWING_WINDOW,
+                                        )
+                                    ),
+                                )
+                                _mh_pre = st["mh"].loc[st["mh"].index <= ts]
+                                if len(_mh_pre) > 0:
+                                    _swing_low = float(
+                                        _mh_pre["Low"].tail(_sw_win).min()
+                                    )
+                                    trail_stop = st["g_highest_since_entry"] - (
+                                        _sw_k
+                                        * (
+                                            st["g_highest_since_entry"]
+                                            - _swing_low
+                                        )
+                                    )
+                                else:
+                                    trail_stop = st["g_highest_since_entry"] * (
+                                        1 - _g_trail / 100
+                                    )
+                            elif _g_exit_mode == "staged" and float(
+                                _ep.get(
+                                    f"{_gp}_exit_staged_thresh", G_EXIT_STAGED_THRESH
+                                )
+                            ) > 0:
+                                # Staged trail: tight below the profit threshold,
+                                # wide above it. Ratchets the stop as profit grows
+                                # so early fades are cut tightly but strong runners
+                                # get room to breathe.
+                                _st_thresh = float(
+                                    _ep.get(
+                                        f"{_gp}_exit_staged_thresh",
+                                        G_EXIT_STAGED_THRESH,
+                                    )
+                                )
+                                _st_wide = float(
+                                    _ep.get(
+                                        f"{_gp}_exit_staged_wide",
+                                        G_EXIT_STAGED_WIDE,
+                                    )
+                                )
+                                _st_pct = (
+                                    _st_wide
+                                    if unrealized_pct >= _st_thresh
+                                    else _g_trail
+                                )
+                                trail_stop = st["g_highest_since_entry"] * (
+                                    1 - _st_pct / 100
+                                )
                             else:
                                 trail_stop = st["g_highest_since_entry"] * (
                                     1 - _g_trail / 100
@@ -4031,6 +4154,110 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                 ):
                     candle_idx = st["candle_count"] - 1
 
+                    # px25>5 strength gate (deploy l_filter="px25>5", matching the
+                    # gl_1min_g2_1x_l_filters_v1 study's px25_min filter). Two modes
+                    # (L_PX25_GATE_MODE, default "trail"):
+                    #   "trail" - trailing L_PX25_GATE_MINUTE-minute return >=
+                    #             L_PX25_GATE_THRESHOLD_PCT at L's normal 09:32+
+                    #             timing (momentum prerequisite)
+                    #   "time"  - hard time gate: no L before minute 25 (09:55),
+                    #             then only if up >threshold% from the 09:30 open
+                    # Default OFF (no behavior change).
+                    _px25_ok = True
+                    if L_PX25_GATE_ENABLED:
+                        if L_PX25_GATE_MODE == "time":
+                            _candle_ts = st["mh"].index[candle_idx]
+                            _session_start = st["mh"].index[0]
+                            _mins_since_open = (
+                                _candle_ts - _session_start
+                            ).total_seconds() / 60.0
+                            _day_open = float(st["mh"].iloc[0]["Open"])
+                            _px25_ok = (
+                                _mins_since_open >= L_PX25_GATE_MINUTE
+                                and _day_open > 0
+                                and c_close
+                                > _day_open * (1 + L_PX25_GATE_THRESHOLD_PCT / 100.0)
+                            )
+                        else:  # "trail" (default)
+                            _bar_interval = (
+                                _detect_bar_interval(st["mh"]) or WINDOW_REF_BAR_MINUTES
+                            )
+                            _trail_bars = max(
+                                1, int(round(L_PX25_GATE_MINUTE / float(_bar_interval)))
+                            )
+                            if candle_idx >= _trail_bars:
+                                _ref_close = float(
+                                    st["mh"].iloc[candle_idx - _trail_bars]["Close"]
+                                )
+                                _win_ret = (
+                                    (c_close / _ref_close - 1) * 100
+                                    if _ref_close > 0
+                                    else 0.0
+                                )
+                                _px25_ok = _win_ret >= L_PX25_GATE_THRESHOLD_PCT
+                            else:
+                                _px25_ok = False  # not enough history yet
+
+                    # Full L-entry filter stack (earlier filters study). Active
+                    # per-filter when its threshold > 0. px25/px10 = trailing
+                    # window returns %, gap = day gap %, pmvol = premarket volume
+                    # (shares), range10 = 10-min high-low range %.
+                    _l_filters_ok = _px25_ok
+                    if _l_filters_ok:
+                        _bar_interval = (
+                            _detect_bar_interval(st["mh"]) or WINDOW_REF_BAR_MINUTES
+                        )
+                        _b10 = max(1, int(round(10 / float(_bar_interval))))
+                        _b25 = max(1, int(round(25 / float(_bar_interval))))
+                        if L_FILTER_GAP_MIN > 0:
+                            _l_filters_ok = (
+                                float(st.get("gap_pct") or 0.0) >= L_FILTER_GAP_MIN
+                            )
+                        if _l_filters_ok and L_FILTER_PMVOL_MIN > 0:
+                            _l_filters_ok = (
+                                float(st.get("pm_volume") or 0.0) >= L_FILTER_PMVOL_MIN
+                            )
+                        if _l_filters_ok and L_FILTER_PX10_MIN > 0:
+                            if candle_idx >= _b10:
+                                _r10 = float(st["mh"].iloc[candle_idx - _b10]["Close"])
+                                _ret10 = (
+                                    (c_close / _r10 - 1) * 100 if _r10 > 0 else 0.0
+                                )
+                                _l_filters_ok = _ret10 >= L_FILTER_PX10_MIN
+                            else:
+                                _l_filters_ok = False
+                        if _l_filters_ok and L_FILTER_PX25_MIN > 0:
+                            if candle_idx >= _b25:
+                                _r25 = float(st["mh"].iloc[candle_idx - _b25]["Close"])
+                                _ret25 = (
+                                    (c_close / _r25 - 1) * 100 if _r25 > 0 else 0.0
+                                )
+                                _l_filters_ok = _ret25 >= L_FILTER_PX25_MIN
+                            else:
+                                _l_filters_ok = False
+                        if _l_filters_ok and L_FILTER_RANGE10_MIN > 0:
+                            _sl = max(0, candle_idx - _b10 + 1)
+                            _rng_hi = float(st["mh"].iloc[_sl : candle_idx + 1]["High"].max())
+                            _rng_lo = float(st["mh"].iloc[_sl : candle_idx + 1]["Low"].min())
+                            _rng10 = (
+                                (_rng_hi - _rng_lo) / c_close * 100 if c_close > 0 else 0.0
+                            )
+                            _l_filters_ok = _rng10 >= L_FILTER_RANGE10_MIN
+                        if _l_filters_ok and L_FILTER_PMVOL_MAX > 0:
+                            _l_filters_ok = (
+                                float(st.get("pm_volume") or 0.0) <= L_FILTER_PMVOL_MAX
+                            )
+                        if _l_filters_ok and L_FILTER_PRICE_MIN > 0:
+                            _l_filters_ok = c_close >= L_FILTER_PRICE_MIN
+                        if _l_filters_ok and L_FILTER_FROM_OPEN_MIN > 0:
+                            _day_open0 = float(st["mh"].iloc[0]["Open"])
+                            _from_open = (
+                                (c_close / _day_open0 - 1) * 100
+                                if _day_open0 > 0
+                                else 0.0
+                            )
+                            _l_filters_ok = _from_open >= L_FILTER_FROM_OPEN_MIN
+
                     # Check if this candle made a new HOD (already tracked above)
                     is_new_hod = (c_high >= st["l_running_hod"]) and (
                         st["l_running_hod"] > 0
@@ -4074,7 +4301,7 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
                         if L_REQUIRE_ABOVE_VWAP and candle_idx < len(st["vwap"]):
                             vwap_ok_l = c_close >= st["vwap"][candle_idx]
 
-                        if vol_ok_l and accel_ok and vwap_ok_l:
+                        if vol_ok_l and accel_ok and vwap_ok_l and _l_filters_ok:
                             # Override tier targets per trade sequence (L1/L2 split)
                             _l_seq = day_trade_counts.get("L", 0)
                             _pfx = "l1" if _l_seq == 0 else "l2"
@@ -4255,7 +4482,13 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             #   > $6.00   -> full margin buying power (~4x intraday)
             # When enabled, we recompute the effective position % of cash from
             # the entry price so sizing mirrors what Alpaca will accept.
-            if PRICE_TIER_SIZING and st.get("signal_price") and st["signal_price"] > 0:
+            # Leverage only applies once equity >= LEVERAGE_MIN_EQUITY.
+            if (
+                PRICE_TIER_SIZING
+                and cash_box[0] >= LEVERAGE_MIN_EQUITY
+                and st.get("signal_price")
+                and st["signal_price"] > 0
+            ):
                 _tier_px = float(st["signal_price"])
                 if _tier_px < 2.50:
                     _tier_pct = 100.0
@@ -4303,11 +4536,16 @@ def simulate_day_combined(picks, cash, cash_account=False, is_live=False, params
             # this, conviction (up to 3x) pushed positions into modeled margin
             # debt (APPS/CNSP/CELZ etc. $1M+ positions on compounded ~$700k
             # cash). MAX_POSITION_PCT_OF_CASH=100 matches a cash account (no
-            # leverage); >100 opts into modeled margin.
-            _cash_cap = cash_box[0] * (MAX_POSITION_PCT_OF_CASH / 100.0)
+            # leverage); >100 opts into modeled margin. Below
+            # LEVERAGE_MIN_EQUITY equity, leverage is force-disabled (100%).
+            _eff_pos_pct = (
+                100.0 if cash_box[0] < LEVERAGE_MIN_EQUITY else MAX_POSITION_PCT_OF_CASH
+            )
+            _cash_cap = cash_box[0] * (_eff_pos_pct / 100.0)
             if trade_size > _cash_cap:
                 trade_size = _cash_cap
                 st["cash_capped"] = True
+                st["cash_cap_pct"] = _eff_pos_pct
             alpha_size = trade_size  # reflect final cap for diagnostics
 
             fill_price = st["signal_price"]
