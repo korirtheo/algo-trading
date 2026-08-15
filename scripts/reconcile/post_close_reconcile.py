@@ -227,9 +227,55 @@ def run_reconcile(trade_date, dry_run=False):
                 xt = str(st.get("exit_time", ""))[11:16]
                 ep = st.get("entry_price") or 0
                 xp = st.get("exit_price") or 0
+
+                # --- entry/exit candle detail from the sim's candle DataFrame ---
+                mh = st.get("mh")
+                entry_candles = None   # [ {bar_time, O,H,L,C,green,new_high} x 2 ]
+                exit_candle = None
+                if mh is not None and len(mh) > 0:
+                    try:
+                        mhf = mh.copy()
+                        if mhf.index.tz is None:
+                            mhf.index = mhf.index.tz_localize("UTC")
+                        mhf.index = mhf.index.tz_convert("America/New_York")
+                        times = [t.strftime("%H:%M") for t in mhf.index]
+                        c1o = float(mhf.iloc[0]["Open"]); c1c = float(mhf.iloc[0]["Close"])
+                        c1h = float(mhf.iloc[0]["High"])
+                        entry_candles = [
+                            {
+                                "bar_time": times[0],
+                                "open": round(c1o, 4), "high": round(c1h, 4),
+                                "close": round(c1c, 4), "green": c1c > c1o,
+                                "body_pct": round((c1c / c1o - 1) * 100, 2) if c1o > 0 else 0,
+                            },
+                        ]
+                        if len(mhf) > 1:
+                            c2o = float(mhf.iloc[1]["Open"]); c2c = float(mhf.iloc[1]["Close"])
+                            c2h = float(mhf.iloc[1]["High"])
+                            entry_candles.append({
+                                "bar_time": times[1],
+                                "open": round(c2o, 4), "high": round(c2h, 4),
+                                "close": round(c2c, 4), "green": c2c > c2o,
+                                "body_pct": round((c2c / c2o - 1) * 100, 2) if c2o > 0 else 0,
+                                "new_high": c2h > c1h,
+                            })
+                        # exit bar = last bar in the trade's window
+                        if len(mhf) > 0:
+                            last = mhf.iloc[-1]
+                            lo = float(last["Open"]); lc = float(last["Close"])
+                            exit_candle = {
+                                "bar_time": times[-1], "open": round(lo, 4),
+                                "high": round(float(last["High"]), 4),
+                                "close": round(lc, 4), "green": lc > lo,
+                            }
+                    except Exception:
+                        entry_candles = None
+                        exit_candle = None
+
                 bt_trades.append({
                     "ticker": st.get("ticker"),
                     "strategy": st.get("strategy"),
+                    "gap_pct": round(st.get("gap_pct", 0), 1),
                     "pnl": pnl,
                     "pnl_pct": round(pnl / cost * 100, 2) if cost > 0 else 0,
                     "reason": st.get("exit_reason"),
@@ -241,6 +287,8 @@ def run_reconcile(trade_date, dry_run=False):
                     "hold_min": round(((st.get("exit_time") or st.get("entry_time")) - (st.get("entry_time") or 0)).total_seconds() / 60, 1)
                     if hasattr(st.get("exit_time"), "total_seconds") and hasattr(st.get("entry_time"), "total_seconds")
                     else None,
+                    "entry_candles": entry_candles,
+                    "exit_candle": exit_candle,
                 })
                 bt_pnl += pnl
 
@@ -334,17 +382,64 @@ def run_reconcile(trade_date, dry_run=False):
         f"match {len(match)}, live-only {len(live_only)}, replay-only {len(bt_only)}."
     )
 
+    # --- live candle detail (Tradier feed_comparison bars around entry/exit) ---
+    def _live_candles(ticker, entry_min_str, exit_min_str=None):
+        """First 3 live Tradier bars + the exit bar for a ticker (for the live trade log)."""
+        bars = db.get_tradier_bars_for_ticker(trade_date, ticker)
+        if not bars:
+            return None, None
+        try:
+            entry_candles = []
+            for b in bars[:3]:
+                c = {
+                    "bar_time": b.get("bar_time"),
+                    "open": round(float(b.get("open") or 0), 4),
+                    "high": round(float(b.get("high") or 0), 4),
+                    "close": round(float(b.get("close") or 0), 4),
+                    "green": float(b.get("close") or 0) > float(b.get("open") or 0),
+                }
+                if entry_candles:
+                    c["new_high"] = float(b.get("high") or 0) > entry_candles[-1]["high"]
+                entry_candles.append(c)
+            exit_candle = None
+            if exit_min_str:
+                for b in bars:
+                    if b.get("bar_time") == exit_min_str:
+                        exit_candle = {
+                            "bar_time": b.get("bar_time"),
+                            "open": round(float(b.get("open") or 0), 4),
+                            "high": round(float(b.get("high") or 0), 4),
+                            "close": round(float(b.get("close") or 0), 4),
+                            "green": float(b.get("close") or 0) > float(b.get("open") or 0),
+                        }
+                        break
+            return entry_candles, exit_candle
+        except Exception:
+            return None, None
+
+    live_trades_detail = []
+    for t in live_trades:
+        et = str(t.get("entry_time", ""))[11:16]
+        xt = str(t.get("exit_time", ""))[11:16]
+        ec, xc = _live_candles(t.get("ticker"), et, xt)
+        live_trades_detail.append({
+            "ticker": t.get("ticker"),
+            "strategy": t.get("strategy"),
+            "gap_pct": round(float(t.get("gap_pct") or 0), 1),
+            "pnl": t.get("pnl"),
+            "pnl_pct": round(t.get("pnl_pct", 0) or 0, 2),
+            "reason": t.get("exit_reason"),
+            "entry_time": et,
+            "exit_time": xt,
+            "entry_price": round(float(t.get("entry_price", 0) or 0), 4),
+            "exit_price": round(float(t.get("exit_price", 0) or 0), 4),
+            "shares": t.get("shares", 0),
+            "entry_candles": ec,
+            "exit_candle": xc,
+        })
+
     details = {
-        "live_trades": [
-            {"ticker": t.get("ticker"), "pnl": t.get("pnl"), "reason": t.get("exit_reason"),
-             "entry_time": str(t.get("entry_time", ""))[11:16],
-             "entry_price": round(float(t.get("entry_price", 0) or 0), 4),
-             "exit_price": round(float(t.get("exit_price", 0) or 0), 4),
-             "shares": t.get("shares", 0),
-             "pnl_pct": round(t.get("pnl_pct", 0) or 0, 2),
-             "exit_time": str(t.get("exit_time", ""))[11:16]}
-            for t in live_trades
-        ],
+        "live_trades": live_trades_detail,
         "bt_trades": bt_trades,
         "live_signals": [{"ticker": s.get("ticker"), "price": s.get("signal_price"),
                           "gap": s.get("gap_pct")} for s in live_signals],
@@ -397,6 +492,14 @@ def run_reconcile(trade_date, dry_run=False):
             print(f"  {t['ticker']:<7} {t.get('entry_time') or '-':>6} {t.get('exit_time') or '-':>6} "
                   f"{t.get('entry_price') or 0:>8.3f} {t.get('exit_price') or 0:>8.3f} "
                   f"{t.get('reason') or '-':<10} {t.get('pnl', 0):>10,.0f} {t.get('pnl_pct', 0):>+6.1f}%")
+            for c in (t.get('entry_candles') or []):
+                hi = f" NEWHI" if c.get('new_high') else ""
+                print(f"    entry-candle {c.get('bar_time')}: {c.get('open')}->{c.get('close')} "
+                      f"({'GREEN' if c.get('green') else 'red'}{hi})")
+            if t.get('exit_candle'):
+                x = t['exit_candle']
+                print(f"    exit-candle  {x.get('bar_time')}: {x.get('open')}->{x.get('close')} "
+                      f"({'GREEN' if x.get('green') else 'red'})")
     if live_trades:
         print("\n  --- LIVE TRADES ---")
         for t in live_trades:

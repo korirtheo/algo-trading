@@ -192,11 +192,38 @@ interface ReconcileRecord {
   summary: string;
   status: string;
   details: {
-    live_trades: { ticker: string; pnl?: number; reason?: string; entry_time?: string }[];
-    bt_trades: { ticker: string; pnl?: number; reason?: string; entry_time?: string }[];
+    live_trades: ReconcileTrade[];
+    bt_trades: ReconcileTrade[];
     live_signals: { ticker: string; price?: number; gap?: number }[];
     comments: string[];
+    findings: Record<string, { bars: number; gaps?: string; note?: string }>;
   };
+}
+
+interface ReconcileCandle {
+  bar_time: string;
+  open: number;
+  high: number;
+  close: number;
+  green: boolean;
+  new_high?: boolean;
+  body_pct?: number;
+}
+
+interface ReconcileTrade {
+  ticker: string;
+  strategy?: string;
+  gap_pct?: number;
+  pnl?: number;
+  pnl_pct?: number;
+  reason?: string;
+  entry_time?: string;
+  exit_time?: string;
+  entry_price?: number;
+  exit_price?: number;
+  shares?: number;
+  entry_candles?: ReconcileCandle[];
+  exit_candle?: ReconcileCandle;
 }
 
 export const Analytics = () => {
@@ -717,30 +744,41 @@ export const Analytics = () => {
 
         {/* trade details */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 12px' }}>Live Trades</div>
-            {(r.details?.live_trades || []).length === 0 && <div style={{ padding: '0 12px', fontSize: 12, color: 'var(--text-muted)' }}>none</div>}
-            {(r.details?.live_trades || []).map((t, i) => (
-              <div key={i} style={{ padding: '2px 12px', fontSize: 12 }}>
-                <span className="ticker-cell">{t.ticker}</span>
-                <span style={{ color: t.pnl && t.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                  {' '}${(t.pnl || 0).toFixed(0)} {t.reason || ''}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 12px' }}>Backtest Trades</div>
-            {(r.details?.bt_trades || []).length === 0 && <div style={{ padding: '0 12px', fontSize: 12, color: 'var(--text-muted)' }}>none</div>}
-            {(r.details?.bt_trades || []).map((t, i) => (
-              <div key={i} style={{ padding: '2px 12px', fontSize: 12 }}>
-                <span className="ticker-cell">{t.ticker}</span>
-                <span style={{ color: t.pnl && t.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
-                  {' '}${(t.pnl || 0).toFixed(0)} {t.reason || ''}
-                </span>
-              </div>
-            ))}
-          </div>
+          {[['Live Trades', r.details?.live_trades || []], ['Backtest Trades', r.details?.bt_trades || []]].map(([label, trades]) => (
+            <div key={label as string}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 12px' }}>{label as string}</div>
+              {(trades as ReconcileTrade[]).length === 0 && <div style={{ padding: '0 12px', fontSize: 12, color: 'var(--text-muted)' }}>none</div>}
+              {(trades as ReconcileTrade[]).map((t, i) => {
+                const pnl = t.pnl ?? 0;
+                const pnlColor = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+                return (
+                  <div key={i} style={{ padding: '6px 12px', fontSize: 12, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div>
+                      <span className="ticker-cell">{t.ticker}</span>
+                      {t.strategy && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-muted)' }}>{t.strategy}</span>}
+                      {t.gap_pct != null && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-muted)' }}>gap {t.gap_pct.toFixed(1)}%</span>}
+                      <span style={{ color: pnlColor, fontWeight: 700, marginLeft: 8 }}>${pnl.toFixed(0)}</span>
+                      <span style={{ color: pnlColor, marginLeft: 4 }}>({pnl >= 0 ? '+' : ''}{t.pnl_pct?.toFixed(1) ?? '0.0'}%)</span>
+                      <span style={{ marginLeft: 8, color: 'var(--text-muted)', fontSize: 10 }}>{t.reason || ''}</span>
+                    </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
+                      entry {t.entry_time} @ ${t.entry_price?.toFixed(4) ?? '-'} → exit {t.exit_time} @ ${t.exit_price?.toFixed(4) ?? '-'}
+                    </div>
+                    {(t.entry_candles || []).map((c, ci) => (
+                      <div key={ci} style={{ fontSize: 11, marginTop: 1, color: c.green ? 'var(--green)' : 'var(--red)' }}>
+                        c{ci + 1} {c.bar_time}: {c.open}→{c.close} {c.green ? 'GREEN' : 'red'}{c.new_high ? ' NEWHI' : ''}{c.body_pct != null ? ` (${c.body_pct >= 0 ? '+' : ''}${c.body_pct.toFixed(1)}%)` : ''}
+                      </div>
+                    ))}
+                    {t.exit_candle && (
+                      <div style={{ fontSize: 11, marginTop: 1, color: t.exit_candle.green ? 'var(--green)' : 'var(--red)' }}>
+                        exit {t.exit_candle.bar_time}: {t.exit_candle.open}→{t.exit_candle.close} {t.exit_candle.green ? 'GREEN' : 'red'}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
       </div>
     );
