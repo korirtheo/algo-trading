@@ -183,6 +183,7 @@ interface ReconcileRecord {
   live_trades: number;
   live_pnl: number;
   live_signals: number;
+  start_cash?: number;
   match_count: number;
   live_only_count: number;
   bt_only_count: number;
@@ -685,6 +686,10 @@ export const Analytics = () => {
           <div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Watchlist / SIP</div>
             <div style={{ fontWeight: 600 }}>{r.watchlist_count} / {r.sip_fetched} fetched</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Start Cash</div>
+            <div style={{ fontWeight: 600 }}>${(r.start_cash || 0).toLocaleString()}</div>
           </div>
           <div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Live P&L</div>

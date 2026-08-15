@@ -371,6 +371,7 @@ class TradingDatabase:
                     live_trades INTEGER,
                     live_pnl REAL,
                     live_signals INTEGER,
+                    start_cash REAL,
                     match_count INTEGER,
                     live_only_count INTEGER,
                     bt_only_count INTEGER,
@@ -385,6 +386,12 @@ class TradingDatabase:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_daily_reconcile_date ON daily_reconcile(date)"
             )
+            # Migration: start_cash column (2026-08-15 — exact starting cash used
+            # by the reconcile backtest, from the prior trading day's close).
+            try:
+                conn.execute("ALTER TABLE daily_reconcile ADD COLUMN start_cash REAL")
+            except Exception:
+                pass  # column already exists
 
     # ===== TRADES =====
 
@@ -487,11 +494,11 @@ class TradingDatabase:
             conn.execute("""
                 INSERT INTO daily_reconcile (
                     date, watchlist_count, sip_fetched, sip_missing,
-                    bt_trades, bt_pnl, live_trades, live_pnl, live_signals,
+                    bt_trades, bt_pnl, live_trades, live_pnl, live_signals, start_cash,
                     match_count, live_only_count, bt_only_count,
                     match_tickers, live_only_tickers, bt_only_tickers,
                     summary, details, status
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(id) DO NOTHING
             """, (
                 data.get("date"),
@@ -503,6 +510,7 @@ class TradingDatabase:
                 data.get("live_trades"),
                 data.get("live_pnl"),
                 data.get("live_signals"),
+                data.get("start_cash"),
                 data.get("match_count"),
                 data.get("live_only_count"),
                 data.get("bt_only_count"),

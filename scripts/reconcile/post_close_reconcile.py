@@ -64,6 +64,40 @@ def latest_completed_trading_day() -> str:
     return d.isoformat()
 
 
+def get_day_starting_cash(db, trade_date, fallback=10000.0):
+    """Exact starting cash for the trade date = the PRIOR trading day's market-close
+    cash balance (the cash that was available at this day's open). The live engine
+    seeds simulate_day_combined with acct.cash (not margin buying power), so the
+    replay must use the same number for dollar figures to align.
+
+    Falls back to fallback if no prior snapshot exists (fresh account / missing data).
+    """
+    from datetime import date as _date
+    target = _date.fromisoformat(trade_date)
+    d = target
+    for _ in range(14):  # back up to ~2 weeks for weekends/holidays
+        d = d - timedelta(days=1)
+        try:
+            snaps = db.get_account_snapshots_by_date(d.isoformat())
+        except Exception:
+            snaps = []
+        # prefer the last market_close cash (fall back to any snapshot's cash)
+        closes = [s for s in snaps if s.get("snapshot_type") == "market_close"]
+        pool = closes if closes else snaps
+        for s in pool:
+            c = s.get("cash")
+            if c is not None:
+                try:
+                    c = float(c)
+                except (TypeError, ValueError):
+                    continue
+                if c >= 0:
+                    log.info("Starting cash for %s: $%.2f (from %s close)", trade_date, c, d)
+                    return c
+    log.warning("No prior cash snapshot for %s — using fallback $%.0f", trade_date, fallback)
+    return fallback
+
+
 def fetch_minute_bars(client, ticker, day):
     """1-min SIP bars for ticker on day (market hours only). Returns DataFrame or None."""
     s = datetime.combine(day, datetime.min.time().replace(hour=9, minute=30)).replace(tzinfo=ET)
@@ -217,8 +251,12 @@ def run_reconcile(trade_date, dry_run=False):
 
     bt_trades = []
     bt_pnl = 0.0
+    start_cash = get_day_starting_cash(db, trade_date)
     if not dry_run:
-        states, _, _, _ = tgc.simulate_day_combined(picks, 10000.0, False, params=snap)
+        # Use the EXACT starting cash the live account had at this day's open
+        # (= prior trading day's market-close cash; live seeds sim with acct.cash,
+        # NOT margin buying power). Dollar figures then align with live.
+        states, _, _, _ = tgc.simulate_day_combined(picks, start_cash, False, params=snap)
         for st in states:
             if st.get("exit_reason") is not None and st.get("position_cost", 0) > 0:
                 cost = st.get("position_cost", 0) or 0
@@ -452,6 +490,7 @@ def run_reconcile(trade_date, dry_run=False):
         "watchlist_count": len(watchlist),
         "sip_fetched": len(bars_map),
         "sip_missing": ",".join(missing) if missing else None,
+        "start_cash": round(start_cash, 2),
         "bt_trades": len(bt_trades),
         "bt_pnl": round(bt_pnl, 2),
         "live_trades": len(live_trades),
