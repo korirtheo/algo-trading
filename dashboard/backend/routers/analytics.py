@@ -403,3 +403,24 @@ async def get_halt_status(date: str):
     except Exception:
         pass
     return result
+
+
+@router.get("/analytics/reconcile/{date}")
+async def get_reconcile(date: str):
+    """Post-close SIP-replay reconcile record for a date (live vs backtest)."""
+    import json as _json
+    try:
+        rows = db.get_daily_reconcile(reconcile_date=date)
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["details"] = _json.loads(d.get("details") or "{}")
+            except Exception:
+                d["details"] = {}
+            out.append(d)
+        return out
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to get reconcile: {e}")
+        return []

@@ -206,8 +206,6 @@ export const api = {
   halts: () => fetchJSON<HaltEvent[]>('/api/halts/today'),
   slippage: () => fetchJSON<SlippageData>('/api/slippage/recent'),
   health: () => fetchJSON<{healthy: boolean | null, checks: HealthCheck[]}>('/api/health'),
-  reconcile: () => fetchJSON<DailyReconcile[]>('/api/reconcile/daily'),
-  reconcileByDate: (date: string) => fetchJSON<DailyReconcile[]>(`/api/reconcile/daily/${date}`),
 };
 
 export interface HealthCheck {

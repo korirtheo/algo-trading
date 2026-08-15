@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchJSON } from '../api/client';
 
-type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage' | 'feed_comparison' | 'intraday_discoveries';
+type Tab = 'trades' | 'signals' | 'orders' | 'snapshots' | 'events' | 'bars' | 'watchlist' | 'slippage' | 'feed_comparison' | 'intraday_discoveries' | 'reconcile';
 
 interface Signal {
   id: number;
@@ -171,6 +171,34 @@ interface IntradayDiscovery {
   float_shares: number | null;
 }
 
+interface ReconcileRecord {
+  id: number;
+  date: string;
+  run_at: string;
+  watchlist_count: number;
+  sip_fetched: number;
+  sip_missing: string | null;
+  bt_trades: number;
+  bt_pnl: number;
+  live_trades: number;
+  live_pnl: number;
+  live_signals: number;
+  match_count: number;
+  live_only_count: number;
+  bt_only_count: number;
+  match_tickers: string | null;
+  live_only_tickers: string | null;
+  bt_only_tickers: string | null;
+  summary: string;
+  status: string;
+  details: {
+    live_trades: { ticker: string; pnl?: number; reason?: string; entry_time?: string }[];
+    bt_trades: { ticker: string; pnl?: number; reason?: string; entry_time?: string }[];
+    live_signals: { ticker: string; price?: number; gap?: number }[];
+    comments: string[];
+  };
+}
+
 export const Analytics = () => {
   const [tab, setTab] = useState<Tab>('trades');
   const [date, setDate] = useState(() => {
@@ -190,6 +218,7 @@ export const Analytics = () => {
   const [slippageRows, setSlippageRows] = useState<SlippageRow[]>([]);
   const [feedComparison, setFeedComparison] = useState<FeedComparisonRow[]>([]);
   const [intradayDiscoveries, setIntradayDiscoveries] = useState<IntradayDiscovery[]>([]);
+  const [reconcile, setReconcile] = useState<ReconcileRecord[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -250,6 +279,11 @@ export const Analytics = () => {
         case 'intraday_discoveries': {
           const discoveriesData = await fetchJSON<IntradayDiscovery[]>(`/api/analytics/intraday_discoveries/${date}`);
           setIntradayDiscoveries(discoveriesData);
+          break;
+        }
+        case 'reconcile': {
+          const reconcileData = await fetchJSON<ReconcileRecord[]>(`/api/analytics/reconcile/${date}`);
+          setReconcile(reconcileData);
           break;
         }
       }
@@ -594,6 +628,122 @@ export const Analytics = () => {
     if (v > 20) return 'var(--red)';
     if (v < -10) return 'var(--green)';
     return 'var(--text-secondary)';
+  };
+
+  const renderReconcile = () => {
+    const r = reconcile[0];
+    if (!r) return <div className="empty-state">No reconcile run for this date (runs automatically after 8pm ET)</div>;
+    const statusColor = r.status === 'match' ? 'var(--green)'
+      : (r.status === 'divergence' || r.status === 'live_only_missed_by_replay') ? 'var(--red)'
+      : '#f59e0b';
+    const liveOnly = (r.live_only_tickers || '').split(',').filter(Boolean);
+    const btOnly = (r.bt_only_tickers || '').split(',').filter(Boolean);
+    const match = (r.match_tickers || '').split(',').filter(Boolean);
+
+    return (
+      <div>
+        {/* summary strip */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+          gap: 12, padding: '12px', borderBottom: '1px solid var(--border)', fontSize: 12,
+        }}>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Status</div>
+            <div style={{ fontWeight: 700, color: statusColor, textTransform: 'uppercase' }}>{r.status.replace(/_/g, ' ')}</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Run At</div>
+            <div style={{ fontWeight: 600 }}>{r.run_at ? new Date(r.run_at + 'Z').toLocaleString() : '—'}</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Watchlist / SIP</div>
+            <div style={{ fontWeight: 600 }}>{r.watchlist_count} / {r.sip_fetched} fetched</div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Live P&L</div>
+            <div style={{ fontWeight: 600, color: r.live_pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {r.live_pnl >= 0 ? '+' : ''}${(r.live_pnl || 0).toFixed(0)}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Backtest P&L</div>
+            <div style={{ fontWeight: 600, color: r.bt_pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+              {r.bt_pnl >= 0 ? '+' : ''}${(r.bt_pnl || 0).toFixed(0)}
+            </div>
+          </div>
+        </div>
+
+        {/* summary + comments */}
+        {r.summary && (
+          <div style={{ padding: '8px 12px', fontSize: 12, borderBottom: '1px solid var(--border)' }}>{r.summary}</div>
+        )}
+        {(r.details?.comments || []).map((c, i) => (
+          <div key={i} style={{
+            padding: '6px 12px', fontSize: 12, color: 'var(--text-secondary)',
+            borderLeft: '3px solid ' + (c.startsWith('BT-ONLY') || c.startsWith('LIVE-ONLY') ? 'var(--red)' : 'var(--green)'),
+            margin: '6px 12px', background: 'rgba(255,255,255,0.03)',
+          }}>
+            {c}
+          </div>
+        ))}
+
+        {/* ticker tables */}
+        <table className="analytics-table" style={{ marginTop: 8 }}>
+          <thead>
+            <tr>
+              <th style={{ textAlign: 'left' }}>Category</th>
+              <th style={{ textAlign: 'right' }}>Count</th>
+              <th style={{ textAlign: 'left' }}>Tickers</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style={{ color: 'var(--green)', fontWeight: 700 }}>MATCH (live = backtest)</td>
+              <td style={{ textAlign: 'right' }}>{r.match_count}</td>
+              <td>{match.join(', ') || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: 'var(--red)', fontWeight: 700 }}>LIVE-ONLY (live traded, replay missed)</td>
+              <td style={{ textAlign: 'right' }}>{r.live_only_count}</td>
+              <td style={{ color: 'var(--red)' }}>{liveOnly.join(', ') || '—'}</td>
+            </tr>
+            <tr>
+              <td style={{ color: '#f59e0b', fontWeight: 700 }}>BT-ONLY (replay traded, live missed)</td>
+              <td style={{ textAlign: 'right' }}>{r.bt_only_count}</td>
+              <td style={{ color: '#f59e0b' }}>{btOnly.join(', ') || '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        {/* trade details */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: '8px 0' }}>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 12px' }}>Live Trades</div>
+            {(r.details?.live_trades || []).length === 0 && <div style={{ padding: '0 12px', fontSize: 12, color: 'var(--text-muted)' }}>none</div>}
+            {(r.details?.live_trades || []).map((t, i) => (
+              <div key={i} style={{ padding: '2px 12px', fontSize: 12 }}>
+                <span className="ticker-cell">{t.ticker}</span>
+                <span style={{ color: t.pnl && t.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {' '}${(t.pnl || 0).toFixed(0)} {t.reason || ''}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', padding: '4px 12px' }}>Backtest Trades</div>
+            {(r.details?.bt_trades || []).length === 0 && <div style={{ padding: '0 12px', fontSize: 12, color: 'var(--text-muted)' }}>none</div>}
+            {(r.details?.bt_trades || []).map((t, i) => (
+              <div key={i} style={{ padding: '2px 12px', fontSize: 12 }}>
+                <span className="ticker-cell">{t.ticker}</span>
+                <span style={{ color: t.pnl && t.pnl >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                  {' '}${(t.pnl || 0).toFixed(0)} {t.reason || ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const renderSlippage = () => (
@@ -954,6 +1104,12 @@ export const Analytics = () => {
         >
           Intraday Discoveries
         </button>
+        <button
+          className={`tab-btn ${tab === 'reconcile' ? 'active' : ''}`}
+          onClick={() => setTab('reconcile')}
+        >
+          Daily Reconcile
+        </button>
       </div>
 
       <div className="analytics-content">
@@ -971,6 +1127,7 @@ export const Analytics = () => {
             {tab === 'slippage' && renderSlippage()}
             {tab === 'feed_comparison' && renderFeedComparison()}
             {tab === 'intraday_discoveries' && renderIntradayDiscoveries()}
+            {tab === 'reconcile' && renderReconcile()}
           </>
         )}
       </div>

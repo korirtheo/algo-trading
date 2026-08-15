@@ -89,10 +89,11 @@ sudo docker compose up -d
 - **Cron**: `deploy/cron_post_close_reconcile.txt` → installed to
   `/etc/cron.d/algo-reconcile` on AWS by `sudo bash deploy/install_cron.sh`.
   Runs `15 20 * * 1-5` (8:15pm ET) inside the `algotrader` container.
-- **Dashboard**: `GET /api/reconcile/daily` (router `reconcile.py`), surfaced in
-  the frontend `Reconcile.tsx` component ("Daily Reconcile" card). Shows status
-  (match / divergence / no_trades), live-vs-bt counts, ticker breakdowns, and the
-  human-readable comments on the divergence.
+- **Dashboard**: "Daily Reconcile" is a tab on the **Analytics page** (Analytics.tsx,
+  date-switchable like the other analytics tabs), served by
+  `GET /api/analytics/reconcile/{date}` (router `analytics.py`). Shows status
+  (match / divergence / no_trades), live-vs-bt P&L, ticker breakdowns
+  (match / live-only / bt-only), and the human-readable comments on divergences.
 - **Why after 8pm**: Alpaca's free SIP forbids querying the CURRENT in-progress
   day (`subscription does not permit querying recent SIP data`) but allows any
   COMPLETED trading day. So the reconcile must run after close.
