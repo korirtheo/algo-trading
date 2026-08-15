@@ -343,3 +343,20 @@ sources (tradehalts.txt dead, RSS is a rolling ~2-day window) — any future
 halt-resume backtest must derive halts from bar-gap detection (contiguous
 >=5-min gap in the 1-min tape), which the reconcile script now accumulates
 daily into data/halts.csv going forward.
+
+### 8b. Morning-window refinement (09:30-10:00) — SPARSE DATA, not halts (2026-08-15)
+
+Full-day scan understated the issue. G's ENTRY happens in the first 30 minutes,
+so the 09:30-10:00 window is what matters:
+- 180/250 (72%) NO gap at all in 09:30-10:00 (all 30 bars present)
+- 70/250 (28%) some gap in the entry window
+- 41/250 (16%) missing >5 minutes of the 30-min entry window (e.g. AHMA 2026-06-09
+  has only 4/30 bars; CANF 2026-03-04 missing 09:39-10:00; KELYB 2026-02-05 6/30)
+
+These are NOT halts — the signature is repeated 4/9-min gaps all morning
+(download sampling artifact). But they DO mean the backtest's G "candle-2
+confirmation" fires on incomplete/missing bars for ~16% of trades. Those entries'
+price/candle-structure/timing is questionable vs the true live 09:31 tape. Worth
+a follow-up: exclude or flag trades whose 09:30-10:00 window is <80% covered and
+re-measure G's OOS P&L — the true gap in backtest-vs-live fidelity is SPARSE
+DATA, not halts.
