@@ -211,6 +211,21 @@ def _load_today_trades():
     return []
 
 
+def _safe_float(v, default=0.0):
+    """Coerce a value to float, defaulting on non-numeric. Guards daily_pnl against
+    a string pnl sneaking in from a fill/exit path (2026-08-15 EOD snapshot crash:
+    'Unknown format code f for object of type str')."""
+    try:
+        f = float(v)
+        if f != f:  # NaN
+            log.warning("_safe_float: NaN pnl value (type %s)", type(v).__name__)
+            return default
+        return f
+    except (TypeError, ValueError):
+        log.warning("_safe_float: non-numeric pnl %r (type %s) -> 0.0", v, type(v).__name__)
+        return default
+
+
 def _append_trade(trade):
     os.makedirs(TRADE_LOG_DIR, exist_ok=True)
     path = _trade_log_path()
@@ -1064,7 +1079,7 @@ class CombinedEngine:
                         else:
                             # Legacy synchronous behavior
                             self.active_positions.discard(ticker)
-                            self.daily_pnl += pnl
+                            self.daily_pnl += _safe_float(pnl)
                             entry_info_l = self.position_entry.get(ticker, {})
                             entry_px = entry_info_l.get("entry_price", 0)
                             shares = entry_info_l.get("shares", 0)
@@ -1701,7 +1716,7 @@ class CombinedEngine:
                     # Legacy synchronous exit
                     self.active_positions.discard(ticker)
                     pnl = (exit_price - entry_price) * entry_info.get("shares", 0)
-                    self.daily_pnl += pnl
+                    self.daily_pnl += _safe_float(pnl)
                     trade = {
                         "ticker": ticker,
                         "strategy": "V3",
@@ -2023,7 +2038,7 @@ class CombinedEngine:
             state["exit_reason"] = reason
             state["pnl"] = pnl
             state["done"] = True
-            self.daily_pnl += pnl
+            self.daily_pnl += _safe_float(pnl)
             if symbol in self.active_positions:
                 self.active_positions.discard(symbol)
             trade = {
@@ -2296,7 +2311,7 @@ class CombinedEngine:
                 market_value = entry_price * total_sold
                 pnl_pct = (pnl / market_value * 100) if market_value > 0 else 0
                 self.active_positions.discard(ticker)
-                self.daily_pnl += pnl
+                self.daily_pnl += _safe_float(pnl)
 
                 # Get execution details from position_state if available
                 pos_details = {}

@@ -826,7 +826,7 @@ def _run_one_day(executor, args, log):
                         positions_count=len(engine.active_positions),
                     )
                     log.info(
-                        f"EOD snapshot saved: equity=${account.equity:.2f} P&L=${engine.daily_pnl:.2f}"
+                        f"EOD snapshot saved: equity=${float(account.equity):.2f} P&L=${float(engine.daily_pnl):.2f}"
                     )
                 except Exception as e:
                     log.warning(f"Failed to save EOD snapshot: {e}")
@@ -843,7 +843,7 @@ def _run_one_day(executor, args, log):
                 engine.db.log_system_event(
                     "shutdown",
                     "info",
-                    f"Market close: {len(engine.trades_today)} trades, P&L=${engine.daily_pnl:.2f}",
+                    f"Market close: {len(engine.trades_today)} trades, P&L=${float(engine.daily_pnl):.2f}",
                 )
 
                 break

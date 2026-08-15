@@ -1027,6 +1027,14 @@ class TradingDatabase:
             timestamp = timestamp.astimezone(ET)
 
         with self._conn() as conn:
+            # Coerce numerics — a string pnl/equity would crash the REAL column insert
+            # (2026-08-15: 'Unknown format code f for object of type str' at EOD).
+            def _f(v):
+                try:
+                    return float(v)
+                except (TypeError, ValueError):
+                    return None
+
             conn.execute(
                 """
                 INSERT INTO account_snapshots (date, timestamp, snapshot_type, cash, equity,
@@ -1038,11 +1046,11 @@ class TradingDatabase:
                     today,
                     timestamp.isoformat(),
                     snapshot_type,
-                    cash,
-                    equity,
-                    buying_power,
-                    portfolio_value,
-                    daily_pnl,
+                    _f(cash),
+                    _f(equity),
+                    _f(buying_power),
+                    _f(portfolio_value),
+                    _f(daily_pnl),
                     trades_count,
                     positions_count,
                 ),
