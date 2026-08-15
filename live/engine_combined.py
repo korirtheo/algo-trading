@@ -403,10 +403,22 @@ class CombinedEngine:
             log.debug("on_intraday_addition: %s already tracked (skip)", ticker)
             return False
 
-        # Skip tickers already in the pre-market watchlist (no duplication)
+        # 2026-08-15 FIX (MDXH/MF fell through the gap): halt-resume previously
+        # REFUSED any ticker already in the pre-market watchlist (return False).
+        # But a watchlist ticker that halts then resumes mid-day (MDXH LUDP 09:31->09:36,
+        # MF LUDP 09:31->09:41) can't be traded by G (G's candle-2 confirmation breaks
+        # across the halt), yet the halt channel also skipped it -> the trade was missed.
+        # Now we ALLOW the halt channel to take over watchlist tickers, EXCEPT ones G has
+        # already bought this day (active position) or already filled (avoid double-entry).
         if ticker in self.bar_data or any(p["ticker"] == ticker for p in self.picks):
-            log.debug("on_intraday_addition: %s already in watchlist (skip)", ticker)
-            return False
+            if ticker in self.active_positions or ticker in self._pending_entries:
+                log.debug("on_intraday_addition: %s already bought/being bought by G (skip halt)", ticker)
+                return False
+            # watchlist ticker, not bought by G -> allow halt-resume channel to manage it
+            log.info(
+                "on_intraday_addition: %s in watchlist but not bought by G — letting halt-resume take it",
+                ticker,
+            )
 
         if source == "halt_resume":
             float_shares = FLOAT_DATA.get(ticker)  # None if unknown — permissive

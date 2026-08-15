@@ -62,15 +62,20 @@ def is_eligible(halt_event, float_shares=None, params=None):
         return False
 
     rp = halt_event.resume_price
-    if rp is None or rp <= 0:
-        return False
-    if not (p["min_price"] <= rp <= p["max_price"]):
-        return False
+    # resume_price is None for the NASDAQ RSS feed (it never provides one).
+    # Don't reject on that alone — the strategy can use the first post-resume
+    # bar's price as the de-facto resume price (check_signal does). Only enforce
+    # the price band when a resume_price is actually present.
+    if rp is not None:
+        if rp <= 0:
+            return False
+        if not (p["min_price"] <= rp <= p["max_price"]):
+            return False
 
     if float_shares is not None and float_shares > p["max_float"]:
         return False
 
-    if halt_event.halt_price and halt_event.halt_price > 0:
+    if rp is not None and halt_event.halt_price and halt_event.halt_price > 0:
         gap_pct = (rp / halt_event.halt_price - 1) * 100
         if gap_pct < p["min_resume_gap_pct"]:
             return False

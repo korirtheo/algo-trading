@@ -15,6 +15,7 @@ services:
       - ./logs:/app/logs
       - ./config:/app/config
       - ./scripts:/app/scripts
+      - ./data:/app/data
     logging:
       driver: json-file
       options:
