@@ -346,17 +346,18 @@ daily into data/halts.csv going forward.
 
 ### 8b. Morning-window refinement (09:30-10:00) — SPARSE DATA, not halts (2026-08-15)
 
-Full-day scan understated the issue. G's ENTRY happens in the first 30 minutes,
-so the 09:30-10:00 window is what matters:
-- 180/250 (72%) NO gap at all in 09:30-10:00 (all 30 bars present)
-- 70/250 (28%) some gap in the entry window
-- 41/250 (16%) missing >5 minutes of the 30-min entry window (e.g. AHMA 2026-06-09
-  has only 4/30 bars; CANF 2026-03-04 missing 09:39-10:00; KELYB 2026-02-05 6/30)
+Full-day scan understated the issue, but a broad 09:30-10:00 scan OVERSTATED it.
+G's entry uses ONLY candle 1 (09:30) and candle 2 (09:31). Precise check of the
+entry-critical 2 bars:
+- 243/250 (97%) had candle1=09:30 AND candle2=09:31 present (clean entry pair)
+- 7/250 (3%) entered on a SHIFTED bar (candle2 was 09:35/09:40, not 09:31):
+  GXAI 2024-02-16, ASPC 2025-12-26, KELYB 2026-02-05, CODX 2026-03-11,
+  AIM 2026-03-18, AHMA 2026-06-09, OBAI 2026-06-16. Their first bars are
+  09:30, 09:35... (sparse download jumped the 09:31-09:34 minutes), so the
+  "candle-2 confirmation" fired on an incorrect/later bar.
 
-These are NOT halts — the signature is repeated 4/9-min gaps all morning
-(download sampling artifact). But they DO mean the backtest's G "candle-2
-confirmation" fires on incomplete/missing bars for ~16% of trades. Those entries'
-price/candle-structure/timing is questionable vs the true live 09:31 tape. Worth
-a follow-up: exclude or flag trades whose 09:30-10:00 window is <80% covered and
-re-measure G's OOS P&L — the true gap in backtest-vs-live fidelity is SPARSE
-DATA, not halts.
+So backtest G's ENTRY is correctly evaluated in ~97% of trades; ~3% (7 trades)
+have a questionable entry bar. (The earlier 09:30-10:00 "16% missing >5min"
+counted bars 3-30 too, which only affect the post-entry trail, not the entry
+itself.) Worth a follow-up: re-run OOS excluding the 7 shifted-entry trades to
+confirm P&L impact.
