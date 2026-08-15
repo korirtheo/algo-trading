@@ -89,9 +89,37 @@ def fetch_minute_bars(client, ticker, day):
     return df[["Open", "High", "Low", "Close", "Volume"]]
 
 
+def scrape_and_persist_halts():
+    """Scrape today's NASDAQ halt feed into data/halts.csv (accumulates history).
+
+    2026-08-15: the halt RSS is the only live source (the .txt is dead); it's a
+    rolling ~60-event window. Scraping it once daily after close preserves a
+    permanent record for backtest. Uses the parser with the millisecond-time fix.
+    """
+    from live.halt_monitor import fetch_halt_log, parse_halt_log, _persist_halt_event
+    try:
+        raw = fetch_halt_log()
+        evs = parse_halt_log(raw)
+        n = 0
+        for ev in evs:
+            try:
+                _persist_halt_event(ev)
+                n += 1
+            except Exception:
+                pass
+        log.info("halt scrape: parsed %d events, persisted %d", len(evs), n)
+        return len(evs)
+    except Exception as e:
+        log.warning("halt scrape failed: %s", e)
+        return 0
+
+
 def run_reconcile(trade_date, dry_run=False):
     db = TradingDatabase()
     day = date.fromisoformat(trade_date)
+
+    # Persist today's halts (accumulate history for backtest).
+    scrape_and_persist_halts()
 
     # 1. live data
     watchlist = db.get_watchlist_by_date(trade_date)
@@ -193,13 +221,28 @@ def run_reconcile(trade_date, dry_run=False):
         states, _, _, _ = tgc.simulate_day_combined(picks, 10000.0, False, params=snap)
         for st in states:
             if st.get("exit_reason") is not None and st.get("position_cost", 0) > 0:
+                cost = st.get("position_cost", 0) or 0
+                pnl = st.get("pnl", 0) or 0
+                et = str(st.get("entry_time", ""))[11:16]
+                xt = str(st.get("exit_time", ""))[11:16]
+                ep = st.get("entry_price") or 0
+                xp = st.get("exit_price") or 0
                 bt_trades.append({
                     "ticker": st.get("ticker"),
-                    "pnl": st.get("pnl", 0),
+                    "strategy": st.get("strategy"),
+                    "pnl": pnl,
+                    "pnl_pct": round(pnl / cost * 100, 2) if cost > 0 else 0,
                     "reason": st.get("exit_reason"),
-                    "entry_time": str(st.get("entry_time", ""))[11:16],
+                    "entry_time": et,
+                    "exit_time": xt,
+                    "entry_price": round(float(ep), 4) if ep else None,
+                    "exit_price": round(float(xp), 4) if xp else None,
+                    "shares": st.get("shares", 0),
+                    "hold_min": round(((st.get("exit_time") or st.get("entry_time")) - (st.get("entry_time") or 0)).total_seconds() / 60, 1)
+                    if hasattr(st.get("exit_time"), "total_seconds") and hasattr(st.get("entry_time"), "total_seconds")
+                    else None,
                 })
-                bt_pnl += st.get("pnl", 0)
+                bt_pnl += pnl
 
     # 4. compare
     live_set = {t["ticker"] for t in live_trades if t.get("ticker")}
@@ -212,19 +255,64 @@ def run_reconcile(trade_date, dry_run=False):
     live_pnl = sum(t.get("pnl", 0) or 0 for t in live_trades)
     live_traded_tickers = sorted(live_set)
 
+    # ---- per-ticker divergence diagnosis (halt gaps in the live Tradier feed) ----
+    def _detect_halt_gaps(ticker):
+        """Compare live Tradier bar coverage vs the 09:30-16:00 minute grid.
+        Returns a dict describing missing-bar windows (halt indicator)."""
+        bars = db.get_tradier_bars_for_ticker(trade_date, ticker)
+        times = sorted(b.get("bar_time", "") for b in bars if b.get("bar_time"))
+        # parse HH:MM -> minutes since 09:30
+        try:
+            mins = [int(t[:2]) * 60 + int(t[3:5]) for t in times]
+        except Exception:
+            return {"bars": len(bars), "note": "unparseable bar times"}
+        session_min = [t for t in mins if 9 * 60 + 30 <= t <= 16 * 60]
+        if not session_min:
+            return {"bars": len(bars), "note": "no session bars in live feed"}
+        gaps = []
+        prev = None
+        for m in session_min:
+            if prev is not None and m - prev > 1:
+                gaps.append((prev, m))  # (last bar minute, first missing)
+            prev = m
+        gap_str = "; ".join(
+            f"{g0//60:02d}:{g0%60:02d}-{g1//60:02d}:{g1%60:02d} missing" for g0, g1 in gaps
+        )
+        return {"bars": len(bars), "first": times[0] if times else None,
+                "last": times[-1] if times else None, "gaps": gap_str}
+
+    findings = {}
+    for tk in live_only + bt_only:
+        findings[tk] = _detect_halt_gaps(tk)
+
     # human-readable comment / findings
     comments = []
-    if live_only:
+    for tk in bt_only:
+        f = findings.get(tk, {})
+        if f.get("gaps"):
+            comments.append(
+                f"BT-ONLY {tk}: SIP replay traded it but LIVE did not — the live Tradier "
+                f"feed had a bar gap [{f['gaps']}] (halt/resume). The live G path can't "
+                f"confirm candle-2 through a halt, so it skipped the trade; the post-hoc "
+                f"SIP replay sees the complete tape."
+            )
+        elif f.get("bars", 0) == 0:
+            comments.append(
+                f"BT-ONLY {tk}: SIP replay traded it but LIVE had NO bars for this ticker "
+                f"(stream issue or halt) — live G never saw a signal."
+            )
+        else:
+            comments.append(
+                f"BT-ONLY {tk}: SIP replay traded it but LIVE did not (no halt gap detected; "
+                f"likely cash/BP, rejected order, already-in-position, or a candle-color "
+                f"difference between the live and SIP feeds)."
+            )
+    for tk in live_only:
+        f = findings.get(tk, {})
         comments.append(
-            f"LIVE-ONLY ({len(live_only)}): {', '.join(live_only)} traded live but the SIP "
-            "replay did not — check fill timing, bar-candle-1 color, or a signal the "
-            "replay couldn't reproduce (e.g. slow fill, halt, or stream-driven entry)."
-        )
-    if bt_only:
-        comments.append(
-            f"BT-ONLY ({len(bt_only)}): {', '.join(bt_only)} fired in the SIP replay but "
-            "not live — the live engine may have skipped them (cash/BP, rejected order, "
-            "already-in-position, halt, or a stream that missed the bar)."
+            f"LIVE-ONLY {tk}: traded live but the SIP replay did not — check fill timing, "
+            f"candle-1 color, or a signal the replay couldn't reproduce. Live Tradier bars: "
+            f"{f.get('bars', '?')}."
         )
     if match:
         comments.append(
@@ -249,13 +337,19 @@ def run_reconcile(trade_date, dry_run=False):
     details = {
         "live_trades": [
             {"ticker": t.get("ticker"), "pnl": t.get("pnl"), "reason": t.get("exit_reason"),
-             "entry_time": str(t.get("entry_time", ""))[11:16]}
+             "entry_time": str(t.get("entry_time", ""))[11:16],
+             "entry_price": round(float(t.get("entry_price", 0) or 0), 4),
+             "exit_price": round(float(t.get("exit_price", 0) or 0), 4),
+             "shares": t.get("shares", 0),
+             "pnl_pct": round(t.get("pnl_pct", 0) or 0, 2),
+             "exit_time": str(t.get("exit_time", ""))[11:16]}
             for t in live_trades
         ],
         "bt_trades": bt_trades,
         "live_signals": [{"ticker": s.get("ticker"), "price": s.get("signal_price"),
                           "gap": s.get("gap_pct")} for s in live_signals],
         "comments": comments,
+        "findings": findings,
     }
 
     record = {
@@ -296,6 +390,22 @@ def run_reconcile(trade_date, dry_run=False):
     print(f"  MATCH: {match or '-'}")
     print(f"  LIVE-ONLY: {live_only or '-'}")
     print(f"  BT-ONLY: {bt_only or '-'}")
+    if bt_trades:
+        print("\n  --- BACKTEST TRADES (SIP replay through deploy G config) ---")
+        print(f"  {'ticker':<7} {'entry':>6} {'exit':>6} {'entry$':>8} {'exit$':>8} {'reason':<10} {'P&L':>10} {'P&L%':>7}")
+        for t in bt_trades:
+            print(f"  {t['ticker']:<7} {t.get('entry_time') or '-':>6} {t.get('exit_time') or '-':>6} "
+                  f"{t.get('entry_price') or 0:>8.3f} {t.get('exit_price') or 0:>8.3f} "
+                  f"{t.get('reason') or '-':<10} {t.get('pnl', 0):>10,.0f} {t.get('pnl_pct', 0):>+6.1f}%")
+    if live_trades:
+        print("\n  --- LIVE TRADES ---")
+        for t in live_trades:
+            print(f"  {t.get('ticker','?'):<7} entry={str(t.get('entry_time',''))[11:16]} "
+                  f"${t.get('pnl',0):>+10,.0f}  ({t.get('exit_reason') or ''})")
+    if findings:
+        print("\n  --- DIVERGENCE DIAGNOSIS (live Tradier bar coverage) ---")
+        for tk, f in findings.items():
+            print(f"    {tk}: {f.get('bars','?')} live bars  gaps: {f.get('gaps') or 'none'}")
     print("\n  Comments:")
     for c in comments:
         print(f"    - {c}")

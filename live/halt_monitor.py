@@ -115,6 +115,13 @@ def _parse_time(s: str) -> Optional[dt_time]:
     s = (s or "").strip()
     if not s:
         return None
+    # NASDAQ's RSS emits HaltTime/ResumptionTime with milliseconds
+    # (e.g. "11:36:11.996"). Strip a fractional-seconds suffix so the
+    # %H:%M:%S format can parse it. 2026-08-15: without this, every
+    # current-day halt was silently dropped (parse returned None -> skip),
+    # so the live halt monitor never saw MDXH's LUDP halt.
+    if "." in s:
+        s = s.split(".")[0]
     for fmt in ("%H:%M:%S", "%H:%M"):
         try:
             return datetime.strptime(s, fmt).time()

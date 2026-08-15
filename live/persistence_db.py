@@ -1318,8 +1318,22 @@ class TradingDatabase:
                     close=excluded.close, volume=excluded.volume,
                     created_at=CURRENT_TIMESTAMP
             """,
-                (date, bar_time, ticker, source, open_, high, low, close, volume),
+                                (date, bar_time, ticker, source, open_, high, low, close, volume),
             )
+
+    def get_tradier_bars_for_ticker(self, date, ticker):
+        """Live Tradier bars for one ticker on a date (for halt-gap diagnosis)."""
+        with self._conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT bar_time, open, high, low, close, volume
+                FROM feed_comparison
+                WHERE date=? AND ticker=? AND source='tradier'
+                ORDER BY bar_time ASC
+            """,
+                (date, ticker),
+            ).fetchall()
+            return [dict(r) for r in rows]
 
     def get_feed_comparison(self, date: str) -> list[dict]:
         """
