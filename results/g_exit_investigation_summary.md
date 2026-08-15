@@ -313,3 +313,33 @@ cleared position state while Alpaca kept filling -> real position left unmanaged
   rehydrates orphaned positions and picks up external closes.
 - Verified with a 4-scenario test (orphan rehydration, pending-buy preservation,
   external-close clearing, transient-failure state retention). 56 repo tests pass.
+
+---
+
+## 8. NOTE: halt-gap scan on G backtest trades (2024-26) — for later follow-up
+
+Context: does the backtest overstate G because it can't see halts? The SIP data
+(what backtests use) OMITS halted minutes entirely (no flat bars), matching live
+Tradier's silent stream — so backtest and live see the same candle structure
+during a halt. The real live-vs-backtest gap on 8/14 (MDXH/MF) was the LIVE
+halt-monitor parser bug (drops current-day halts — now fixed), NOT backtest data.
+
+Scan of the 250 G backtest trades, 2024-01-04..2026-08-07 (626 days):
+- 139 (56%) NO gap at all (every 1-min bar present 09:30-15:59)
+- 111 (44%) some missing minute
+  - 14 sparse (<85% bar coverage — data-download artifact, not a halt)
+  - 73 have a >=3-min contiguous gap but >=85% coverage (loose halt-ish signal;
+    mostly scattered 4/9-min gaps all day = download sampling, not a single halt)
+  - 24 only tiny scattered 1-2-min gaps
+- STRICT halt-like (>=85% coverage + >=5-min contiguous gap ending within 15 min
+  before entry): 0-3 (3 candidates were 4-min gaps — borderline, dropped)
+
+Verdict to revisit later: backtest G is NOT materially inflated by halts — only
+~1% of trades had a halt-like gap at the buy window. The 3 borderline names
+(GXAI 2024-02-16, AIM 2026-03-18, OBAI 2026-06-16) have a missing 09:31
+confirmation bar (first bars 09:30, 09:35...) and are worth an entry-quality
+recheck. Historical NASDAQ halt data (2024-26) is NOT obtainable from free
+sources (tradehalts.txt dead, RSS is a rolling ~2-day window) — any future
+halt-resume backtest must derive halts from bar-gap detection (contiguous
+>=5-min gap in the 1-min tape), which the reconcile script now accumulates
+daily into data/halts.csv going forward.
