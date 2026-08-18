@@ -30,6 +30,7 @@ from strategies import halt_resume as hr
 from config.settings import FLOAT_DATA
 from live.position_state import PositionStateManager
 from live.event_logger import log_event
+from live.executor import _modeled_slip_bp
 
 log = logging.getLogger(__name__)
 ET = ZoneInfo("America/New_York")
@@ -1005,6 +1006,18 @@ class CombinedEngine:
                             "signal_time": ts,
                             "side": "buy",
                             "requested_cost": trade_size,
+                            # Calibration context stashed at placement so the
+                            # stream fill handler (_on_buy_fill) can write the
+                            # order_event fill row itself. 2026-08-18 (PFSA):
+                            # the reconcile poller's 30s timeout missed a 55s
+                            # partial fill AND its terminal status was 'canceled'
+                            # (event_type='canceled', not 'partial_fill'), so the
+                            # buy never appeared in slippage calibration.
+                            "cum_dollar_vol": cum_dollar,
+                            "veff_adj": veff_adj,
+                            "pm_gate": pm_gate,
+                            "pm_volume": pm_vol,
+                            "bar_range_pct": brange,
                         }
                     if self.fill_stream is not None:
                         self.fill_stream.register(order.id, self._on_buy_fill)
@@ -1046,81 +1059,104 @@ class CombinedEngine:
                 prev is None or prev.get("exit_price") is None
             ):
                 if ticker in self.active_positions:
-                    exit_price = st["exit_price"]
-                    exit_reason = st.get("exit_reason", "UNKNOWN")
-                    pnl = st.get("pnl", 0)
+                    # FIX 2026-08-18 (PFSA sell spam): the sim emits TWO states
+                    # sharing the same (ticker, strategy) key (the real state +
+                    # a parallel copy whose last_states update clobbers the
+                    # trail-exit state back to exit_price=None). Because on_bar
+                    # re-runs the sim for EVERY symbol's bar, the exit branch
+                    # fired once per on_bar (~17/min), and each new
+                    # close_position canceled the prior pending sell (54 sells,
+                    # 51 canceled). Guard: if a sell for this ticker is already
+                    # pending, let the stream path resolve it — the exit branch
+                    # re-fires naturally once that order terminates.
+                    with self._pending_lock:
+                        _has_pending_sell = any(
+                            p.get("ticker") == ticker and p.get("side") == "sell"
+                            for p in self.pending_orders.values()
+                        )
+                    if _has_pending_sell:
+                        log.debug(
+                            "SELL %s (%s): sell already pending — skipping re-fire "
+                            "(sim duplicate-state guard)",
+                            ticker,
+                            st.get("exit_reason", "UNKNOWN"),
+                        )
+                    else:
+                        exit_price = st["exit_price"]
+                        exit_reason = st.get("exit_reason", "UNKNOWN")
+                        pnl = st.get("pnl", 0)
 
-                    entry_info = self.position_entry.get(ticker, {})
-                    veff_adj, _, _, brange = self._calibration_ctx(
-                        ticker, exit_price, ts, st.get("mh")
-                    )
-                    order = self.executor.sell(
-                        ticker,
-                        reason=exit_reason,
-                        signal_price=exit_price,
-                        cumulative_dollar_volume=self._cum_dollar_vol(ticker),
-                        strategy=entry_info.get("strategy", "?"),
-                        veff_adj=veff_adj,
-                        bar_range_pct=brange,
-                    )
-                    if order:
-                        # 2026-06-23: stream-based sell tracking — don't clear
-                        # active_position until fill confirmed. Prevents phantom
-                        # "I sold" state when actually order was rejected/unfilled.
-                        with self._pending_lock:
-                            self.pending_orders[str(order.id)] = {
-                                "ticker": ticker,
-                                "strategy": entry_info.get("strategy", "?"),
-                                "signal_price": exit_price,
-                                "signal_time": ts,
-                                "side": "sell",
-                                "exit_reason": exit_reason,
-                                "expected_pnl": pnl,
-                                "pre_sell_shares": entry_info.get("shares", 0),
-                                "is_partial": False,
-                            }
-                        if self.fill_stream is not None:
-                            self.fill_stream.register(order.id, self._on_sell_fill)
-                            log.info(
-                                "SELL %s (%s): order %s placed, awaiting stream fill",
-                                ticker,
-                                exit_reason,
-                                order.id,
-                            )
-                            self._schedule_sell_safety_poll(order.id, ticker)
-                        else:
-                            # Legacy synchronous behavior
-                            self.active_positions.discard(ticker)
-                            self.daily_pnl += _safe_float(pnl)
-                            entry_info_l = self.position_entry.get(ticker, {})
-                            entry_px = entry_info_l.get("entry_price", 0)
-                            shares = entry_info_l.get("shares", 0)
-                            market_value = entry_px * shares
-                            pnl_pct = (
-                                (pnl / market_value * 100) if market_value > 0 else 0
-                            )
-                            trade = {
-                                "ticker": ticker,
-                                "strategy": entry_info_l.get("strategy", "?"),
-                                "entry_price": entry_px,
-                                "exit_price": exit_price,
-                                "shares": int(shares),
-                                "market_value": round(market_value, 2),
-                                "pnl": round(pnl, 2),
-                                "pnl_pct": round(pnl_pct, 2),
-                                "reason": exit_reason,
-                                "entry_time": entry_info_l.get("entry_time"),
-                                "exit_time": ts,
-                            }
-                            self._save_trade(trade)
-                            log.info(
-                                "EXIT %s (%s) [LEGACY]: PnL=$%s | $%.2f -> $%.2f",
-                                ticker,
-                                exit_reason,
-                                format(pnl, "+,.2f"),
-                                entry_info_l.get("entry_price", 0),
-                                exit_price,
-                            )
+                        entry_info = self.position_entry.get(ticker, {})
+                        veff_adj, _, _, brange = self._calibration_ctx(
+                            ticker, exit_price, ts, st.get("mh")
+                        )
+                        order = self.executor.sell(
+                            ticker,
+                            reason=exit_reason,
+                            signal_price=exit_price,
+                            cumulative_dollar_volume=self._cum_dollar_vol(ticker),
+                            strategy=entry_info.get("strategy", "?"),
+                            veff_adj=veff_adj,
+                            bar_range_pct=brange,
+                        )
+                        if order:
+                            # 2026-06-23: stream-based sell tracking — don't clear
+                            # active_position until fill confirmed. Prevents phantom
+                            # "I sold" state when actually order was rejected/unfilled.
+                            with self._pending_lock:
+                                self.pending_orders[str(order.id)] = {
+                                    "ticker": ticker,
+                                    "strategy": entry_info.get("strategy", "?"),
+                                    "signal_price": exit_price,
+                                    "signal_time": ts,
+                                    "side": "sell",
+                                    "exit_reason": exit_reason,
+                                    "expected_pnl": pnl,
+                                    "pre_sell_shares": entry_info.get("shares", 0),
+                                    "is_partial": False,
+                                }
+                            if self.fill_stream is not None:
+                                self.fill_stream.register(order.id, self._on_sell_fill)
+                                log.info(
+                                    "SELL %s (%s): order %s placed, awaiting stream fill",
+                                    ticker,
+                                    exit_reason,
+                                    order.id,
+                                )
+                                self._schedule_sell_safety_poll(order.id, ticker)
+                            else:
+                                # Legacy synchronous behavior
+                                self.active_positions.discard(ticker)
+                                self.daily_pnl += _safe_float(pnl)
+                                entry_info_l = self.position_entry.get(ticker, {})
+                                entry_px = entry_info_l.get("entry_price", 0)
+                                shares = entry_info_l.get("shares", 0)
+                                market_value = entry_px * shares
+                                pnl_pct = (
+                                    (pnl / market_value * 100) if market_value > 0 else 0
+                                )
+                                trade = {
+                                    "ticker": ticker,
+                                    "strategy": entry_info_l.get("strategy", "?"),
+                                    "entry_price": entry_px,
+                                    "exit_price": exit_price,
+                                    "shares": int(shares),
+                                    "market_value": round(market_value, 2),
+                                    "pnl": round(pnl, 2),
+                                    "pnl_pct": round(pnl_pct, 2),
+                                    "reason": exit_reason,
+                                    "entry_time": entry_info_l.get("entry_time"),
+                                    "exit_time": ts,
+                                }
+                                self._save_trade(trade)
+                                log.info(
+                                    "EXIT %s (%s) [LEGACY]: PnL=$%s | $%.2f -> $%.2f",
+                                    ticker,
+                                    exit_reason,
+                                    format(pnl, "+,.2f"),
+                                    entry_info_l.get("entry_price", 0),
+                                    exit_price,
+                                )
 
             # Partial sell detected
             # FIX 2026-07-24: use simulator's explicit partial_sell_executed flag
@@ -2196,6 +2232,63 @@ class CombinedEngine:
                     oid,
                     event_type,
                 )
+
+                # FIX 2026-08-18 (PFSA buy missing from slippage): write the
+                # order_event fill row from the STREAM — the reconcile poller
+                # (executor._reconcile_fill_async) has a 30s timeout and its
+                # event_type maps only terminal status (a partial-then-canceled
+                # buy became 'canceled', never 'partial_fill'), so slow fills
+                # were dropped from order_events entirely. The stream knows the
+                # real fill in real time. Skip if a fill row already exists for
+                # this order (reconcile may have won the race).
+                try:
+                    _existing = self.db.get_order_events(oid)
+                    _has_fill_row = any(
+                        e.get("event_type") == event_type
+                        and e.get("filled_qty") is not None
+                        and int(e.get("filled_qty") or 0) == int(cumulative_shares)
+                        for e in _existing
+                    )
+                    if not _has_fill_row:
+                        _slip_bp = None
+                        if pending.get("signal_price") and pending["signal_price"] > 0:
+                            _slip_bp = (actual_avg / pending["signal_price"] - 1.0) * 10_000
+                        _dollar = actual_avg * cumulative_shares
+                        _veff = pending.get("veff_adj")
+                        _part_eff = (_dollar / _veff) if _veff and _veff > 0 else None
+                        self.db.log_order_event(
+                            order_id=oid,
+                            ticker=ticker,
+                            strategy=strategy,
+                            side="buy",
+                            event_type=event_type,
+                            signal_price=pending.get("signal_price"),
+                            fill_price=actual_avg,
+                            filled_qty=int(cumulative_shares),
+                            status=event_type,
+                            slip_bp=_slip_bp,
+                            cum_dollar_vol=pending.get("cum_dollar_vol"),
+                            veff_adj=_veff,
+                            participation_eff=_part_eff,
+                            modeled_slip_bp=_modeled_slip_bp(
+                                actual_avg, _dollar, _veff
+                            ),
+                            pm_gate=pending.get("pm_gate"),
+                            pm_volume=pending.get("pm_volume"),
+                            bar_range_pct=pending.get("bar_range_pct"),
+                        )
+                        log.debug(
+                            "order_event %s buy %s: fill row written (stream, slip=%.1fbp)",
+                            oid,
+                            ticker,
+                            _slip_bp or 0,
+                        )
+                except Exception as e:
+                    log.warning(
+                        "Failed to log stream buy fill order_event for %s: %s",
+                        ticker,
+                        e,
+                    )
 
                 # Save position state to disk for crash recovery
                 # Extract strategy params from tgc module globals

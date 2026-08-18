@@ -9,5 +9,9 @@
 # Format: <minute> <hour> * * <dow> root docker exec algotrader python ...
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# FIX 2026-08-18: host TZ is UTC, so `15 20` ran at 16:15 ET (Alpaca SIP
+# blocked the in-progress day → reconciled yesterday's date instead). cron.d
+# honors TZ= to make the schedule wall-clock ET.
+TZ=America/New_York
 
 15 20 * * 1-5 root docker exec algotrader python /app/scripts/reconcile/post_close_reconcile.py >> /home/ubuntu/algo-trading/logs/reconcile_cron.log 2>&1

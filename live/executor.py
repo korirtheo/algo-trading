@@ -220,29 +220,50 @@ class OrderExecutor:
 
             # Log order event to database (fill or terminal status)
             event_type = 'fill' if status == 'filled' else 'partial_fill' if status == 'partially_filled' else status
+            # FIX 2026-08-18 (PFSA buy): the engine's stream handler
+            # (_on_buy_fill) now writes the fill/partial_fill row in real time.
+            # Dedup here so a slow-fill order that the stream captured isn't
+            # double-counted when this poller later reaches a terminal status.
             try:
-                self.db.log_order_event(
-                    order_id=str(order_id),
-                    ticker=ticker,
-                    strategy=strategy,
-                    side=side,
-                    event_type=event_type,
-                    signal_price=signal_price,
-                    fill_price=fill_price,
-                    filled_qty=filled_qty,
-                    slip_bp=slip_bp,
-                    status=status,
-                    cum_dollar_vol=cum_dollar_vol,
-                    veff_adj=veff_adj,
-                    participation_eff=participation_eff,
-                    modeled_slip_bp=modeled,
-                    pm_gate=pm_gate,
-                    pm_volume=pm_volume,
-                    bar_range_pct=bar_range_pct,
+                _existing = self.db.get_order_events(str(order_id))
+                _has_fill_row = any(
+                    e.get("event_type") in ("fill", "partial_fill")
+                    for e in _existing
                 )
-            except Exception as e:
-                log.error(f"Failed to log order event to DB: {e}")
-                log_event("db_error", "warning", f"Failed to log order event to DB for {ticker}: {e}")
+            except Exception:
+                _has_fill_row = False
+            if _has_fill_row and event_type in ("fill", "partial_fill"):
+                log.debug(
+                    "order_event %s %s %s: fill row already exists (stream wrote it) — skipping",
+                    order_id,
+                    ticker,
+                    side,
+                )
+                event_type = None  # skip DB write below, CSV row already appended
+            if event_type is not None:
+                try:
+                    self.db.log_order_event(
+                        order_id=str(order_id),
+                        ticker=ticker,
+                        strategy=strategy,
+                        side=side,
+                        event_type=event_type,
+                        signal_price=signal_price,
+                        fill_price=fill_price,
+                        filled_qty=filled_qty,
+                        slip_bp=slip_bp,
+                        status=status,
+                        cum_dollar_vol=cum_dollar_vol,
+                        veff_adj=veff_adj,
+                        participation_eff=participation_eff,
+                        modeled_slip_bp=modeled,
+                        pm_gate=pm_gate,
+                        pm_volume=pm_volume,
+                        bar_range_pct=bar_range_pct,
+                    )
+                except Exception as e:
+                    log.error(f"Failed to log order event to DB: {e}")
+                    log_event("db_error", "warning", f"Failed to log order event to DB for {ticker}: {e}")
 
             # Stash the real fill on the executor's position record so future
             # consumers (dashboard, EOD report) can pick it up.
