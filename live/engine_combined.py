@@ -20,7 +20,7 @@ import time
 from collections import defaultdict
 import numpy as np
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 
 import test_green_candle_combined as tgc
@@ -666,6 +666,23 @@ class CombinedEngine:
             return
 
         if symbol not in self.bar_data:
+            return
+
+        # The strategy is RTH-only. 2026-08-17 IPST showed that a Tradier
+        # pre-open tick could be emitted as a completed bar at 09:30 and become
+        # G candle 1, causing the real 09:30/09:31 green pair to be rejected.
+        # Enforce the boundary here as a final guard even if a streamer accepts
+        # a stale or malformed premarket event.
+        bar_ts = pd.Timestamp(bar["timestamp"])
+        if bar_ts.tzinfo is None:
+            bar_ts = bar_ts.tz_localize("UTC")
+        bar_et = bar_ts.tz_convert(ET)
+        if not (dt_time(9, 30) <= bar_et.time() < dt_time(16, 0)):
+            log.warning(
+                "Ignoring out-of-session bar %s at %s ET",
+                symbol,
+                bar_et.strftime("%H:%M:%S"),
+            )
             return
 
         # Log raw bar for backtest comparison (no perf impact: 1 CSV append).
