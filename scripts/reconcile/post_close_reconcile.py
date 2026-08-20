@@ -56,9 +56,18 @@ log = logging.getLogger("post_close_reconcile")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
 
-def latest_completed_trading_day() -> str:
-    """Most recent weekday before today (best-effort; holidays just mean fewer picks)."""
-    d = datetime.now(ET).date() - timedelta(days=1)
+def latest_completed_trading_day(now: datetime | None = None) -> str:
+    """Return the most recent completed ET trading day.
+
+    The scheduled job runs at 20:15 ET, after extended-hours close.  At that
+    point the current weekday is the completed day to reconcile; treating it
+    as "yesterday" made the cron job permanently one trading day behind.
+    Earlier/manual invocations still default to the prior weekday, because
+    Alpaca SIP does not permit historical queries for the in-progress day.
+    """
+    now_et = (now or datetime.now(ET)).astimezone(ET)
+    close_complete = now_et.hour >= 20
+    d = now_et.date() if close_complete and now_et.weekday() < 5 else now_et.date() - timedelta(days=1)
     while d.weekday() >= 5:  # Sat=5, Sun=6
         d -= timedelta(days=1)
     return d.isoformat()
