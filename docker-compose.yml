@@ -21,3 +21,23 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  # Optional AI operator/control plane. This is intentionally NOT part of the
+  # deterministic live signal/execution path. Tradier remains the live market
+  # data source; Alpaca MCP is for account/data inspection and approved operator
+  # workflows.
+  alpaca-mcp:
+    profiles: ["agent"]
+    build:
+      context: ./deploy/alpaca-mcp
+    container_name: alpaca-mcp
+    restart: unless-stopped
+    environment:
+      - ALPACA_API_KEY=${ALPACA_API_KEY}
+      - ALPACA_SECRET_KEY=${ALPACA_API_SECRET}
+      - ALPACA_PAPER_TRADE=${ALPACA_PAPER:-true}
+      - ALPACA_TOOLSETS=${ALPACA_MCP_TOOLSETS:-account,assets,stock-data,news,corporate-actions}
+    # Alpaca MCP does not ship remote OAuth/authentication. Bind to loopback
+    # only; never expose this port publicly without an authenticated MCP gateway.
+    ports:
+      - "127.0.0.1:8001:8001"
