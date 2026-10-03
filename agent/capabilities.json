@@ -1,0 +1,47 @@
+{
+  "market_data": {
+    "primary_live_feed": "tradier",
+    "purpose": "real-time streaming for signal generation and live risk inputs"
+  },
+  "historical_data": {
+    "primary_provider": "alpaca",
+    "preferred_feed": "sip",
+    "purpose": "historical bars, backfills, validation, and research"
+  },
+  "execution": {
+    "broker": "alpaca",
+    "path": "direct_api",
+    "deterministic_only": true,
+    "paper_by_default": true
+  },
+  "operator_control_plane": {
+    "provider": "alpaca-mcp-server-v2",
+    "enabled_by_default": false,
+    "default_toolsets": [
+      "account",
+      "assets",
+      "stock-data",
+      "news",
+      "corporate-actions"
+    ],
+    "trading_toolset_enabled_by_default": false,
+    "locates_toolset_enabled_by_default": false,
+    "must_not_supply_live_signal_data": true
+  },
+  "llm_boundary": {
+    "may": [
+      "inspect account and portfolio state",
+      "query Alpaca historical/reference data",
+      "read news and corporate actions",
+      "explain deterministic strategy decisions",
+      "diagnose system health and data quality",
+      "propose operator actions for explicit approval"
+    ],
+    "must_not": [
+      "replace Tradier as the live signal feed",
+      "change strategy parameters during a live session",
+      "place discretionary trades from model judgment",
+      "bypass deterministic risk and execution controls"
+    ]
+  }
+}
