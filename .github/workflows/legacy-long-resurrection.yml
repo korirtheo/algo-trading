@@ -30,6 +30,8 @@ jobs:
         run: python -m research.legacy_long_resurrection.run_baseline
       - name: Standalone viability baseline
         run: python -m research.legacy_long_resurrection.run_standalone
+      - name: Causal first-batch search
+        run: python -m research.legacy_long_resurrection.optimize_first_batch
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
