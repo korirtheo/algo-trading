@@ -1,0 +1,2 @@
+V2 runner rerun trigger after pivot_bars=0 edge-case fix.
+Fix commit: 32d18abb32dc3abc6eb81c95683d6e5d7896a64c
