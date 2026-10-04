@@ -28,7 +28,7 @@ jobs:
         run: pytest -q tests/test_legacy_long_causality.py
       - name: Clean unoptimized baseline
         run: python -m research.legacy_long_resurrection.run_baseline
-      - name: Upload results
+      - name: Standalone viability baseline\n        run: python -m research.legacy_long_resurrection.run_standalone\n      - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
