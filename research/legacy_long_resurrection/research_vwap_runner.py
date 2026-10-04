@@ -41,7 +41,7 @@ def v2_signal(b,p,cfg):
         room=(prior_hod/close[i]-1)*100 if close[i]>0 else -99
         pmroom=(float(p["premarket_high"])/close[i]-1)*100 if close[i]>0 else -99
         # local pivot: reclaim bar must also clear recent closes when requested.
-        pivot=float(np.max(close[max(0,i-cfg["pivot_bars"]):i])) if i else close[i]
+        pivot=(float(np.max(close[max(0,i-cfg["pivot_bars"]):i])) if cfg["pivot_bars"] > 0 else float("-inf"))
         accel=(close[i]/close[max(0,i-cfg["accel_bars"])]-1)*100 if i>=cfg["accel_bars"] else 0
         ok=(rvol>=cfg["rvol"] and body>=cfg["body"] and room>=cfg["hod_room"]
             and pmroom>=cfg["pmh_room"] and accel>=cfg["accel"]
