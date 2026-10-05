@@ -1,0 +1,73 @@
+{
+  "schema": "NEW_RTH_V2_MANIFEST_1",
+  "definition": "First Top-30 appearance of the entire day occurs at 09:35 ET or later. Any ticker seen in PM Top-30 or at the 09:30 exact-open Top-30 is excluded. Re-entry episodes excluded.",
+  "top_n": 30,
+  "candidate_pool": 600,
+  "source": "Alpaca SIP historical bars; asof=event_date",
+  "snapshot_semantics": "PM/RTH completed 5-minute bars; 09:30 uses exact 1-minute opening print",
+  "persistence_rule": "Commit every completed event-index shard to GitHub before advancing. Mirror progress manifest/checkpoint to ChatGPT Library. Never rely on temporary compute storage.",
+  "status": {
+    "legacy_recovery": "2024-01 events_s1/s2/s3 retained but non-authoritative because they can include PM carry names",
+    "corrected_v2_completed_dates": [
+      "2024-01-24",
+      "2024-01-25",
+      "2024-01-26",
+      "2024-01-29",
+      "2024-01-30",
+      "2024-01-31"
+    ],
+    "corrected_v2_completed_count": 6,
+    "january_trading_days": 21,
+    "january_remaining_to_redo": 15
+  },
+  "shards": [
+    {
+      "date": "2024-01-24",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-24_event_index.json",
+      "sha": "117c568bb3b9061fe65e0174e55f8929b2722de6",
+      "event_count": 62,
+      "confirmed": 40,
+      "rank_gain_improved": 14
+    },
+    {
+      "date": "2024-01-25",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-25_event_index.json",
+      "sha": "daaacc121a79c98a4413f69ff30271efae89ffd8",
+      "event_count": 54,
+      "confirmed": 32,
+      "rank_gain_improved": 12
+    },
+    {
+      "date": "2024-01-26",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-26_event_index.json",
+      "sha": "88341a1dd57399490c3848755ad75020afbec046",
+      "event_count": 54,
+      "confirmed": 35,
+      "rank_gain_improved": 11
+    },
+    {
+      "date": "2024-01-29",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-29_event_index.json",
+      "sha": "9dfeb7b4f4d60836f7c0b43bfa7bf3d561893972",
+      "event_count": 50,
+      "confirmed": 33,
+      "rank_gain_improved": 14
+    },
+    {
+      "date": "2024-01-30",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-30_event_index.json",
+      "sha": "6171d6963b27572c827c05337ea21b8ca1086ed1",
+      "event_count": 59,
+      "confirmed": 43,
+      "rank_gain_improved": 19
+    },
+    {
+      "date": "2024-01-31",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-31_event_index.json",
+      "sha": "480defb7e7b3a990e835002215bbcf541b1ce7cf",
+      "event_count": 65,
+      "confirmed": 38,
+      "rank_gain_improved": 15
+    }
+  ]
+}
