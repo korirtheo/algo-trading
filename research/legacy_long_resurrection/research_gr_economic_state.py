@@ -26,6 +26,12 @@ from research.legacy_long_resurrection.causal_execution import Signal
 warnings.filterwarnings("ignore")
 SEED=20261005; N_POLICY_TRIALS=400
 OUT=Path("results/gr_economic_state_engine_20261005")
+OUT.mkdir(parents=True,exist_ok=True)
+def progress(msg, **payload):
+ print(json.dumps({"phase":msg, **payload}, default=str), flush=True)
+def checkpoint(name, obj):
+ p=OUT/f"{name}.json"; p.write_text(json.dumps(obj,indent=2,default=str))
+ progress("checkpoint_saved", file=str(p))
 FEATURES=[
  "gap","price","body","range_pct","close_pos","upper_wick","lower_wick",
  "vol_ratio1","vol_ratio5","cum_dvol_m","vwap_dist","open_ext","pm_dist",
@@ -118,8 +124,10 @@ def states_for_pick(p,d):
 
 def build_surface(dates,picks):
  rows=[]
- for d in dates:
+ for di,d in enumerate(dates,1):
   for p in picks.get(d,[]):rows.extend(states_for_pick(p,d))
+  if di % 25 == 0 or di == len(dates):
+   progress("surface_progress", days_done=di, days_total=len(dates), states=len(rows))
  return rows
 
 def X(rows):return pd.DataFrame([{k:r[k] for k in FEATURES} for r in rows]).replace([np.inf,-np.inf],0).fillna(0)
@@ -179,8 +187,12 @@ def policy_search(sel_rows,sel_scores,s):
   m,_=replay_selected(sel_rows,sel_scores,s,thr,ex);n=m["trades"]
   if n<15:return -1e9+n
   return m["pnl"]+1600*m["mean"]+2200*m["median"]+1800*min(m["pf"],3)+2500*math.log1p(n)-700*abs(m["max_dd"])-5000*max(0,4-m["mean"])
- st.optimize(obj,n_trials=N_POLICY_TRIALS,show_progress_bar=False)
- p=st.best_params;thr=float(qs[p.pop("q_idx")]);ex=p
+def cb(study, trial):
+  n=trial.number+1
+  if n % 50 == 0 or n == N_POLICY_TRIALS:
+   progress("policy_search_progress", strategy=s, trials_done=n, best_value=study.best_value if study.best_trial else None)
+ st.optimize(obj,n_trials=N_POLICY_TRIALS,show_progress_bar=False,callbacks=[cb])
+ p=st.best_params.copy();thr=float(qs[p.pop("q_idx")]);ex=p
  return thr,ex
 
 def bins(rows):
@@ -196,18 +208,33 @@ def bins(rows):
 
 def main():
  test_full.MIN_GAP_PCT=5;test_full.MIN_PM_VOLUME=250000
+ progress("load_start")
  dates,picks=test_full.load_all_picks(["stored_data_combined"])
+ progress("load_complete", days=len(dates), coverage=[dates[0],dates[-1]])
+ progress("surface_build_start")
  surf=build_surface(dates,picks)
+ checkpoint("surface_counts", {"coverage":[dates[0],dates[-1]],"total_states":len(surf),"G":sum(r["strategy"]=="G" for r in surf),"R":sum(r["strategy"]=="R" for r in surf)})
  res={"coverage":[dates[0],dates[-1]],"method":"2024 model train -> 2025 policy select -> 2026 replay"}
  for s in ["G","R"]:
+  progress("strategy_start", strategy=s)
   rr=[r for r in surf if r["strategy"]==s];tr=[r for r in rr if r["date"].startswith("2024-")];sel=[r for r in rr if r["date"].startswith("2025-")];oos=[r for r in rr if r["date"].startswith("2026-")]
-  pred,diag=train_models(tr,sel);ss=pred(sel);oo=pred(oos)
-  thr,ex=policy_search(sel,ss,s);m25,t25=replay_selected(sel,ss,s,thr,ex);m26,t26=replay_selected(oos,oo,s,thr,ex)
+  progress("split_ready", strategy=s, train_2024=len(tr), select_2025=len(sel), oos_2026=len(oos))
+  pred,diag=train_models(tr,sel)
+  checkpoint(f"{s.lower()}_model_diagnostics", {"states":{"2024":len(tr),"2025":len(sel),"2026":len(oos)},"model":diag})
+  progress("model_complete", strategy=s, auc10=diag.get("auc10"), auc15=diag.get("auc15"), top_features=diag.get("top_features"))
+  ss=pred(sel);oo=pred(oos)
+  progress("policy_search_start", strategy=s, trials=N_POLICY_TRIALS)
+  thr,ex=policy_search(sel,ss,s)
+  checkpoint(f"{s.lower()}_selected_policy", {"threshold":thr,"exit":ex})
+  progress("policy_selected", strategy=s, threshold=thr, exit=ex)
+  m25,t25=replay_selected(sel,ss,s,thr,ex);m26,t26=replay_selected(oos,oo,s,thr,ex)
+  progress("replay_complete", strategy=s, selection_2025=m25, oos_2026=m26)
   res[s]={"states":{"2024":len(tr),"2025":len(sel),"2026":len(oos)},
    "base_labels":{"2024_hit10":np.mean([r["up10_before_dn8"] for r in tr]),"2024_hit15":np.mean([r["up15_before_dn8"] for r in tr]),
                   "2025_hit10":np.mean([r["up10_before_dn8"] for r in sel]),"2025_hit15":np.mean([r["up15_before_dn8"] for r in sel])},
    "model":diag,"threshold":thr,"exit":ex,"selection_2025":m25,"oos_2026":m26,
    "diagnostic_bins_2024":bins(tr)}
- OUT.mkdir(parents=True,exist_ok=True);(OUT/"summary.json").write_text(json.dumps(res,indent=2,default=str))
+  checkpoint(f"{s.lower()}_complete", res[s])
+ checkpoint("summary",res)
  print(json.dumps({k:v if k not in ["G","R"] else {q:v[q] for q in ["states","base_labels","model","threshold","exit","selection_2025","oos_2026"]} for k,v in res.items()},indent=2,default=str))
 if __name__=="__main__":main()
