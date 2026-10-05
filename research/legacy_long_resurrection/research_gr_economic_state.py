@@ -187,10 +187,10 @@ def policy_search(sel_rows,sel_scores,s):
   m,_=replay_selected(sel_rows,sel_scores,s,thr,ex);n=m["trades"]
   if n<15:return -1e9+n
   return m["pnl"]+1600*m["mean"]+2200*m["median"]+1800*min(m["pf"],3)+2500*math.log1p(n)-700*abs(m["max_dd"])-5000*max(0,4-m["mean"])
-def cb(study, trial):
+ def cb(study, trial):
   n=trial.number+1
   if n % 50 == 0 or n == N_POLICY_TRIALS:
-   progress("policy_search_progress", strategy=s, trials_done=n, best_value=study.best_value if study.best_trial else None)
+   progress("policy_search_progress", strategy=s, trials_done=n, best_value=study.best_value)
  st.optimize(obj,n_trials=N_POLICY_TRIALS,show_progress_bar=False,callbacks=[cb])
  p=st.best_params.copy();thr=float(qs[p.pop("q_idx")]);ex=p
  return thr,ex
