@@ -257,9 +257,10 @@ def get_asset_master(client: AlpacaClient, outdir: Path) -> list[str]:
 
 def get_calendar(client: AlpacaClient, year: int, outdir: Path) -> list[date]:
     p = outdir / "calendar.json"
-    if p.exists():
-        return [date.fromisoformat(x) for x in json.loads(p.read_text())["dates"]]
-    q = urllib.parse.urlencode({"start":f"{year}-01-01", "end":f"{year}-12-31"})
+    # Exclude the current ET date so the final session's after-hours bars are
+    # complete. This also keeps future calendar sessions out of a year-to-date run.
+    through = min(date(year, 12, 31), datetime.now(ET).date() - timedelta(days=1))
+    q = urllib.parse.urlencode({"start":f"{year}-01-01", "end":through.isoformat()})
     rows = client.get_json(TRADING + "/v2/calendar?" + q)
     ds = [date.fromisoformat(r["date"]) for r in rows]
     atomic_json(p, {"dates":[d.isoformat() for d in ds]})
