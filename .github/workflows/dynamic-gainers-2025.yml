@@ -1,0 +1,248 @@
+name: Dynamic gainers 2025 recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: Optional prior workflow run ID whose checkpoints should be restored
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dynamic-gainers-2025
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
+      ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+      OUT: ${{ runner.temp }}/dynamic-gainers/2025_fast
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Create output directory
+        run: mkdir -p "$OUT"
+      - name: Restore candidate checkpoint
+        if: ${{ inputs.resume_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-gainers-2025-candidates
+          path: ${{ runner.temp }}/dynamic-gainers/2025_fast
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Restore membership checkpoint
+        if: ${{ inputs.resume_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-gainers-2025-membership
+          path: ${{ runner.temp }}/dynamic-gainers/2025_fast/stage3_membership
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Restore lifecycle checkpoints
+        if: ${{ inputs.resume_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dynamic-gainers-2025-lifecycle-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Restore validation and manifest
+        if: ${{ inputs.resume_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-gainers-2025-report
+          path: ${{ runner.temp }}/dynamic-gainers/2025_fast
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Build daily references and candidate days
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --stop-after candidates
+      - name: Save candidate checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-candidates
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/asset_master.json
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/calendar.json
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage1_daily_reference/
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage2_candidates/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build membership and entrants
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --stop-after membership
+      - name: Save membership checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-membership
+          path: ${{ runner.temp }}/dynamic-gainers/2025_fast/stage3_membership/
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 01
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 1
+      - name: Save lifecycle month 01
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-01
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_01.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-01-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 02
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 2
+      - name: Save lifecycle month 02
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-02
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_02.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-02-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 03
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 3
+      - name: Save lifecycle month 03
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-03
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_03.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-03-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 04
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 4
+      - name: Save lifecycle month 04
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-04
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_04.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-04-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 05
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 5
+      - name: Save lifecycle month 05
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-05
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_05.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-05-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 06
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 6
+      - name: Save lifecycle month 06
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-06
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_06.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-06-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 07
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 7
+      - name: Save lifecycle month 07
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-07
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_07.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-07-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 08
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 8
+      - name: Save lifecycle month 08
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-08
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_08.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-08-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 09
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 9
+      - name: Save lifecycle month 09
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-09
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_09.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-09-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 10
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 10
+      - name: Save lifecycle month 10
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-10
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_10.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-10-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 11
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 11
+      - name: Save lifecycle month 11
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-11
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_11.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-11-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Build lifecycle month 12
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 12
+      - name: Save lifecycle month 12
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-lifecycle-12
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/lifecycle_2025_12.csv.gz
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/stage4_lifecycle/days/2025-12-??.csv.gz
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Validate and create manifest
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year 2025 --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180
+      - name: Save validation and manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-report
+          path: |
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/VALIDATION_2025.json
+            ${{ runner.temp }}/dynamic-gainers/2025_fast/MANIFEST_2025.json
+          if-no-files-found: warn
+          retention-days: 30
