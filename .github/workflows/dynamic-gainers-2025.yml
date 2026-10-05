@@ -23,7 +23,7 @@ jobs:
     env:
       ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
       ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
-      OUT: ${{ runner.temp }}/dynamic-gainers/2025_fast
+      OUT: /tmp/dynamic-gainers/2025_fast
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
