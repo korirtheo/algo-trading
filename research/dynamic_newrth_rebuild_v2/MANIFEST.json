@@ -9,6 +9,7 @@
   "status": {
     "legacy_recovery": "2024-01 events_s1/s2/s3 retained but non-authoritative because they can include PM carry names",
     "corrected_v2_completed_dates": [
+      "2024-01-02",
       "2024-01-24",
       "2024-01-25",
       "2024-01-26",
@@ -16,11 +17,19 @@
       "2024-01-30",
       "2024-01-31"
     ],
-    "corrected_v2_completed_count": 6,
+    "corrected_v2_completed_count": 7,
     "january_trading_days": 21,
-    "january_remaining_to_redo": 15
+    "january_remaining_to_redo": 14
   },
   "shards": [
+    {
+      "date": "2024-01-02",
+      "path": "research/dynamic_newrth_rebuild_v2/2024-01-02_event_index.json",
+      "sha": "2d7bdc8f139b4fc3ee51d1de20a9c1350a590bd0",
+      "event_count": 71,
+      "confirmed": 44,
+      "rank_gain_improved": 23
+    },
     {
       "date": "2024-01-24",
       "path": "research/dynamic_newrth_rebuild_v2/2024-01-24_event_index.json",
