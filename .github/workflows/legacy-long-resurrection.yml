@@ -26,12 +26,12 @@ jobs:
         run: python -m pip install --upgrade pip && pip install numpy pandas pytest matplotlib optuna
       - name: Causality tests
         run: pytest -q tests/test_legacy_long_causality.py
-      - name: Corrected G and A resurrection
-        run: python -m research.legacy_long_resurrection.research_ga_corrected
+      - name: Midday Range Break resurrection
+        run: python -m research.legacy_long_resurrection.research_midday_range_break
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: legacy-long-resurrection-baseline-20261004
-          path: results/ga_corrected_resurrection_20261005/
+          path: results/midday_range_break_resurrection_20261005/
           if-no-files-found: warn
