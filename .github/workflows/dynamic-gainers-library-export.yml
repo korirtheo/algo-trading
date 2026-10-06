@@ -52,7 +52,7 @@ jobs:
 
           source = Path("source")
           out = Path("transfer_parts")
-          limit = 18 * 1024 * 1024
+          limit = 15 * 1024 * 1024
           files = []
           for p in source.rglob("*"):
               if not p.is_file():
