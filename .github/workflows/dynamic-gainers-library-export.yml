@@ -98,8 +98,8 @@ jobs:
           if chunk_meta:
               meta_path = Path("REASSEMBLY.json")
               meta_path.write_text(json.dumps(chunk_meta, indent=2), encoding="utf-8")
-              # Attach the small reconstruction map to the first transfer part.
-              groups[0].append((meta_path, meta_path, meta_path.stat().st_size))
+              # Keep the reconstruction map in its own part.
+              groups.append([(meta_path, meta_path, meta_path.stat().st_size)])
 
           for i, entries in enumerate(groups, 1):
               dest = out / f"part-{i}"
