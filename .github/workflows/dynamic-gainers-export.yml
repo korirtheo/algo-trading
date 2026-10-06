@@ -1,0 +1,119 @@
+name: Split recovery checkpoint for Library transfer
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Run ID containing the source daily checkpoint artifact
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: dynamic-gainers-export
+  cancel-in-progress: false
+
+jobs:
+  split:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download source checkpoint from selected run
+        uses: actions/download-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily
+          path: daily_checkpoint
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+      - name: Split checkpoint into eight small archives
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+
+          root = Path('daily_checkpoint')
+          files = [root / 'asset_master.json', root / 'calendar.json']
+          files += sorted((root / 'stage1_daily_reference' / 'shards').glob('batch_*.csv.gz'))
+          files = [p for p in files if p.is_file()]
+          if len(files) < 500:
+              raise SystemExit(f'Expected at least 500 daily-reference files, found {len(files)}')
+          groups = [[] for _ in range(8)]
+          sizes = [0] * 8
+          for src in sorted(files, key=lambda p: p.stat().st_size, reverse=True):
+              idx = min(range(8), key=lambda i: sizes[i])
+              groups[idx].append(src)
+              sizes[idx] += src.stat().st_size
+          out = Path('checkpoint_parts')
+          for i, group in enumerate(groups, 1):
+              dest = out / f'part-{i:02d}'
+              for src in group:
+                  rel = src.relative_to(root)
+                  target = dest / rel
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  shutil.copy2(src, target)
+              if sizes[i - 1] > 24 * 1024 * 1024:
+                  raise SystemExit(f'Part {i:02d} is too large for transfer: {sizes[i - 1]} bytes')
+              print(f'part={i:02d} files={len(group)} bytes={sizes[i - 1]}')
+          PY
+      - name: Save daily checkpoint part 01
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-01
+          path: checkpoint_parts/part-01/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 02
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-02
+          path: checkpoint_parts/part-02/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 03
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-03
+          path: checkpoint_parts/part-03/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 04
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-04
+          path: checkpoint_parts/part-04/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 05
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-05
+          path: checkpoint_parts/part-05/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 06
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-06
+          path: checkpoint_parts/part-06/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 07
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-07
+          path: checkpoint_parts/part-07/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Save daily checkpoint part 08
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-2025-daily-part-08
+          path: checkpoint_parts/part-08/
+          if-no-files-found: error
+          retention-days: 30
