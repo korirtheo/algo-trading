@@ -1,0 +1,148 @@
+name: Package checkpoints for Library transfer
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Completed recovery workflow run ID
+        required: true
+        type: string
+      year:
+        description: Data year
+        required: true
+        type: choice
+        options:
+          - "2025"
+          - "2026"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: dynamic-gainers-library-export
+  cancel-in-progress: false
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      parts: ${{ steps.package.outputs.parts }}
+      part_count: ${{ steps.package.outputs.part_count }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download completed checkpoints from selected run
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dynamic-gainers-${{ inputs.year }}-*
+          path: source
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+      - name: Package files into transfer parts under 18 MiB
+        id: package
+        env:
+          YEAR: ${{ inputs.year }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib, json, os
+
+          source = Path("source")
+          out = Path("transfer_parts")
+          limit = 18 * 1024 * 1024
+          files = []
+          for p in source.rglob("*"):
+              if not p.is_file():
+                  continue
+              if p.name in {"reference.sqlite", "reference.sqlite-wal", "reference.sqlite-shm", "COMPLETE.json"}:
+                  continue
+              files.append(p)
+
+          chunks_root = Path("__chunks__")
+          chunk_meta = []
+          prepared = []
+          for p in sorted(files, key=lambda x: str(x)):
+              rel = p.relative_to(source)
+              size = p.stat().st_size
+              if size <= limit:
+                  prepared.append((p, rel, size))
+                  continue
+              entry = {"source_path": str(rel), "size_bytes": size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest(), "chunks": []}
+              with p.open("rb") as f:
+                  i = 0
+                  while data := f.read(limit - 1024):
+                      cp = chunks_root / (hashlib.sha256(str(rel).encode()).hexdigest()[:12] + f".part-{i:04d}")
+                      cp.parent.mkdir(parents=True, exist_ok=True)
+                      cp.write_bytes(data)
+                      entry["chunks"].append(str(cp))
+                      prepared.append((cp, cp, cp.stat().st_size))
+                      i += 1
+              chunk_meta.append(entry)
+
+          groups = []
+          group = []
+          size = 0
+          for path, rel, n in sorted(prepared, key=lambda x: x[2], reverse=True):
+              if n > limit:
+                  raise SystemExit(f"Unexpected oversize file: {path} ({n})")
+              if group and size + n > limit:
+                  groups.append(group)
+                  group, size = [], 0
+              group.append((path, rel, n))
+              size += n
+          if group:
+              groups.append(group)
+          if chunk_meta:
+              meta_path = Path("REASSEMBLY.json")
+              meta_path.write_text(json.dumps(chunk_meta, indent=2), encoding="utf-8")
+              # Attach the small reconstruction map to the first transfer part.
+              groups[0].append((meta_path, meta_path, meta_path.stat().st_size))
+
+          for i, entries in enumerate(groups, 1):
+              dest = out / f"part-{i}"
+              total = 0
+              for src, rel, n in entries:
+                  target = dest / rel
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(src.read_bytes())
+                  total += n
+              if total > limit:
+                  raise SystemExit(f"Part {i} exceeds limit: {total}")
+              print(f"part={i:03d} files={len(entries)} bytes={total}")
+
+          nums = list(range(1, len(groups) + 1))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
+              f.write("parts=" + json.dumps(nums) + "\n")
+              f.write(f"part_count={len(nums)}\n")
+          PY
+      - name: Stage the transfer parts for matrix upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: transfer-parts-staging
+          path: transfer_parts/
+          if-no-files-found: error
+          retention-days: 1
+
+  upload:
+    needs: package
+    if: needs.package.outputs.part_count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJson(needs.package.outputs.parts) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: transfer-parts-staging
+          path: transfer_parts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-gainers-${{ inputs.year }}-library-part-${{ matrix.part }}
+          path: transfer_parts/part-${{ matrix.part }}/
+          if-no-files-found: error
+          retention-days: 30
+
