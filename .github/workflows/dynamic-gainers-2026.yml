@@ -19,14 +19,14 @@ permissions:
 # Replacing the old queued run is deliberate: the previous version put every
 # lifecycle month in one six-hour job. New 2026 runs supersede that stale run.
 concurrency:
-  group: dynamic-gainers-data
+  group: dynamic-gainers-2026-data
   cancel-in-progress: true
 
 env:
   YEAR: "2026"
   OUT: ${{ github.workspace }}/dynamic-gainers-output/2026_fast
-  ALPACA_API_KEY_ID: ${{ secrets.ALPACA_API_KEY_ID }}
-  ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_API_SECRET_KEY }}
+  ALPACA_API_KEY_ID: ${{ secrets.ALPACA_2026_API_KEY_ID }}
+  ALPACA_API_SECRET_KEY: ${{ secrets.ALPACA_2026_API_SECRET_KEY }}
 
 jobs:
   references_and_candidates:
@@ -55,7 +55,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
       - name: Build daily references
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --stop-after daily
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --stop-after daily
       - name: Save daily reference checkpoint
         if: always()
         uses: actions/upload-artifact@v4
