@@ -68,7 +68,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
       - name: Build candidate days
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --stop-after candidates
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --stop-after candidates
       - name: Save candidate checkpoint
         if: always()
         uses: actions/upload-artifact@v4
@@ -111,7 +111,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
       - name: Build membership and entrants
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --stop-after membership
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --stop-after membership
       - name: Save membership checkpoint
         if: always()
         uses: actions/upload-artifact@v4
@@ -161,7 +161,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.resume_run_id }}
       - name: Build lifecycle month 01
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 1 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 1 --stop-after lifecycle
       - name: Verify and save lifecycle month 01
         if: always()
         run: |
@@ -227,7 +227,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 02
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 2 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 2 --stop-after lifecycle
       - name: Verify and save lifecycle month 02
         if: always()
         run: |
@@ -296,7 +296,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 03
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 3 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 3 --stop-after lifecycle
       - name: Verify and save lifecycle month 03
         if: always()
         run: |
@@ -365,7 +365,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 04
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 4 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 4 --stop-after lifecycle
       - name: Verify and save lifecycle month 04
         if: always()
         run: |
@@ -434,7 +434,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 05
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 5 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 5 --stop-after lifecycle
       - name: Verify and save lifecycle month 05
         if: always()
         run: |
@@ -503,7 +503,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 06
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 6 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 6 --stop-after lifecycle
       - name: Verify and save lifecycle month 06
         if: always()
         run: |
@@ -572,7 +572,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 07
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 7 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 7 --stop-after lifecycle
       - name: Verify and save lifecycle month 07
         if: always()
         run: |
@@ -641,7 +641,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 08
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 8 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 8 --stop-after lifecycle
       - name: Verify and save lifecycle month 08
         if: always()
         run: |
@@ -710,7 +710,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 09
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 9 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 9 --stop-after lifecycle
       - name: Verify and save lifecycle month 09
         if: always()
         run: |
@@ -779,7 +779,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 10
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 10 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 10 --stop-after lifecycle
       - name: Verify and save lifecycle month 10
         if: always()
         run: |
@@ -848,7 +848,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 11
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 11 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 11 --stop-after lifecycle
       - name: Verify and save lifecycle month 11
         if: always()
         run: |
@@ -917,7 +917,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Build lifecycle month 12
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180 --lifecycle-month 12 --stop-after lifecycle
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180 --lifecycle-month 12 --stop-after lifecycle
       - name: Verify and save lifecycle month 12
         if: always()
         run: |
@@ -978,7 +978,7 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.run_id }}
       - name: Rebuild indexes, validate full year and write manifest
-        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 8 --symbol-batch 180 --rpm 180
+        run: python scripts/recovery/alpaca_dynamic_gainers.py --year "$YEAR" --output "$OUT" --top-n 30 --workers 6 --symbol-batch 180 --rpm 180
       - name: Save final validation and manifest
         if: always()
         uses: actions/upload-artifact@v4
